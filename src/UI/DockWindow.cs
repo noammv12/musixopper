@@ -65,6 +65,8 @@ sealed class DockWindow : Window
     readonly DispatcherTimer _collapseDelay;
     readonly DispatcherTimer _toastTimer;
     readonly DispatcherTimer _fullscreenPoll;
+    readonly DispatcherTimer _callTicker;
+    DateTime _callStartedUtc;
 
     DockState _state = DockState.Collapsed;
     CallState _callState = CallState.Idle;
@@ -238,6 +240,8 @@ sealed class DockWindow : Window
         };
         _fullscreenPoll = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
         _fullscreenPoll.Tick += (_, _) => UpdateFullscreenHidden();
+        _callTicker = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _callTicker.Tick += (_, _) => UpdateStatusText();
 
         _pill.MouseEnter += (_, _) =>
         {
@@ -287,6 +291,7 @@ sealed class DockWindow : Window
         _collapseDelay.Stop();
         _toastTimer.Stop();
         _fullscreenPoll.Stop();
+        _callTicker.Stop();
         SnippetStore.Changed -= RefreshChips;
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplayChanged;
         Hide();
@@ -303,7 +308,17 @@ sealed class DockWindow : Window
             Dispatcher.InvokeAsync(() => SyncState(state));
             return;
         }
+        var wasOnCall = _callState == CallState.OnCall;
         _callState = state;
+        if (state == CallState.OnCall && !wasOnCall)
+        {
+            _callStartedUtc = DateTime.UtcNow;
+            _callTicker.Start();
+        }
+        else if (state != CallState.OnCall)
+        {
+            _callTicker.Stop();
+        }
         var dotKey = state switch
         {
             CallState.OnCall => "AmberBrush",
@@ -333,7 +348,7 @@ sealed class DockWindow : Window
     {
         _statusText.Text = _callState switch
         {
-            CallState.OnCall => "On a call — music paused",
+            CallState.OnCall => $"On a call — {DateTime.UtcNow - _callStartedUtc:mm\\:ss}",
             CallState.Disabled => "Paused",
             _ => _processingStatus.Length > 0 ? _processingStatus : "Listening for calls",
         };
