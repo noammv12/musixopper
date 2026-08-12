@@ -7,10 +7,10 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using System.Windows.Threading;
-using Musixopper.Interop;
+using Saley.Interop;
 using WinF = System.Windows.Forms;
 
-namespace Musixopper.UI;
+namespace Saley.UI;
 
 /// <summary>
 /// The single window of the app: status, trigger mode, toggles — plus the
@@ -41,9 +41,17 @@ sealed class FlyoutWindow : Window
     // onboarding
     readonly StackPanel _welcomePanel;
     readonly StackPanel _softphonePanel;
+    TextBlock _softphoneNotice = null!;
     Border _cardMic = null!;
     Border _cardEvents = null!;
     int _welcomeSelection;
+
+    // snippets
+    readonly StackPanel _snippetsPanel;
+    StackPanel _snippetList = null!;
+    TextBlock _addSnippetLink = null!;
+    List<Snippet> _snippets = new();
+    int _editingIndex = -1;
 
     readonly DispatcherTimer _statusOverrideTimer;
     string? _statusOverride;
@@ -81,10 +89,12 @@ sealed class FlyoutWindow : Window
         _mainPanel = BuildMainPanel();
         _welcomePanel = BuildWelcomePanel();
         _softphonePanel = BuildSoftphonePanel();
+        _snippetsPanel = BuildSnippetsPanel();
         var host = new Grid();
         host.Children.Add(_mainPanel);
         host.Children.Add(_welcomePanel);
         host.Children.Add(_softphonePanel);
+        host.Children.Add(_snippetsPanel);
 
         _root = new Border
         {
@@ -168,7 +178,7 @@ sealed class FlyoutWindow : Window
         _setupLink = Ui.Text("Set up Softphone.Pro…", 11, "AccentBrush", FontWeights.SemiBold);
         _setupLink.Cursor = Cursors.Hand;
         _setupLink.Margin = new Thickness(2, 6, 2, 0);
-        _setupLink.MouseLeftButtonUp += (_, _) => ShowPanel(_softphonePanel);
+        _setupLink.MouseLeftButtonUp += (_, _) => ShowSoftphoneSetup();
         panel.Children.Add(_setupLink);
 
         panel.Children.Add(Ui.Divider(12, 12));
@@ -183,10 +193,16 @@ sealed class FlyoutWindow : Window
         startupRow.Margin = new Thickness(0, 10, 0, 0);
         panel.Children.Add(startupRow);
 
+        var snippetsLink = Ui.Text("Snippets…", 11, "AccentBrush", FontWeights.SemiBold);
+        snippetsLink.Cursor = Cursors.Hand;
+        snippetsLink.Margin = new Thickness(2, 12, 2, 0);
+        snippetsLink.MouseLeftButtonUp += (_, _) => ShowSnippets();
+        panel.Children.Add(snippetsLink);
+
         panel.Children.Add(Ui.Divider(12, 10));
 
         var footer = new Grid();
-        var appName = Ui.Text($"Musixopper {Program.Version}", 10.5, "TextSecondaryBrush");
+        var appName = Ui.Text($"Saley {Program.Version}", 10.5, "TextSecondaryBrush");
         appName.VerticalAlignment = VerticalAlignment.Center;
         var quit = Ui.Text("Quit", 11, "TextSecondaryBrush");
         quit.Cursor = Cursors.Hand;
@@ -206,7 +222,7 @@ sealed class FlyoutWindow : Window
     {
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
-        panel.Children.Add(Ui.Text("Welcome to Musixopper", 15, "TextPrimaryBrush", FontWeights.SemiBold));
+        panel.Children.Add(Ui.Text("Welcome to Saley", 15, "TextPrimaryBrush", FontWeights.SemiBold));
         var subtitle = Ui.Text("Your music pauses when a call starts, and comes back when it ends.", 11.5, "TextSecondaryBrush");
         subtitle.TextWrapping = TextWrapping.Wrap;
         subtitle.Margin = new Thickness(0, 6, 0, 0);
@@ -240,6 +256,13 @@ sealed class FlyoutWindow : Window
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
         panel.Children.Add(Ui.Text("Connect Softphone.Pro", 15, "TextPrimaryBrush", FontWeights.SemiBold));
+
+        _softphoneNotice = Ui.Text("", 11, "AmberBrush", FontWeights.SemiBold);
+        _softphoneNotice.TextWrapping = TextWrapping.Wrap;
+        _softphoneNotice.Margin = new Thickness(0, 6, 0, 0);
+        _softphoneNotice.Visibility = Visibility.Collapsed;
+        panel.Children.Add(_softphoneNotice);
+
         var body = Ui.Text("In Softphone.Pro, open Settings → Integration → Third-party systems and add three handlers:", 11.5, "TextSecondaryBrush");
         body.TextWrapping = TextWrapping.Wrap;
         body.Margin = new Thickness(0, 6, 0, 0);
@@ -247,7 +270,7 @@ sealed class FlyoutWindow : Window
 
         // Softphone.Pro launches the string as "path + arguments" without
         // shell-style quote stripping, so quote only when unavoidable.
-        var exe = Environment.ProcessPath ?? "Musixopper.exe";
+        var exe = Environment.ProcessPath ?? "Saley.exe";
         var hasSpaces = exe.Contains(' ');
         if (hasSpaces) exe = $"\"{exe}\"";
         var rows = new (string Caption, string Command)[]
@@ -266,13 +289,13 @@ sealed class FlyoutWindow : Window
         }
         if (hasSpaces)
         {
-            var spaceHint = Ui.Text("If a handler doesn't fire, move Musixopper.exe to a folder without spaces (e.g. C:\\Tools) — some softphones don't handle quoted paths.", 10.5, "TextSecondaryBrush");
+            var spaceHint = Ui.Text("If a handler doesn't fire, move Saley.exe to a folder without spaces (e.g. C:\\Tools) — some softphones don't handle quoted paths.", 10.5, "TextSecondaryBrush");
             spaceHint.TextWrapping = TextWrapping.Wrap;
             spaceHint.Margin = new Thickness(0, 8, 0, 0);
             panel.Children.Add(spaceHint);
         }
 
-        var hint = Ui.Text("Tip: run “Musixopper test” in a terminal — your music pauses for 8 seconds, then resumes.", 11, "TextSecondaryBrush");
+        var hint = Ui.Text("Tip: run “Saley test” in a terminal — your music pauses for 8 seconds, then resumes.", 11, "TextSecondaryBrush");
         hint.TextWrapping = TextWrapping.Wrap;
         hint.Margin = new Thickness(0, 12, 0, 0);
         panel.Children.Add(hint);
@@ -288,6 +311,202 @@ sealed class FlyoutWindow : Window
         panel.Children.Add(note);
 
         return panel;
+    }
+
+    StackPanel BuildSnippetsPanel()
+    {
+        var panel = new StackPanel { Visibility = Visibility.Collapsed };
+
+        panel.Children.Add(Ui.Text("Snippets", 15, "TextPrimaryBrush", FontWeights.SemiBold));
+        var subtitle = Ui.Text("Hover the dock above the taskbar and click a chip to paste it into the app you're working in. Right-click copies.", 11.5, "TextSecondaryBrush");
+        subtitle.TextWrapping = TextWrapping.Wrap;
+        subtitle.Margin = new Thickness(0, 6, 0, 0);
+        panel.Children.Add(subtitle);
+
+        _snippetList = new StackPanel();
+        var scroll = new ScrollViewer
+        {
+            MaxHeight = 300,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Content = _snippetList,
+            Margin = new Thickness(0, 2, 0, 0),
+        };
+        panel.Children.Add(scroll);
+
+        _addSnippetLink = Ui.Text("+ Add snippet", 11.5, "AccentBrush", FontWeights.SemiBold);
+        _addSnippetLink.Cursor = Cursors.Hand;
+        _addSnippetLink.Margin = new Thickness(2, 10, 2, 0);
+        _addSnippetLink.MouseLeftButtonUp += (_, _) =>
+        {
+            if (_snippets.Count >= SnippetStore.MaxSnippets) return;
+            _snippets.Add(new Snippet("", ""));
+            _editingIndex = _snippets.Count - 1;
+            RebuildSnippetList();
+        };
+        panel.Children.Add(_addSnippetLink);
+
+        var done = Ui.PrimaryButton("Done");
+        done.Margin = new Thickness(0, 12, 0, 0);
+        done.MouseLeftButtonUp += (_, _) => ShowPanel(_mainPanel);
+        panel.Children.Add(done);
+
+        return panel;
+    }
+
+    void RebuildSnippetList()
+    {
+        _snippetList.Children.Clear();
+        for (var i = 0; i < _snippets.Count; i++)
+            _snippetList.Children.Add(BuildSnippetCard(i));
+        _addSnippetLink.Visibility =
+            _snippets.Count >= SnippetStore.MaxSnippets ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    Border BuildSnippetCard(int index)
+    {
+        var snippet = _snippets[index];
+        var stack = new StackPanel();
+
+        var header = new Grid();
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        for (var c = 0; c < 3; c++)
+            header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var title = Ui.Text(snippet.Label.Length > 0 ? snippet.Label : "(untitled)", 12, "TextPrimaryBrush", FontWeights.SemiBold);
+        title.TextTrimming = TextTrimming.CharacterEllipsis;
+        title.VerticalAlignment = VerticalAlignment.Center;
+        header.Children.Add(title);
+
+        TextBlock Link(string text, int column, Action onClick, bool enabled = true)
+        {
+            var link = Ui.Text(text, 11, enabled ? "AccentBrush" : "TextSecondaryBrush", FontWeights.SemiBold);
+            link.Margin = new Thickness(10, 0, 0, 0);
+            link.VerticalAlignment = VerticalAlignment.Center;
+            if (enabled)
+            {
+                link.Cursor = Cursors.Hand;
+                link.MouseLeftButtonUp += (_, _) => onClick();
+            }
+            Grid.SetColumn(link, column);
+            header.Children.Add(link);
+            return link;
+        }
+
+        Link("▲", 1, () => MoveSnippet(index, -1), enabled: index > 0);
+        Link("▼", 2, () => MoveSnippet(index, +1), enabled: index < _snippets.Count - 1);
+        if (_editingIndex != index)
+            Link("Edit", 3, () =>
+            {
+                _editingIndex = index;
+                RebuildSnippetList();
+            });
+        stack.Children.Add(header);
+
+        if (_editingIndex == index)
+        {
+            var labelBox = Ui.TextBox(snippet.Label);
+            labelBox.Margin = new Thickness(0, 8, 0, 0);
+            stack.Children.Add(labelBox);
+            var textBox = Ui.TextBox(snippet.Text, multiline: true);
+            textBox.Margin = new Thickness(0, 6, 0, 0);
+            stack.Children.Add(textBox);
+
+            var buttons = new Grid { Margin = new Thickness(0, 8, 0, 0) };
+            buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var delete = Ui.Text("Delete", 11, "TextSecondaryBrush", FontWeights.SemiBold);
+            delete.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x45, 0x3A));
+            delete.Cursor = Cursors.Hand;
+            delete.MouseLeftButtonUp += (_, _) =>
+            {
+                _snippets.RemoveAt(index);
+                _editingIndex = -1;
+                CommitSnippets();
+            };
+            buttons.Children.Add(delete);
+
+            var cancel = Ui.Text("Cancel", 11, "TextSecondaryBrush", FontWeights.SemiBold);
+            cancel.Cursor = Cursors.Hand;
+            cancel.Margin = new Thickness(0, 0, 12, 0);
+            Grid.SetColumn(cancel, 2);
+            cancel.MouseLeftButtonUp += (_, _) =>
+            {
+                if (snippet.Label.Length == 0 && snippet.Text.Length == 0) _snippets.RemoveAt(index);
+                _editingIndex = -1;
+                RebuildSnippetList();
+            };
+            buttons.Children.Add(cancel);
+
+            var save = Ui.Text("Save", 11, "AccentBrush", FontWeights.SemiBold);
+            save.Cursor = Cursors.Hand;
+            Grid.SetColumn(save, 3);
+            save.MouseLeftButtonUp += (_, _) =>
+            {
+                _snippets[index] = new Snippet(labelBox.Text.Trim(), textBox.Text);
+                _editingIndex = -1;
+                CommitSnippets();
+            };
+            buttons.Children.Add(save);
+
+            stack.Children.Add(buttons);
+        }
+
+        var card = new Border
+        {
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(10, 8, 10, 8),
+            Margin = new Thickness(0, 8, 0, 0),
+            Child = stack,
+        };
+        card.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
+        return card;
+    }
+
+    void MoveSnippet(int index, int delta)
+    {
+        var target = index + delta;
+        if (target < 0 || target >= _snippets.Count) return;
+        (_snippets[index], _snippets[target]) = (_snippets[target], _snippets[index]);
+        _editingIndex = -1;
+        CommitSnippets();
+    }
+
+    void CommitSnippets()
+    {
+        SnippetStore.Save(_snippets);
+        _snippets = SnippetStore.Load();
+        RebuildSnippetList();
+    }
+
+    public void ShowSnippets()
+    {
+        if (!CheckAccess())
+        {
+            Dispatcher.InvokeAsync(ShowSnippets);
+            return;
+        }
+        _snippets = SnippetStore.Load();
+        _editingIndex = -1;
+        RebuildSnippetList();
+        ShowFlyout();
+        ShowPanel(_snippetsPanel);
+    }
+
+    public void ShowSoftphoneSetup(string? notice = null)
+    {
+        if (!CheckAccess())
+        {
+            Dispatcher.InvokeAsync(() => ShowSoftphoneSetup(notice));
+            return;
+        }
+        _softphoneNotice.Text = notice ?? "";
+        _softphoneNotice.Visibility = string.IsNullOrEmpty(notice) ? Visibility.Collapsed : Visibility.Visible;
+        ShowFlyout();
+        ShowPanel(_softphonePanel);
     }
 
     void SelectWelcomeCard(int index)

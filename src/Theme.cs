@@ -2,7 +2,7 @@ using Microsoft.Win32;
 using System.Windows;
 using System.Windows.Media;
 
-namespace Musixopper;
+namespace Saley;
 
 /// <summary>
 /// Light/dark palette management. Windows keep up automatically because

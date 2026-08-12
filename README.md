@@ -1,66 +1,76 @@
-# Musixopper 🎵📞
+# Saley 🟢
 
-**Your music pauses when a call starts, and comes back when it ends.**
+**Your sales sidekick.** Saley pauses your music when a call starts and brings it back when it ends — and keeps your go-to texts one click away, right above the taskbar.
 
-A tiny Windows tray app for people who live between calls — sales, support, recruiting — and are tired of scrambling for the pause button. Works with anything the Windows media keys can control: YouTube Music in Chrome/Edge, Spotify, Apple Music, foobar2000…
+Built for people who live between calls: sales, support, recruiting. Works with anything the Windows media keys can control (YouTube Music in Chrome/Edge, Spotify, Apple Music…) and any softphone.
 
 ## Install
 
-1. Download `Musixopper.exe` from the [latest release](../../releases) (or from the artifacts of the latest [build](../../actions)).
-2. Run it. A ♪ appears in the tray and a 30-second welcome walks you through setup.
-3. In the flyout, turn on **Start with Windows** so it's always there.
+1. Download `Saley.exe` from the [latest release](../../releases) (or from the artifacts of the latest [build](../../actions)).
+2. Run it. An **S** appears in the tray, the dock pill appears above the taskbar, and a 30-second welcome walks you through setup.
+3. In the flyout (left-click the tray icon), turn on **Start with Windows**.
 
-One self-contained exe — nothing to install, no dependencies. First launch takes a couple of seconds while Windows unpacks it.
+One self-contained exe — nothing to install. First launch takes a couple of seconds while Windows unpacks it.
 
 > **SmartScreen note:** the exe is unsigned, so the first run may show "Windows protected your PC". Click *More info → Run anyway*.
 
 Requires Windows 10 version 1903 or later (Windows 11 works).
 
-## How it works
+## The dock
 
-Left-click the tray icon for the flyout. Everything lives there:
+A small capsule floats just above the taskbar (drag it left/right to taste — the spot is remembered):
 
-- **Status** — a green dot means it's listening; amber (pulsing) means you're on a call and the music is paused.
-- **Detect calls by** — two modes:
-  - **Microphone** *(zero config)* — pauses the moment any app opens your mic, resumes ~2 s after it's released. Only ever resumes what it paused. Caveat: most softphones open the mic when you *dial*, so outbound ringing pauses music too.
-  - **Call events** *(recommended for outbound sales)* — ignores the mic and pauses **only when your softphone reports the call was answered**. Dialing and unanswered ringing never touch the music. Needs a 2-minute Softphone.Pro setup (below).
-- **Pause music during calls** — master switch. Turning it off mid-call deliberately does *not* resume the music into your call.
-- **Start with Windows** / **Quit**.
+- **Resting**: a quiet sliver with a status dot — green (listening), amber (on a call, music paused), grey (off).
+- **Hover**: it expands into a pill with your status and your snippet chips.
+- **Call events**: it briefly shows "Paused for your call" / "Music resumed", then tucks itself away.
+- It hides automatically during presentations and fullscreen apps, and never, ever steals focus from what you're typing.
 
-When music pauses or resumes, a small pill appears bottom-center for two seconds. It never steals focus and clicks pass straight through it.
+## Snippets
 
-## Connecting Softphone.Pro (Call events mode)
+The texts you paste all day — calendar links, follow-ups, pricing blurbs — live as chips in the dock:
 
-The app shows these steps with copy buttons (flyout → *Set up Softphone.Pro…*), but for reference: in Softphone.Pro open *Settings → Integration → Third-party systems* and add three handlers (SIP account: *All*, Action: *Launch a program*):
+- **Click a chip** → the text is typed straight into whatever app you're working in (CRM, WhatsApp, email). No Ctrl+V, no switching windows.
+- **Right-click** → copies to the clipboard only.
+- Manage them via the **…** chip (or tray flyout → *Snippets…*): add, edit, reorder, delete — up to 15.
 
-| Event                  | URL/Program                        |
-|------------------------|------------------------------------|
-| `Outgoing call answer` | `C:\path\to\Musixopper.exe pause`  |
-| `Incoming call answer` | `C:\path\to\Musixopper.exe pause`  |
-| `Call end`             | `C:\path\to\Musixopper.exe resume` |
+Stored locally at `%LOCALAPPDATA%\Saley\snippets.json`. Two caveats: apps running **as administrator** silently ignore the auto-paste (Windows blocks injected input into elevated apps — the text is still on the clipboard, Ctrl+V works), and some terminals bind paste to Ctrl+Shift+V.
 
-**Don't quote the path** — Softphone.Pro launches the string as-is (its own example is unquoted). If your path contains spaces, move the exe to a folder without them (e.g. `C:\Tools`). Event names can vary slightly between versions — pick the "answer" events, **not** "ring". Any other softphone that can run a program on call events works the same way.
+## Music pausing — two trigger modes
 
-Troubleshooting: the Handler Settings dialog has a **Test** button — click it while music plays (Musixopper in *Call events* mode) and the music should pause. Every received command is also logged to `%LOCALAPPDATA%\Musixopper\log.txt`; if no "CLI 'pause' received" line appears after Test, Softphone.Pro never launched the exe (check the command format).
+In the tray flyout, under **Detect calls by**:
 
-## Testing your setup
+- **Microphone** *(zero config)* — pauses the moment any app opens your mic, resumes ~2 s after it's released. Only ever resumes what it paused. Caveat: most softphones open the mic when you *dial*, so outbound ringing pauses music too.
+- **Call events** *(recommended for outbound sales)* — pauses **only when your softphone reports the call was answered**. Needs a 2-minute setup:
 
-```
-Musixopper.exe test
-```
+  In Softphone.Pro open *Settings → Integration → Third-party systems* and add three handlers (SIP account: *All*, Action: *Launch a program*):
 
-Simulates an 8-second call: your music pauses, then resumes. No phone needed.
+  | Event                  | URL/Program                    |
+  |------------------------|--------------------------------|
+  | `Outgoing call answer` | `C:\path\to\Saley.exe pause`   |
+  | `Incoming call answer` | `C:\path\to\Saley.exe pause`   |
+  | `Call end`             | `C:\path\to\Saley.exe resume`  |
+
+  **Don't quote the path** — Softphone.Pro launches the string as-is. If your path contains spaces, move the exe to a folder without them (e.g. `C:\Tools`). Pick the "answer" events, **not** "ring". The app shows these commands with copy buttons (flyout → *Set up Softphone.Pro…*). Any softphone that can run a program on call events works the same way.
+
+**Testing:** `Saley.exe test` simulates an 8-second call — music pauses, dock shows the toast, music resumes. The handler dialog's **Test** button works too. Every received command is logged to `%LOCALAPPDATA%\Saley\log.txt`; no "CLI 'pause' received" line after a Test means the softphone never launched the exe.
+
+## Upgrading from Musixopper
+
+Settings migrate automatically on first run. Then:
+
+1. Quit and delete the old `Musixopper.exe`, and turn off its "Start with Windows" if it was on.
+2. Re-point the three Softphone.Pro handlers to `Saley.exe` — the app reminds you and shows the new commands. (A leftover Musixopper handler would keep pausing music on its own, fighting Saley.)
 
 ## Good to know
 
 - Only media on the same Windows PC can be controlled — not a phone or another device.
-- Musixopper never sends anything anywhere: no network access at all. It reads the Windows theme + microphone-usage registry keys and talks to the Windows media session API.
-- A small activity log lives at `%LOCALAPPDATA%\Musixopper\log.txt` (capped at 256 KB) if something needs debugging.
+- Saley never sends anything anywhere: no network access at all.
+- Turning "Pause music during calls" off mid-call deliberately does *not* resume the music into your call.
 
 ## Building from source
 
 ```
-dotnet publish src/Musixopper.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish
+dotnet publish src/Saley.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish
 ```
 
-Requires the .NET 8 SDK on Windows. CI does exactly this on every push (`.github/workflows/build.yml`); tagging `v*` attaches the exe to a GitHub release. The app icon is generated by `assets/make_icon.py` (Pillow) and committed at `src/Assets/Musixopper.ico`.
+Requires the .NET 8 SDK on Windows. CI does exactly this on every push (`.github/workflows/build.yml`); tagging `v*` attaches the exe to a GitHub release. The app icon is generated by `assets/make_icon.py` (Pillow) and committed at `src/Assets/Saley.ico` — the runtime tray glyph in `TrayIconRenderer.cs` uses the same arc geometry.

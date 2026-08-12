@@ -6,7 +6,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 
-namespace Musixopper.UI;
+namespace Saley.UI;
 
 /// <summary>iOS-style animated toggle switch.</summary>
 sealed class PillSwitch : Grid
@@ -188,6 +188,29 @@ static class Ui
         if (weight is { } w) tb.FontWeight = w;
         tb.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
         return tb;
+    }
+
+    public static TextBox TextBox(string text, bool multiline = false)
+    {
+        var box = new TextBox
+        {
+            Text = text,
+            FontSize = 12,
+            Padding = new Thickness(6, 4, 6, 4),
+            BorderThickness = new Thickness(1),
+        };
+        box.SetResourceReference(Control.BackgroundProperty, "ControlFillBrush");
+        box.SetResourceReference(Control.ForegroundProperty, "TextPrimaryBrush");
+        box.SetResourceReference(Control.BorderBrushProperty, "DividerBrush");
+        box.SetResourceReference(System.Windows.Controls.TextBox.CaretBrushProperty, "TextPrimaryBrush");
+        if (multiline)
+        {
+            box.AcceptsReturn = true;
+            box.TextWrapping = TextWrapping.Wrap;
+            box.Height = 64;
+            box.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+        }
+        return box;
     }
 
     public static Border Divider(double top, double bottom)

@@ -1,6 +1,6 @@
 using Microsoft.Win32;
 
-namespace Musixopper;
+namespace Saley;
 
 /// <summary>
 /// Detects whether any app currently has the microphone open, using the

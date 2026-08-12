@@ -1,4 +1,4 @@
-namespace Musixopper;
+namespace Saley;
 
 /// <summary>
 /// Named events that let short-lived CLI invocations (wired to softphone
@@ -7,7 +7,7 @@ namespace Musixopper;
 /// </summary>
 static class TraySignals
 {
-    public const string CallStartName = @"Local\Musixopper.CallStart";
-    public const string CallEndName = @"Local\Musixopper.CallEnd";
-    public const string ShowFlyoutName = @"Local\Musixopper.ShowFlyout";
+    public const string CallStartName = @"Local\Saley.CallStart";
+    public const string CallEndName = @"Local\Saley.CallEnd";
+    public const string ShowFlyoutName = @"Local\Saley.ShowFlyout";
 }

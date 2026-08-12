@@ -1,7 +1,7 @@
 using System.IO;
 using Windows.Media.Control;
 
-namespace Musixopper;
+namespace Saley;
 
 /// <summary>
 /// Pauses and resumes system media sessions (browser tabs, Spotify, ...)
@@ -12,7 +12,7 @@ static class MediaController
 {
     static string StateFile => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Musixopper", "paused-sessions.txt");
+        "Saley", "paused-sessions.txt");
 
     /// <summary>Pauses every currently playing session and returns those session objects.</summary>
     public static async Task<IReadOnlyList<GlobalSystemMediaTransportControlsSession>> PauseAllPlayingSessionsAsync()

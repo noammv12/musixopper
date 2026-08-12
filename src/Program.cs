@@ -1,6 +1,6 @@
-using Musixopper.Interop;
+using Saley.Interop;
 
-namespace Musixopper;
+namespace Saley;
 
 static class Program
 {
@@ -10,7 +10,7 @@ static class Program
         // Trim stray quotes too — some dialer integrations pass them through.
         if (args.Length > 0) return RunCli(args[0].Trim().Trim('"').ToLowerInvariant());
 
-        using var mutex = new Mutex(initiallyOwned: true, "Musixopper.Tray.SingleInstance", out var isFirstInstance);
+        using var mutex = new Mutex(initiallyOwned: true, "Saley.Tray.SingleInstance", out var isFirstInstance);
         if (!isFirstInstance)
         {
             // Already running — open the existing instance's flyout instead.
@@ -20,7 +20,8 @@ static class Program
         }
 
         Log.Init();
-        Log.Write($"Musixopper {Version} starting");
+        Log.Write($"Saley {Version} starting");
+        Settings.MigrateFromMusixopper(); // must run before Shell reads Settings
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Write($"Unhandled: {e.ExceptionObject}");
         TaskScheduler.UnobservedTaskException += (_, e) =>
         {
@@ -44,7 +45,7 @@ static class Program
     }
 
     internal static string Version =>
-        typeof(Program).Assembly.GetName().Version is { } v ? $"{v.Major}.{v.Minor}" : "2.0";
+        typeof(Program).Assembly.GetName().Version is { } v ? $"{v.Major}.{v.Minor}" : "3.0";
 
     // ---- CLI mode (softphone event handlers, terminal) --------------------
 
@@ -98,7 +99,7 @@ static class Program
             return 0;
         }
 
-        TryWriteLine("Musixopper isn't running — simulating the call standalone…");
+        TryWriteLine("Saley isn't running — simulating the call standalone…");
         try
         {
             Task.Run(MediaController.CliPauseAsync).GetAwaiter().GetResult();
@@ -118,7 +119,7 @@ static class Program
     {
         Log.Write($"CLI: unknown verb '{verb}'");
         NativeMethods.AttachConsole(NativeMethods.ATTACH_PARENT_PROCESS);
-        TryWriteLine("Usage: Musixopper.exe [pause | resume | test]   (no arguments starts the app)");
+        TryWriteLine("Usage: Saley.exe [pause | resume | test]   (no arguments starts the app)");
         return 2;
     }
 

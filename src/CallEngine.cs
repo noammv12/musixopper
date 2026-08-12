@@ -1,6 +1,6 @@
 using Windows.Media.Control;
 
-namespace Musixopper;
+namespace Saley;
 
 enum CallState
 {

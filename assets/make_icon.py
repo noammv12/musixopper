@@ -1,24 +1,19 @@
 #!/usr/bin/env python3
-"""Generates src/Assets/Musixopper.ico — the app icon (exe, Explorer, alt-tab).
+"""Generates src/Assets/Saley.ico — the app icon (exe, Explorer, alt-tab).
 
-Rounded green square with a white eighth-note, drawn at 1024px and
-downsampled. The tray icon is rendered at runtime instead (it must adapt
-to the taskbar theme), so this file only affects the executable's identity.
+Rounded green square with a bold round-capped white "S" built from two
+tangent-circle arcs, drawn at 1024px and downsampled. The tray icon is
+rendered at runtime instead (it must adapt to the taskbar theme) with the
+same arc geometry — keep the two in sync.
 
 Usage: python make_icon.py [output.ico]
 Requires: Pillow
 """
+import math
 import sys
 from PIL import Image, ImageDraw
 
 S = 1024
-
-
-def bezier(p0, c1, c2, p1, t):
-    mt = 1 - t
-    x = mt**3 * p0[0] + 3 * mt**2 * t * c1[0] + 3 * mt * t**2 * c2[0] + t**3 * p1[0]
-    y = mt**3 * p0[1] + 3 * mt**2 * t * c1[1] + 3 * mt * t**2 * c2[1] + t**3 * p1[1]
-    return x, y
 
 
 def draw_base():
@@ -36,31 +31,32 @@ def draw_base():
     ImageDraw.Draw(mask).rounded_rectangle([0, 0, S - 1, S - 1], radius=int(S * 0.22), fill=255)
     img.paste(grad, (0, 0), mask)
 
-    # Eighth-note on a 16-unit design grid, optically centered.
+    # "S" mark on a 16-unit design grid: two tangent circles r=2.35 centered
+    # (8, 5.65) and (8, 10.35); stroke 2.3u, round caps. Angles are GDI+
+    # convention (0deg = +x, positive = clockwise with y-down), so the C#
+    # tray renderer uses the exact same numbers.
     d = ImageDraw.Draw(img)
-    u = S * 0.052  # glyph scale
-    ox = S * 0.5 - 7.6 * u
-    oy = S * 0.5 - 8.4 * u
+    u = S * 0.055
+    ox = S * 0.5 - 8 * u
+    oy = S * 0.5 - 8 * u
     white = (255, 255, 255, 245)
+    stamp_r = 1.15 * u  # half the 2.3u stroke
 
-    def pt(x, y):
-        return ox + x * u, oy + y * u
+    def arc(cx, cy, r, start_deg, sweep_deg):
+        steps = 96
+        for i in range(steps + 1):
+            theta = math.radians(start_deg + sweep_deg * i / steps)
+            x = ox + (cx + r * math.cos(theta)) * u
+            y = oy + (cy + r * math.sin(theta)) * u
+            d.ellipse([x - stamp_r, y - stamp_r, x + stamp_r, y + stamp_r], fill=white)
 
-    # Head
-    d.ellipse([pt(2.8, 10.4), pt(8.8, 14.4)], fill=white)
-    # Stem
-    d.rectangle([pt(7.2, 3.0), pt(8.8, 12.6)], fill=white)
-    # Flag: stroked cubic bezier, simulated with stamped circles.
-    p0, c1, c2, p1 = pt(8.0, 3.6), pt(11.2, 4.0), pt(12.2, 5.8), pt(11.7, 8.4)
-    r = 0.85 * u
-    for i in range(61):
-        x, y = bezier(p0, c1, c2, p1, i / 60)
-        d.ellipse([x - r, y - r, x + r, y + r], fill=white)
+    arc(8, 5.65, 2.35, -45, -225)   # top bowl: upper-right terminal -> center
+    arc(8, 10.35, 2.35, 270, 225)   # bottom bowl: center -> lower-left terminal
     return img
 
 
 def main():
-    out = sys.argv[1] if len(sys.argv) > 1 else "src/Assets/Musixopper.ico"
+    out = sys.argv[1] if len(sys.argv) > 1 else "src/Assets/Saley.ico"
     base = draw_base()
     sizes = [16, 24, 32, 48, 64, 128, 256]
     frames = [base.resize((s, s), Image.LANCZOS) for s in sizes]

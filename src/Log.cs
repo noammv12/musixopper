@@ -1,8 +1,8 @@
 using System.IO;
 
-namespace Musixopper;
+namespace Saley;
 
-/// <summary>Minimal size-capped file log: %LOCALAPPDATA%\Musixopper\log.txt.</summary>
+/// <summary>Minimal size-capped file log: %LOCALAPPDATA%\Saley\log.txt.</summary>
 static class Log
 {
     const long MaxBytes = 256 * 1024;
@@ -11,7 +11,7 @@ static class Log
     static int _writesSinceCheck;
 
     static string Dir => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Musixopper");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Saley");
     static string FilePath => Path.Combine(Dir, "log.txt");
 
     public static void Init()

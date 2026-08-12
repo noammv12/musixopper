@@ -1,14 +1,15 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
-using Musixopper.Interop;
+using Saley.Interop;
 
-namespace Musixopper;
+namespace Saley;
 
 /// <summary>
-/// Renders the tray glyph at runtime — an eighth-note drawn as geometry
-/// (crisp at 16 px, no font fallback), white on a dark taskbar and
-/// near-black on a light one, with an amber dot while on a call.
+/// Renders the tray glyph at runtime — the Saley "S" drawn as two
+/// tangent-circle arcs (crisp at 16 px, no font fallback; same geometry
+/// as assets/make_icon.py), white on a dark taskbar and near-black on a
+/// light one, with an amber dot while on a call.
 /// </summary>
 static class TrayIconRenderer
 {
@@ -42,11 +43,10 @@ static class TrayIconRenderer
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
             float u = size / 16f;
 
-            using var brush = new SolidBrush(color);
-            g.FillEllipse(brush, 3.0f * u, 10.2f * u, 5.6f * u, 3.9f * u); // head
-            g.FillRectangle(brush, 7.2f * u, 3.0f * u, 1.5f * u, 9.4f * u); // stem
-            using var pen = new Pen(color, 1.7f * u) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            g.DrawBezier(pen, 8.0f * u, 3.6f * u, 10.8f * u, 4.0f * u, 11.8f * u, 5.6f * u, 11.4f * u, 8.0f * u); // flag
+            using var pen = new Pen(color, 2.3f * u) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            // Two tangent circles r=2.35 centered (8,5.65)/(8,10.35) on the 16-grid.
+            g.DrawArc(pen, (8 - 2.35f) * u, (5.65f - 2.35f) * u, 4.7f * u, 4.7f * u, -45f, -225f);  // top bowl
+            g.DrawArc(pen, (8 - 2.35f) * u, (10.35f - 2.35f) * u, 4.7f * u, 4.7f * u, 270f, 225f);  // bottom bowl
 
             if (state == CallState.OnCall)
             {

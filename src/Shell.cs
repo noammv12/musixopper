@@ -1,19 +1,19 @@
 using System.Windows;
 using System.Windows.Threading;
-using Musixopper.UI;
+using Saley.UI;
 
-namespace Musixopper;
+namespace Saley;
 
 /// <summary>
 /// Wires everything together for tray mode: engine ticks, tray icon,
-/// flyout, HUD, second-instance signal, and first-run onboarding.
+/// flyout, dock pill, second-instance signal, and first-run onboarding.
 /// </summary>
 sealed class Shell : IDisposable
 {
     readonly CallEngine _engine;
     readonly TrayHost _tray;
     readonly FlyoutWindow _flyout;
-    readonly HudWindow _hud;
+    readonly DockWindow _dock;
     readonly DispatcherTimer _ticker;
     readonly EventWaitHandle _showFlyoutSignal;
     readonly RegisteredWaitHandle _showFlyoutWait;
@@ -23,44 +23,61 @@ sealed class Shell : IDisposable
         Theme.Initialize();
 
         _engine = new CallEngine();
-        _hud = new HudWindow();
+        _dock = new DockWindow();
         _flyout = new FlyoutWindow(_engine);
         _tray = new TrayHost();
 
         _tray.OpenRequested += () => _flyout.ShowFlyout();
         _tray.QuitRequested += Quit;
         _flyout.QuitRequested += Quit;
+        _dock.OpenFlyoutRequested += () => _flyout.ShowSnippets();
 
         _engine.StateChanged += () =>
         {
             _tray.SetState(_engine.State);
             _flyout.SyncFromEngine();
+            _dock.SyncState(_engine.State);
         };
-        _engine.MusicPaused += () => _hud.ShowMessage("Paused for your call", paused: true);
-        _engine.MusicResumed += () => _hud.ShowMessage("Music resumed", paused: false);
+        _engine.MusicPaused += () => _dock.ShowToast("Paused for your call", paused: true);
+        _engine.MusicResumed += () => _dock.ShowToast("Music resumed", paused: false);
 
         _ticker = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(750) };
         _ticker.Tick += async (_, _) => await _engine.TickAsync();
         _ticker.Start();
 
-        // A second launch of the exe (or "Musixopper.exe" from anywhere)
-        // opens this instance's flyout instantly.
+        // A second launch of the exe opens this instance's flyout instantly.
         _showFlyoutSignal = new EventWaitHandle(false, EventResetMode.AutoReset, TraySignals.ShowFlyoutName);
         _showFlyoutWait = ThreadPool.RegisterWaitForSingleObject(
             _showFlyoutSignal,
             (_, _) => Application.Current.Dispatcher.InvokeAsync(() => _flyout.ShowFlyout()),
             null, Timeout.Infinite, executeOnlyOnce: false);
 
+        _dock.ShowDock();
+
         if (!Settings.OnboardingDone)
         {
-            var once = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };
-            once.Tick += (_, _) =>
-            {
-                once.Stop();
-                _flyout.ShowFlyout(onboarding: true);
-            };
-            once.Start();
+            OpenFlyoutSoon(() => _flyout.ShowFlyout(onboarding: true));
         }
+        else if (Settings.JustMigrated && Settings.Trigger == TriggerMode.SoftphoneEvents)
+        {
+            // The exe changed names — softphone handlers point at the old one.
+            OpenFlyoutSoon(() =>
+            {
+                _flyout.ShowFlyout();
+                _flyout.ShowSoftphoneSetup("Saley replaces Musixopper — update your softphone handlers.");
+            });
+        }
+    }
+
+    static void OpenFlyoutSoon(Action open)
+    {
+        var once = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };
+        once.Tick += (_, _) =>
+        {
+            once.Stop();
+            open();
+        };
+        once.Start();
     }
 
     static void Quit() => Application.Current.Shutdown();
@@ -70,6 +87,7 @@ sealed class Shell : IDisposable
         _ticker.Stop();
         _showFlyoutWait.Unregister(null);
         _showFlyoutSignal.Dispose();
+        _dock.Shutdown();
         _tray.Dispose();
         _engine.Dispose();
         Theme.Shutdown();

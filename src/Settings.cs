@@ -1,6 +1,7 @@
+using System.Globalization;
 using Microsoft.Win32;
 
-namespace Musixopper;
+namespace Saley;
 
 enum TriggerMode
 {
@@ -8,15 +9,15 @@ enum TriggerMode
     Microphone = 0,
 
     /// <summary>Pause only on explicit call-answered signals from the
-    /// softphone's event handlers (via "Musixopper.exe pause/resume").</summary>
+    /// softphone's event handlers (via "Saley.exe pause/resume").</summary>
     SoftphoneEvents = 1,
 }
 
 static class Settings
 {
-    const string KeyPath = @"SOFTWARE\Musixopper";
+    const string KeyPath = @"SOFTWARE\Saley";
     const string RunKeyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
-    const string RunValueName = "Musixopper";
+    const string RunValueName = "Saley";
 
     public static TriggerMode Trigger
     {
@@ -56,6 +57,42 @@ static class Settings
                 // rather than silently deleting what the user asked to enable.
                 key.SetValue(RunValueName, $"\"{path}\"");
             }
+        }
+    }
+
+    /// <summary>Dock pill center, as a fraction of the work-area width.</summary>
+    public static double DockX
+    {
+        get => double.TryParse(Read("DockX"), NumberStyles.Float, CultureInfo.InvariantCulture, out var v)
+            ? Math.Clamp(v, 0.0, 1.0)
+            : 0.5;
+        set => WriteValue("DockX", value.ToString("0.###", CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>Set when this run inherited settings from a Musixopper install.</summary>
+    public static bool JustMigrated { get; private set; }
+
+    /// <summary>One-time copy of settings from the app's previous identity.</summary>
+    public static void MigrateFromMusixopper()
+    {
+        try
+        {
+            using (var existing = Registry.CurrentUser.OpenSubKey(KeyPath))
+                if (existing is not null) return; // Saley settings already exist
+
+            using var old = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Musixopper");
+            if (old is null) return; // fresh install
+
+            using var dest = Registry.CurrentUser.CreateSubKey(KeyPath);
+            foreach (var name in new[] { "TriggerMode", "Enabled", "OnboardingDone" })
+                if (old.GetValue(name)?.ToString() is { } value)
+                    dest.SetValue(name, value);
+            JustMigrated = true; // old key deliberately left in place
+            Log.Write("Migrated settings from Musixopper");
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Settings migration failed: {ex.Message}");
         }
     }
 

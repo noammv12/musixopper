@@ -6,20 +6,20 @@
     <TargetPlatformMinVersion>10.0.18362.0</TargetPlatformMinVersion>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
-    <RootNamespace>Musixopper</RootNamespace>
-    <AssemblyName>Musixopper</AssemblyName>
-    <ApplicationIcon>Assets\Musixopper.ico</ApplicationIcon>
+    <RootNamespace>Saley</RootNamespace>
+    <AssemblyName>Saley</AssemblyName>
+    <ApplicationIcon>Assets\Saley.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <Product>Musixopper</Product>
-    <Description>Pauses your music when a call starts. Brings it back when it ends.</Description>
-    <Company>Musixopper</Company>
-    <Copyright>© 2026 Musixopper</Copyright>
-    <Version>2.0.0</Version>
-    <FileVersion>2.0.0.0</FileVersion>
-    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <Product>Saley</Product>
+    <Description>Your sales sidekick: pauses music on calls, pastes your go-to texts in one click.</Description>
+    <Company>Saley</Company>
+    <Copyright>© 2026 Saley</Copyright>
+    <Version>3.0.0</Version>
+    <FileVersion>3.0.0.0</FileVersion>
+    <AssemblyVersion>3.0.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>
