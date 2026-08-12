@@ -69,6 +69,8 @@ sealed class DockWindow : Window
     DockState _state = DockState.Collapsed;
     CallState _callState = CallState.Idle;
     bool _fullscreenHidden;
+    Action? _toastAction;
+    string _processingStatus = "";
 
     // drag
     bool _dragging;
@@ -143,6 +145,14 @@ sealed class DockWindow : Window
         _toastContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 16, 0) };
         _toastContent.Children.Add(_toastIcon);
         _toastContent.Children.Add(_toastText);
+        _toastContent.MouseLeftButtonUp += (_, _) =>
+        {
+            if (_dragging || _toastAction is not { } action) return;
+            _toastAction = null;
+            _toastTimer.Stop();
+            SetState(DockState.Collapsed);
+            action();
+        };
 
         // -- reminder content ---------------------------------------------
         var phone = new TextBlock { Text = "📞", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
@@ -302,21 +312,38 @@ sealed class DockWindow : Window
         };
         _collapsedDot.SetResourceReference(Shape.FillProperty, dotKey);
         _statusDot.SetResourceReference(Shape.FillProperty, dotKey);
-        _statusText.Text = state switch
-        {
-            CallState.OnCall => "On a call — music paused",
-            CallState.Disabled => "Paused",
-            _ => "Listening for calls",
-        };
+        UpdateStatusText();
         if (_state == DockState.Collapsed)
             _pill.BeginAnimation(OpacityProperty, Motion.Fade(RestingOpacityFor(), Motion.Fast));
     }
 
-    public void ShowToast(string text, bool paused)
+    /// <summary>Shown in the expanded status line while a note is being processed.</summary>
+    public void SetProcessingStatus(string status)
     {
         if (!CheckAccess())
         {
-            Dispatcher.InvokeAsync(() => ShowToast(text, paused));
+            Dispatcher.InvokeAsync(() => SetProcessingStatus(status));
+            return;
+        }
+        _processingStatus = status;
+        UpdateStatusText();
+    }
+
+    void UpdateStatusText()
+    {
+        _statusText.Text = _callState switch
+        {
+            CallState.OnCall => "On a call — music paused",
+            CallState.Disabled => "Paused",
+            _ => _processingStatus.Length > 0 ? _processingStatus : "Listening for calls",
+        };
+    }
+
+    public void ShowToast(string text, bool paused, Action? onClick = null, bool showIcon = true)
+    {
+        if (!CheckAccess())
+        {
+            Dispatcher.InvokeAsync(() => ShowToast(text, paused, onClick, showIcon));
             return;
         }
         if (_fullscreenHidden || !IsVisible) return;
@@ -324,6 +351,9 @@ sealed class DockWindow : Window
         if (_state == DockState.Reminder) return; // a reminder outranks a toast
         _toastText.Text = text;
         _toastIcon.Data = paused ? PauseGlyph : PlayGlyph;
+        _toastIcon.Visibility = showIcon ? Visibility.Visible : Visibility.Collapsed;
+        _toastAction = onClick;
+        _toastContent.Cursor = onClick is null ? Cursors.Arrow : Cursors.Hand;
         if (_state == DockState.Expanded) return; // status text already tells the story
 
         _toastTimer.Stop();

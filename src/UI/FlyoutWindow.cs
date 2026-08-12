@@ -91,12 +91,14 @@ sealed partial class FlyoutWindow : Window
         _softphonePanel = BuildSoftphonePanel();
         _snippetsPanel = BuildSnippetsPanel();
         _remindersPanel = BuildRemindersPanel();
+        _notesPanel = BuildNotesPanel();
         var host = new Grid();
         host.Children.Add(_mainPanel);
         host.Children.Add(_welcomePanel);
         host.Children.Add(_softphonePanel);
         host.Children.Add(_snippetsPanel);
         host.Children.Add(_remindersPanel);
+        host.Children.Add(_notesPanel);
 
         _root = new Border
         {
@@ -205,6 +207,11 @@ sealed partial class FlyoutWindow : Window
         remindersLink.Margin = new Thickness(2, 8, 2, 0);
         remindersLink.MouseLeftButtonUp += (_, _) => ShowReminders();
         panel.Children.Add(remindersLink);
+
+        var notesLink = Ui.Link("Call notes…", 11);
+        notesLink.Margin = new Thickness(2, 8, 2, 0);
+        notesLink.MouseLeftButtonUp += (_, _) => ShowNotes();
+        panel.Children.Add(notesLink);
 
         panel.Children.Add(Ui.Divider(12, 10));
 

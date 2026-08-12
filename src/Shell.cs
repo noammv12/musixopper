@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Threading;
+using Saley.Notes;
 using Saley.UI;
 
 namespace Saley;
@@ -15,6 +16,7 @@ sealed class Shell : IDisposable
     readonly FlyoutWindow _flyout;
     readonly DockWindow _dock;
     readonly ReminderScheduler _reminders;
+    readonly NotesPipeline _notes;
     readonly DispatcherTimer _ticker;
     readonly EventWaitHandle _showFlyoutSignal;
     readonly RegisteredWaitHandle _showFlyoutWait;
@@ -39,6 +41,17 @@ sealed class Shell : IDisposable
         _dock.ReminderOpenRequested += _reminders.Open;
         _dock.ReminderSnoozeRequested += _reminders.Snooze;
         _dock.ReminderDismissRequested += _reminders.Dismiss;
+
+        _notes = new NotesPipeline(_engine)
+        {
+            Transcriber = new WhisperTranscriber(),
+            TranscriberReady = () => WhisperTranscriber.Ready,
+        };
+        _notes.ToastRequested += message => _dock.ShowToast(message, paused: false, showIcon: false);
+        _notes.StatusChanged += status => _dock.SetProcessingStatus(status);
+        _notes.NoteReady += _ => _dock.ShowToast("Notes ready — click to view", paused: false,
+            onClick: () => _flyout.ShowNotes(), showIcon: false);
+        _notes.SweepRecoveredSessions();
 
         _engine.StateChanged += () =>
         {
@@ -94,6 +107,7 @@ sealed class Shell : IDisposable
     public void Dispose()
     {
         _ticker.Stop();
+        _notes.Dispose();
         _reminders.Dispose();
         _showFlyoutWait.Unregister(null);
         _showFlyoutSignal.Dispose();
