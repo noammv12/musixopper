@@ -102,17 +102,19 @@ sealed class FlyoutWindow : Window
             Padding = new Thickness(16),
             Margin = new Thickness(ShadowMargin),
             RenderTransform = _rootSlide,
+            BorderThickness = new Thickness(1),
             Effect = new DropShadowEffect
             {
                 BlurRadius = 24,
                 ShadowDepth = 4,
                 Direction = 270,
-                Opacity = 0.30,
+                Opacity = 0.45,
                 Color = Colors.Black,
             },
             Child = host,
         };
         _root.SetResourceReference(Border.BackgroundProperty, "SurfaceBrush");
+        _root.SetResourceReference(Border.BorderBrushProperty, "SurfaceStrokeBrush");
         Content = _root;
 
         Deactivated += (_, _) => HideFlyout();
@@ -140,7 +142,7 @@ sealed class FlyoutWindow : Window
         _statusHalo.SetResourceReference(Shape.FillProperty, "AmberBrush");
 
         _statusDot = new Ellipse { Width = 8, Height = 8 };
-        _statusDot.SetResourceReference(Shape.FillProperty, "AccentBrush");
+        _statusDot.SetResourceReference(Shape.FillProperty, "StatusGoodBrush");
 
         var dotHost = new Grid { Width = 12, Height = 12, VerticalAlignment = VerticalAlignment.Center };
         dotHost.Children.Add(_statusHalo);
@@ -175,8 +177,7 @@ sealed class FlyoutWindow : Window
         _caption.Margin = new Thickness(2, 8, 2, 0);
         panel.Children.Add(_caption);
 
-        _setupLink = Ui.Text("Set up Softphone.Pro…", 11, "AccentBrush", FontWeights.SemiBold);
-        _setupLink.Cursor = Cursors.Hand;
+        _setupLink = Ui.Link("Set up Softphone.Pro…", 11);
         _setupLink.Margin = new Thickness(2, 6, 2, 0);
         _setupLink.MouseLeftButtonUp += (_, _) => ShowSoftphoneSetup();
         panel.Children.Add(_setupLink);
@@ -193,8 +194,7 @@ sealed class FlyoutWindow : Window
         startupRow.Margin = new Thickness(0, 10, 0, 0);
         panel.Children.Add(startupRow);
 
-        var snippetsLink = Ui.Text("Snippets…", 11, "AccentBrush", FontWeights.SemiBold);
-        snippetsLink.Cursor = Cursors.Hand;
+        var snippetsLink = Ui.Link("Snippets…", 11);
         snippetsLink.Margin = new Thickness(2, 12, 2, 0);
         snippetsLink.MouseLeftButtonUp += (_, _) => ShowSnippets();
         panel.Children.Add(snippetsLink);
@@ -334,8 +334,7 @@ sealed class FlyoutWindow : Window
         };
         panel.Children.Add(scroll);
 
-        _addSnippetLink = Ui.Text("+ Add snippet", 11.5, "AccentBrush", FontWeights.SemiBold);
-        _addSnippetLink.Cursor = Cursors.Hand;
+        _addSnippetLink = Ui.Link("+ Add snippet", 11.5);
         _addSnippetLink.Margin = new Thickness(2, 10, 2, 0);
         _addSnippetLink.MouseLeftButtonUp += (_, _) =>
         {
@@ -548,14 +547,40 @@ sealed class FlyoutWindow : Window
 
     void ShowPanel(UIElement panel)
     {
-        foreach (UIElement child in ((Grid)_root.Child).Children)
-            child.Visibility = child == panel ? Visibility.Visible : Visibility.Collapsed;
-        if (panel.Visibility == Visibility.Visible)
+        var host = (Grid)_root.Child;
+        UIElement? current = null;
+        foreach (UIElement child in host.Children)
+            if (child.Visibility == Visibility.Visible && child != panel) current = child;
+
+        if (!IsVisible || current is null)
         {
-            panel.Opacity = 0;
-            panel.BeginAnimation(OpacityProperty,
-                new DoubleAnimation(1, TimeSpan.FromMilliseconds(120)));
+            // Window hidden (or already on this panel): switch instantly.
+            foreach (UIElement child in host.Children)
+            {
+                child.BeginAnimation(OpacityProperty, null);
+                child.Opacity = 1;
+                child.Visibility = child == panel ? Visibility.Visible : Visibility.Collapsed;
+            }
+            return;
         }
+
+        // Cross-fade: outgoing dips out, incoming rises in.
+        var outgoing = current;
+        var fadeOut = Motion.Fade(0, 90);
+        fadeOut.Completed += (_, _) =>
+        {
+            outgoing.Visibility = Visibility.Collapsed;
+            outgoing.BeginAnimation(OpacityProperty, null);
+            outgoing.Opacity = 1;
+
+            panel.Visibility = Visibility.Visible;
+            panel.Opacity = 0;
+            var rise = new TranslateTransform(0, 6);
+            panel.RenderTransform = rise;
+            panel.BeginAnimation(OpacityProperty, Motion.FromTo(0, 1, Motion.Base));
+            rise.BeginAnimation(TranslateTransform.YProperty, Motion.Fade(0, Motion.Base));
+        };
+        outgoing.BeginAnimation(OpacityProperty, fadeOut);
     }
 
     void ShowTransientStatus(string text)
@@ -581,7 +606,7 @@ sealed class FlyoutWindow : Window
         {
             CallState.OnCall => "AmberBrush",
             CallState.Disabled => "TextSecondaryBrush",
-            _ => "AccentBrush",
+            _ => "StatusGoodBrush",
         });
         if (_statusOverride is null)
         {

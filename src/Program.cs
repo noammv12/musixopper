@@ -45,7 +45,7 @@ static class Program
     }
 
     internal static string Version =>
-        typeof(Program).Assembly.GetName().Version is { } v ? $"{v.Major}.{v.Minor}" : "3.0";
+        typeof(Program).Assembly.GetName().Version is { } v ? $"{v.Major}.{v.Minor}" : "4.0";
 
     // ---- CLI mode (softphone event handlers, terminal) --------------------
 

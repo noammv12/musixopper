@@ -39,7 +39,7 @@ sealed class DockWindow : Window
     const double WindowHeight = 76;
     const double BottomGap = 4;    // pill bottom to work-area bottom
     const double EdgeKeepIn = 60;  // min px between pill center and screen edge
-    const double RestingOpacity = 0.6;
+    const double RestingOpacity = 0.7;
     const double DisabledOpacity = 0.45;
 
     static readonly Geometry PauseGlyph = Geometry.Parse("M0,0 H3.6 V11 H0 Z M6.4,0 H10 V11 H6.4 Z");
@@ -92,7 +92,7 @@ sealed class DockWindow : Window
         FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI, sans-serif");
 
         _collapsedDot = new Ellipse { Width = 6, Height = 6 };
-        _collapsedDot.SetResourceReference(Shape.FillProperty, "AccentBrush");
+        _collapsedDot.SetResourceReference(Shape.FillProperty, "StatusGoodBrush");
 
         // -- expanded content ------------------------------------------------
         var sMark = new ShapePath
@@ -108,7 +108,7 @@ sealed class DockWindow : Window
         sMark.SetResourceReference(Shape.StrokeProperty, "AccentBrush");
 
         _statusDot = new Ellipse { Width = 8, Height = 8, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
-        _statusDot.SetResourceReference(Shape.FillProperty, "AccentBrush");
+        _statusDot.SetResourceReference(Shape.FillProperty, "StatusGoodBrush");
         _statusText = new TextBlock { Text = "Listening for calls", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
         _statusText.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
 
@@ -148,17 +148,19 @@ sealed class DockWindow : Window
             VerticalAlignment = VerticalAlignment.Bottom,
             Margin = new Thickness(20, 20, 20, BottomGap),
             Cursor = Cursors.Hand,
+            BorderThickness = new Thickness(1),
             Effect = new DropShadowEffect
             {
                 BlurRadius = 16,
                 ShadowDepth = 2,
                 Direction = 270,
-                Opacity = 0.30,
+                Opacity = 0.45,
                 Color = Colors.Black,
             },
             Child = host,
         };
         _pill.SetResourceReference(Border.BackgroundProperty, "SurfaceBrush");
+        _pill.SetResourceReference(Border.BorderBrushProperty, "SurfaceStrokeBrush");
         Content = _pill;
 
         ApplyContentVisibility();
@@ -252,7 +254,7 @@ sealed class DockWindow : Window
         {
             CallState.OnCall => "AmberBrush",
             CallState.Disabled => "TextSecondaryBrush",
-            _ => "AccentBrush",
+            _ => "StatusGoodBrush",
         };
         _collapsedDot.SetResourceReference(Shape.FillProperty, dotKey);
         _statusDot.SetResourceReference(Shape.FillProperty, dotKey);
@@ -263,7 +265,7 @@ sealed class DockWindow : Window
             _ => "Listening for calls",
         };
         if (_state == DockState.Collapsed)
-            _pill.BeginAnimation(OpacityProperty, Anim(RestingOpacityFor(), 120, easeOut: true));
+            _pill.BeginAnimation(OpacityProperty, Motion.Fade(RestingOpacityFor(), Motion.Fast));
     }
 
     public void ShowToast(string text, bool paused)
@@ -284,7 +286,7 @@ sealed class DockWindow : Window
         if (_state == DockState.Toast)
         {
             // Toast replacing a toast: resize the pill for the new text.
-            AnimatePillTo(MeasureWidth(_toastContent), ToastHeight, 150, easeOut: true);
+            AnimatePillTo(MeasureWidth(_toastContent), ToastHeight, 150, Motion.Out);
             return;
         }
         SetState(DockState.Toast);
@@ -307,7 +309,7 @@ sealed class DockWindow : Window
         more.MouseLeftButtonUp += (_, _) => OpenFlyoutRequested?.Invoke();
         _chipsPanel.Children.Add(more);
 
-        if (_state == DockState.Expanded) AnimatePillTo(MeasureExpandedWidth(), ExpandedHeight, 150, easeOut: true);
+        if (_state == DockState.Expanded) AnimatePillTo(MeasureExpandedWidth(), ExpandedHeight, 150, Motion.Out);
     }
 
     Border MakeChip(Snippet snippet)
@@ -356,8 +358,7 @@ sealed class DockWindow : Window
             Child = label,
         };
         chip.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
-        chip.MouseEnter += (_, _) => chip.Opacity = 0.8;
-        chip.MouseLeave += (_, _) => chip.Opacity = 1.0;
+        Ui.HoverFill(chip);
         // Chips never start a pill drag.
         chip.MouseLeftButtonDown += (_, e) => e.Handled = true;
         return chip;
@@ -389,20 +390,20 @@ sealed class DockWindow : Window
         {
             case DockState.Collapsed:
                 _pill.CornerRadius = new CornerRadius(5);
-                AnimatePillTo(CollapsedWidth, CollapsedHeight, 200, easeOut: false);
-                _pill.BeginAnimation(OpacityProperty, Anim(RestingOpacityFor(), 200, easeOut: false));
+                AnimatePillTo(CollapsedWidth, CollapsedHeight, Motion.Base, Motion.InOut);
+                _pill.BeginAnimation(OpacityProperty, Motion.Fade(RestingOpacityFor(), Motion.Base, Motion.InOut));
                 break;
             case DockState.Expanded:
                 Reposition();
                 _pill.CornerRadius = new CornerRadius(20);
-                AnimatePillTo(MeasureExpandedWidth(), ExpandedHeight, 200, easeOut: true);
-                _pill.BeginAnimation(OpacityProperty, Anim(1.0, 200, easeOut: true));
+                AnimatePillTo(MeasureExpandedWidth(), ExpandedHeight, Motion.Slow, Motion.Overshoot);
+                _pill.BeginAnimation(OpacityProperty, Motion.Fade(1.0, Motion.Fast));
                 FadeInContent(_expandedContent);
                 break;
             case DockState.Toast:
                 _pill.CornerRadius = new CornerRadius(18);
-                AnimatePillTo(MeasureWidth(_toastContent), ToastHeight, 200, easeOut: true);
-                _pill.BeginAnimation(OpacityProperty, Anim(1.0, 200, easeOut: true));
+                AnimatePillTo(MeasureWidth(_toastContent), ToastHeight, Motion.Base, Motion.Out);
+                _pill.BeginAnimation(OpacityProperty, Motion.Fade(1.0, Motion.Fast));
                 FadeInContent(_toastContent);
                 break;
         }
@@ -425,10 +426,10 @@ sealed class DockWindow : Window
         return Math.Min(content.DesiredSize.Width + 8, WindowWidth - 40);
     }
 
-    void AnimatePillTo(double width, double height, int ms, bool easeOut)
+    void AnimatePillTo(double width, double height, int ms, IEasingFunction ease)
     {
-        _pill.BeginAnimation(WidthProperty, SizeAnim(_pill.ActualWidth, width, ms, easeOut));
-        _pill.BeginAnimation(HeightProperty, SizeAnim(_pill.ActualHeight, height, ms, easeOut));
+        _pill.BeginAnimation(WidthProperty, Motion.FromTo(_pill.ActualWidth, width, ms, ease));
+        _pill.BeginAnimation(HeightProperty, Motion.FromTo(_pill.ActualHeight, height, ms, ease));
     }
 
     static void PrepareFade(UIElement element)
@@ -440,24 +441,10 @@ sealed class DockWindow : Window
     void FadeInContent(UIElement content)
     {
         PrepareFade(content);
-        content.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120))
-        {
-            BeginTime = TimeSpan.FromMilliseconds(60),
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
-        });
+        var fadeIn = Motion.FromTo(0, 1, Motion.Fast);
+        fadeIn.BeginTime = TimeSpan.FromMilliseconds(60);
+        content.BeginAnimation(OpacityProperty, fadeIn);
     }
-
-    static DoubleAnimation SizeAnim(double from, double to, int ms, bool easeOut) =>
-        new(from, to, TimeSpan.FromMilliseconds(ms))
-        {
-            EasingFunction = new CubicEase { EasingMode = easeOut ? EasingMode.EaseOut : EasingMode.EaseIn },
-        };
-
-    static DoubleAnimation Anim(double to, int ms, bool easeOut) =>
-        new(to, TimeSpan.FromMilliseconds(ms))
-        {
-            EasingFunction = new CubicEase { EasingMode = easeOut ? EasingMode.EaseOut : EasingMode.EaseIn },
-        };
 
     // ---- drag --------------------------------------------------------------------
 

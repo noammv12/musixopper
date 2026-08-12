@@ -5,21 +5,22 @@ using System.Windows.Media;
 namespace Saley;
 
 /// <summary>
-/// Light/dark palette management. Windows keep up automatically because
-/// every color is consumed via SetResourceReference (DynamicResource).
-/// AppsUseLightTheme drives the windows; SystemUsesLightTheme drives the
-/// tray glyph (the taskbar theme is independent of the app theme).
+/// Saley's signature look: one black/silver palette, always — near-black
+/// graphite surfaces with a machined silver hairline, silver chrome for
+/// interactive elements, and semantic status colors. All colors are
+/// consumed via SetResourceReference so a future palette swap stays a
+/// one-file change. The tray glyph is the only theme-adaptive part: it
+/// follows the taskbar via SystemUsesLightTheme.
 /// </summary>
 static class Theme
 {
-    public static bool AppsLight { get; private set; } = true;
     public static bool SystemLight { get; private set; }
 
     public static event Action? Changed;
 
     public static void Initialize()
     {
-        ReadValues();
+        ReadTaskbarTheme();
         Apply();
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
     }
@@ -28,25 +29,22 @@ static class Theme
 
     static void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
     {
-        var before = (AppsLight, SystemLight);
-        ReadValues();
-        if (before == (AppsLight, SystemLight)) return;
-        Apply();
+        var before = SystemLight;
+        ReadTaskbarTheme();
+        if (before == SystemLight) return;
         Changed?.Invoke();
     }
 
-    static void ReadValues()
+    static void ReadTaskbarTheme()
     {
         try
         {
             using var key = Registry.CurrentUser.OpenSubKey(
                 @"SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize");
-            AppsLight = (key?.GetValue("AppsUseLightTheme") as int?) != 0;
             SystemLight = (key?.GetValue("SystemUsesLightTheme") as int?) == 1;
         }
         catch
         {
-            AppsLight = true;
             SystemLight = false;
         }
     }
@@ -54,38 +52,35 @@ static class Theme
     static void Apply()
     {
         var r = Application.Current.Resources;
-        if (AppsLight)
-        {
-            Set(r, "SurfaceBrush", "#FCFFFFFF");
-            Set(r, "TextPrimaryBrush", "#FF1D1D1F");
-            Set(r, "TextSecondaryBrush", "#FF6E6E73");
-            Set(r, "DividerBrush", "#12000000");
-            Set(r, "ControlFillBrush", "#0C000000");
-            Set(r, "AccentBrush", "#FF28A745");
-            Set(r, "OnAccentBrush", "#FFFFFFFF");
-            Set(r, "SegThumbBrush", "#FFFFFFFF");
-            Set(r, "SwitchOffBrush", "#FFE9E9EB");
-            Set(r, "AmberBrush", "#FFFF9500");
-        }
-        else
-        {
-            Set(r, "SurfaceBrush", "#F52C2C2E");
-            Set(r, "TextPrimaryBrush", "#FFF5F5F7");
-            Set(r, "TextSecondaryBrush", "#FF98989D");
-            Set(r, "DividerBrush", "#1FFFFFFF");
-            Set(r, "ControlFillBrush", "#14FFFFFF");
-            Set(r, "AccentBrush", "#FF30D158");
-            Set(r, "OnAccentBrush", "#FF0A2E14");
-            Set(r, "SegThumbBrush", "#FF48484A");
-            Set(r, "SwitchOffBrush", "#FF39393D");
-            Set(r, "AmberBrush", "#FFFF9F0A");
-        }
+
+        SetGradient(r, "SurfaceBrush", "#FA1C1C21", "#FA0F0F12");       // graphite, lit from above
+        SetGradient(r, "SurfaceStrokeBrush", "#2EFFFFFF", "#10FFFFFF"); // machined hairline
+        Set(r, "TextPrimaryBrush", "#FFF2F2F5");
+        Set(r, "TextSecondaryBrush", "#FF9B9BA4");
+        Set(r, "DividerBrush", "#16FFFFFF");
+        Set(r, "ControlFillBrush", "#14FFFFFF");
+        Set(r, "ControlFillHoverBrush", "#24FFFFFF");
+        Set(r, "AccentBrush", "#FFE3E3EA");   // silver: links, marks, buttons
+        Set(r, "OnAccentBrush", "#FF15151A"); // near-black on silver
+        Set(r, "SegThumbBrush", "#FF4A4A52");
+        Set(r, "SwitchOffBrush", "#FF3A3A40");
+        Set(r, "StatusGoodBrush", "#FF32D74B"); // semantic: listening / enabled
+        Set(r, "AmberBrush", "#FFFF9F0A");      // semantic: on a call
     }
 
     static void Set(ResourceDictionary resources, string key, string hex)
     {
-        var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+        var brush = new SolidColorBrush(Hex(hex));
         brush.Freeze();
         resources[key] = brush;
     }
+
+    static void SetGradient(ResourceDictionary resources, string key, string topHex, string bottomHex)
+    {
+        var brush = new LinearGradientBrush(Hex(topHex), Hex(bottomHex), new Point(0, 0), new Point(0, 1));
+        brush.Freeze();
+        resources[key] = brush;
+    }
+
+    static Color Hex(string hex) => (Color)ColorConverter.ConvertFromString(hex);
 }

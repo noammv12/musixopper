@@ -17,9 +17,9 @@
     <Description>Your sales sidekick: pauses music on calls, pastes your go-to texts in one click.</Description>
     <Company>Saley</Company>
     <Copyright>© 2026 Saley</Copyright>
-    <Version>3.0.0</Version>
-    <FileVersion>3.0.0.0</FileVersion>
-    <AssemblyVersion>3.0.0.0</AssemblyVersion>
+    <Version>4.0.0</Version>
+    <FileVersion>4.0.0.0</FileVersion>
+    <AssemblyVersion>4.0.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>

@@ -60,15 +60,11 @@ sealed class PillSwitch : Grid
 
     void ApplyVisual(bool animate)
     {
-        _track.SetResourceReference(Border.BackgroundProperty, _isOn ? "AccentBrush" : "SwitchOffBrush");
+        _track.SetResourceReference(Border.BackgroundProperty, _isOn ? "StatusGoodBrush" : "SwitchOffBrush");
         double target = _isOn ? 18 : 0;
         if (animate)
         {
-            _knobOffset.BeginAnimation(TranslateTransform.XProperty,
-                new DoubleAnimation(target, TimeSpan.FromMilliseconds(120))
-                {
-                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
-                });
+            _knobOffset.BeginAnimation(TranslateTransform.XProperty, Motion.Fade(target, Motion.Fast));
         }
         else
         {
@@ -155,11 +151,7 @@ sealed class Segmented : Grid
         double target = _selected * w;
         if (animate)
         {
-            _thumbOffset.BeginAnimation(TranslateTransform.XProperty,
-                new DoubleAnimation(target, TimeSpan.FromMilliseconds(150))
-                {
-                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
-                });
+            _thumbOffset.BeginAnimation(TranslateTransform.XProperty, Motion.Fade(target, 150));
         }
         else
         {
@@ -211,6 +203,23 @@ static class Ui
             box.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
         }
         return box;
+    }
+
+    /// <summary>A silver text link that brightens to white on hover.</summary>
+    public static TextBlock Link(string text, double size, FontWeight? weight = null)
+    {
+        var link = Text(text, size, "AccentBrush", weight ?? FontWeights.SemiBold);
+        link.Cursor = Cursors.Hand;
+        link.MouseEnter += (_, _) => link.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
+        link.MouseLeave += (_, _) => link.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush");
+        return link;
+    }
+
+    /// <summary>Standard hover treatment for a clickable filled surface.</summary>
+    public static void HoverFill(Border element)
+    {
+        element.MouseEnter += (_, _) => element.SetResourceReference(Border.BackgroundProperty, "ControlFillHoverBrush");
+        element.MouseLeave += (_, _) => element.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
     }
 
     public static Border Divider(double top, double bottom)
@@ -270,6 +279,7 @@ static class Ui
             Child = stack,
         };
         card.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
+        HoverFill(card);
         return card;
     }
 
