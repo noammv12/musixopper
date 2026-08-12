@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.18362.0</TargetPlatformMinVersion>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>Musixopper</RootNamespace>
+    <AssemblyName>Musixopper</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <Product>Musixopper</Product>
+    <Description>Auto-pauses your music when you answer a call and resumes it when the call ends.</Description>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+</Project>
