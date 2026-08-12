@@ -33,13 +33,19 @@ static class SnippetPaster
         0x5B, 0x5C, // left/right Win
     };
 
-    public static async Task<PasteResult> PasteAsync(Snippet snippet)
+    public static Task<PasteResult> PasteAsync(Snippet snippet) => PasteTextAsync(snippet.Text, snippet.Label);
+
+    public static async Task<PasteResult> PasteTextAsync(string text, string label = "dictation")
     {
         var target = NativeMethods.GetForegroundWindow();
         if (target == IntPtr.Zero || IsOwnWindow(target))
-            return CopyOnly(snippet);
+        {
+            if (!TrySetClipboard(text)) return PasteResult.Failed;
+            Log.Write($"Copied '{label}' (no paste target)");
+            return PasteResult.CopiedOnly;
+        }
 
-        if (!TrySetClipboard(snippet.Text)) return PasteResult.Failed;
+        if (!TrySetClipboard(text)) return PasteResult.Failed;
 
         await Task.Delay(50); // let the clipboard settle before the paste lands
 
@@ -65,7 +71,7 @@ static class SnippetPaster
             Log.Write($"SendInput sent {sent}/{array.Length} (error {Marshal.GetLastWin32Error()})");
             return PasteResult.CopiedOnly; // text is on the clipboard at least
         }
-        Log.Write($"Pasted snippet '{snippet.Label}'");
+        Log.Write($"Pasted '{label}'");
         return PasteResult.Pasted;
     }
 

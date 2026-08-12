@@ -1,0 +1,118 @@
+using System.IO;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
+using NAudio.Wave;
+
+namespace Saley.Notes;
+
+/// <summary>
+/// Cloud transcription via Groq's OpenAI-compatible Whisper endpoint —
+/// whisper-large-v3-turbo, much better Hebrew than the local small model
+/// and seconds instead of minutes. Free tier caps files at 25 MB, so long
+/// calls are split into ≤10-minute WAV chunks and the transcripts joined.
+/// </summary>
+sealed class GroqTranscriber : ITranscriber
+{
+    const string Endpoint = "https://api.groq.com/openai/v1/audio/transcriptions";
+    const string Model = "whisper-large-v3-turbo";
+    static readonly TimeSpan ChunkLength = TimeSpan.FromMinutes(10);
+    static readonly TimeSpan MaxSingleFile = TimeSpan.FromMinutes(12);
+
+    static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(120) };
+
+    public async Task<string> TranscribeAsync(string wav16kMonoPath, string language, CancellationToken ct)
+    {
+        var key = Settings.GroqKey ?? throw new InvalidOperationException("No Groq key configured.");
+
+        if (AudioMixdown.WavDuration(wav16kMonoPath) <= MaxSingleFile)
+            return await TranscribeFileAsync(wav16kMonoPath, language, key, ct);
+
+        // Long call: chunk under the 25 MB free-tier file cap.
+        var text = new StringBuilder();
+        var chunkIndex = 0;
+        foreach (var chunk in SplitWav(wav16kMonoPath))
+        {
+            try
+            {
+                chunkIndex++;
+                Log.Write($"Groq: transcribing chunk {chunkIndex}");
+                text.Append(await TranscribeFileAsync(chunk, language, key, ct));
+                text.Append(' ');
+            }
+            finally
+            {
+                try
+                {
+                    File.Delete(chunk);
+                }
+                catch
+                {
+                }
+            }
+        }
+        return text.ToString();
+    }
+
+    static async Task<string> TranscribeFileAsync(string path, string language, string key, CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, Endpoint);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
+
+        await using var file = File.OpenRead(path);
+        var content = new MultipartFormDataContent();
+        var audio = new StreamContent(file);
+        audio.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
+        content.Add(audio, "file", "audio.wav");
+        content.Add(new StringContent(Model), "model");
+        content.Add(new StringContent("text"), "response_format");
+        content.Add(new StringContent("0"), "temperature");
+        if (language != "auto") content.Add(new StringContent(language), "language");
+        request.Content = content;
+
+        using var response = await Http.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            var status = (int)response.StatusCode;
+            var reason = status switch
+            {
+                401 => "Groq key rejected",
+                413 => "Groq: file too large",
+                429 => "Groq rate limit reached",
+                _ => $"Groq HTTP {status}",
+            };
+            throw new HttpRequestException(reason);
+        }
+        return (await response.Content.ReadAsStringAsync(ct)).Trim();
+    }
+
+    /// <summary>Splits a 16 kHz mono PCM16 WAV into ≤10-minute chunk files.</summary>
+    static IEnumerable<string> SplitWav(string path)
+    {
+        var chunks = new List<string>();
+        using (var reader = new WaveFileReader(path))
+        {
+            var bytesPerChunk = (long)(reader.WaveFormat.AverageBytesPerSecond * ChunkLength.TotalSeconds);
+            // Keep chunks block-aligned.
+            bytesPerChunk -= bytesPerChunk % reader.WaveFormat.BlockAlign;
+            var buffer = new byte[64 * 1024];
+            var index = 0;
+            while (reader.Position < reader.Length)
+            {
+                var chunkPath = path + $".chunk{index++}.wav";
+                using var writer = new WaveFileWriter(chunkPath, reader.WaveFormat);
+                long written = 0;
+                while (written < bytesPerChunk)
+                {
+                    var toRead = (int)Math.Min(buffer.Length, bytesPerChunk - written);
+                    var read = reader.Read(buffer, 0, toRead);
+                    if (read == 0) break;
+                    writer.Write(buffer, 0, read);
+                    written += read;
+                }
+                chunks.Add(chunkPath);
+            }
+        }
+        return chunks;
+    }
+}

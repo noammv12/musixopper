@@ -150,13 +150,17 @@ sealed class NotesPipeline : IDisposable
                         return;
                     }
                     var audioLength = AudioMixdown.WavDuration(mixed);
+                    Log.Write($"Notes: mixed audio {audioLength.TotalSeconds:0.#}s");
                     if (audioLength < MinCallLength)
                     {
-                        return; // sub-5s scrap (mostly recovered fragments)
+                        Log.Write("Notes: mixed audio too short — skipping");
+                        if (!recovered) ToastRequested?.Invoke("Notes: call audio too short");
+                        return;
                     }
 
                     StatusChanged?.Invoke("Transcribing your last call…");
                     var transcript = (await Transcriber.TranscribeAsync(mixed, Settings.NotesLanguage, CancellationToken.None)).Trim();
+                    Log.Write($"Notes: transcript {transcript.Length} chars");
                     if (transcript.Length == 0)
                     {
                         if (!recovered) ToastRequested?.Invoke("Notes: nothing heard on the call");
@@ -185,7 +189,7 @@ sealed class NotesPipeline : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    Log.Write($"Notes processing failed: {ex.Message}");
+                    Log.Write($"Notes processing failed: {ex}");
                     ToastRequested?.Invoke("Notes failed — see log");
                 }
                 finally

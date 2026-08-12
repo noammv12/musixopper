@@ -66,6 +66,7 @@ static class NotesStore
             File.WriteAllText(tmp, JsonSerializer.Serialize(new Envelope { Notes = notes }, JsonOptions));
             File.Move(tmp, IndexPath, overwrite: true);
             AppendDaily(note);
+            Log.Write($"Note saved: {note.Transcript.Length} chars, summary={(note.Summary is null ? "no" : "yes")}");
         }
         catch (Exception ex)
         {

@@ -17,6 +17,8 @@ partial class FlyoutWindow
     Border _modelProgressFill = null!;
     PasswordBox _keyBox = null!;
     TextBlock _keyStatus = null!;
+    PasswordBox _groqKeyBox = null!;
+    TextBlock _groqKeyStatus = null!;
     StackPanel _notesList = null!;
 
     StackPanel BuildNotesPanel()
@@ -33,8 +35,11 @@ partial class FlyoutWindow
         _notesSwitch.Toggled += on =>
         {
             Settings.NotesEnabled = on;
-            // Don't start a 466 MB download on a machine that can't transcribe.
-            if (on && WhisperRuntime.EnsureLoaded() && !ModelStore.IsReady && !ModelStore.IsDownloading)
+            // With a Groq key the model is only an optional offline backup —
+            // don't force a 466 MB download (nor start one on a CPU that
+            // can't run it).
+            if (on && Settings.GroqKey is null && WhisperRuntime.EnsureLoaded() &&
+                !ModelStore.IsReady && !ModelStore.IsDownloading)
                 ModelStore.StartDownload();
             UpdateModelRow();
         };
@@ -42,9 +47,56 @@ partial class FlyoutWindow
         toggleRow.Margin = new Thickness(0, 12, 0, 0);
         panel.Children.Add(toggleRow);
 
+        panel.Children.Add(Ui.Divider(12, 10));
+
+        panel.Children.Add(Ui.Text("FAST TRANSCRIPTION (GROQ)", 10, "TextSecondaryBrush", FontWeights.SemiBold));
+        var groqRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        groqRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        groqRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _groqKeyBox = Ui.PasswordBox();
+        groqRow.Children.Add(_groqKeyBox);
+        var saveGroq = Ui.Link("Save", 11);
+        saveGroq.Margin = new Thickness(10, 0, 0, 0);
+        saveGroq.VerticalAlignment = VerticalAlignment.Center;
+        saveGroq.MouseLeftButtonUp += (_, _) =>
+        {
+            if (_groqKeyBox.Password.Trim().Length == 0) return;
+            Settings.GroqKey = _groqKeyBox.Password;
+            _groqKeyBox.Password = "";
+            UpdateGroqStatus();
+            UpdateModelRow();
+        };
+        Grid.SetColumn(saveGroq, 1);
+        groqRow.Children.Add(saveGroq);
+        panel.Children.Add(groqRow);
+
+        var groqStatusRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        groqStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        groqStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _groqKeyStatus = Ui.Text("", 10.5, "TextSecondaryBrush");
+        _groqKeyStatus.TextWrapping = TextWrapping.Wrap;
+        groqStatusRow.Children.Add(_groqKeyStatus);
+        var removeGroq = Ui.Link("Remove", 10.5);
+        removeGroq.Margin = new Thickness(10, 0, 0, 0);
+        removeGroq.MouseLeftButtonUp += (_, _) =>
+        {
+            Settings.GroqKey = null;
+            UpdateGroqStatus();
+            UpdateModelRow();
+        };
+        Grid.SetColumn(removeGroq, 1);
+        groqStatusRow.Children.Add(removeGroq);
+        panel.Children.Add(groqStatusRow);
+
+        panel.Children.Add(Ui.Divider(12, 2));
+
+        var backupCaption = Ui.Text("OFFLINE BACKUP (ON-DEVICE MODEL)", 10, "TextSecondaryBrush", FontWeights.SemiBold);
+        backupCaption.Margin = new Thickness(0, 8, 0, 0);
+        panel.Children.Add(backupCaption);
+
         _modelStatus = Ui.Text("", 11, "TextSecondaryBrush");
         _modelStatus.TextWrapping = TextWrapping.Wrap;
-        _modelStatus.Margin = new Thickness(0, 10, 0, 0);
+        _modelStatus.Margin = new Thickness(0, 6, 0, 0);
         panel.Children.Add(_modelStatus);
 
         _modelProgressFill = new Border { CornerRadius = new CornerRadius(3), HorizontalAlignment = HorizontalAlignment.Left, Width = 0 };
@@ -159,6 +211,7 @@ partial class FlyoutWindow
 
         UpdateModelRow();
         UpdateKeyStatus();
+        UpdateGroqStatus();
         return panel;
     }
 
@@ -201,11 +254,20 @@ partial class FlyoutWindow
         }
         else
         {
-            _modelStatus.Text = $"Voice model needed — one-time {ModelStore.DisplaySize} download.";
+            _modelStatus.Text = Settings.GroqKey is null
+                ? $"Voice model needed — one-time {ModelStore.DisplaySize} download."
+                : $"Optional — used when Groq is unreachable ({ModelStore.DisplaySize}).";
             _modelAction.Text = "Download model";
             _modelAction.Visibility = Visibility.Visible;
             _modelProgressTrack.Visibility = Visibility.Collapsed;
         }
+    }
+
+    void UpdateGroqStatus()
+    {
+        _groqKeyStatus.Text = Settings.GroqKey is null
+            ? "No key — using the on-device model. Free key at console.groq.com."
+            : "Key saved ✓ — fast Hebrew transcription on (call audio is sent to Groq).";
     }
 
     void UpdateKeyStatus()
@@ -274,6 +336,7 @@ partial class FlyoutWindow
         RebuildNotesList();
         UpdateModelRow();
         UpdateKeyStatus();
+        UpdateGroqStatus();
         ShowFlyoutCore(onboarding: false, force: true);
         ShowPanel(_notesPanel);
     }

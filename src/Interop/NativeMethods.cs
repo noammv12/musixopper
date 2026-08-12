@@ -100,6 +100,18 @@ static class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool GetCursorPos(out POINT pt);
 
+    // ---- global hotkey (dictation) ------------------------------------------
+
+    public const int WM_HOTKEY = 0x0312;
+    public const uint MOD_ALT = 0x1;
+    public const uint MOD_CONTROL = 0x2;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool RegisterHotKey(IntPtr hwnd, int id, uint modifiers, uint vk);
+
+    [DllImport("user32.dll")]
+    public static extern bool UnregisterHotKey(IntPtr hwnd, int id);
+
     // ---- fullscreen detection ----------------------------------------------
 
     public const int QUNS_BUSY = 2;

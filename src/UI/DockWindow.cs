@@ -19,6 +19,7 @@ enum DockState
     Expanded,
     Toast,
     Reminder,
+    Dictation,
 }
 
 /// <summary>
@@ -60,6 +61,8 @@ sealed class DockWindow : Window
     readonly StackPanel _reminderContent;
     readonly TextBlock _reminderLabel;
     readonly TextBlock _reminderCount;
+    readonly StackPanel _dictationContent;
+    readonly Ellipse _dictationDot;
 
     readonly DispatcherTimer _hoverIntent;
     readonly DispatcherTimer _collapseDelay;
@@ -80,8 +83,13 @@ sealed class DockWindow : Window
     double _dragStartLeft;
     double _dragScale = 1;
 
+    const int DictationHotkeyId = 0xA11;
+
     public event Action? OpenFlyoutRequested;
     public event Action? OpenRemindersRequested;
+    public event Action? DictationToggleRequested;
+    public event Action? DictationCancelRequested;
+    bool _dictationActive;
     public event Action<Reminder>? ReminderOpenRequested;
     public event Action<Reminder>? ReminderSnoozeRequested;
     public event Action<Reminder>? ReminderDismissRequested;
@@ -152,7 +160,7 @@ sealed class DockWindow : Window
             if (_dragging || _toastAction is not { } action) return;
             _toastAction = null;
             _toastTimer.Stop();
-            SetState(DockState.Collapsed);
+            SetState(RestState() == DockState.Dictation ? DockState.Dictation : DockState.Collapsed);
             action();
         };
 
@@ -187,11 +195,32 @@ sealed class DockWindow : Window
         _reminderContent.Children.Add(snoozeButton);
         _reminderContent.Children.Add(dismissButton);
 
+        // -- dictation content ----------------------------------------------
+        _dictationDot = new Ellipse { Width = 8, Height = 8, VerticalAlignment = VerticalAlignment.Center };
+        _dictationDot.SetResourceReference(Shape.FillProperty, "StatusGoodBrush");
+        var dictationText = new TextBlock
+        {
+            Text = "Listening — Ctrl+Alt+D to finish",
+            FontSize = 12.5,
+            FontWeight = FontWeights.Medium,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(8, 0, 0, 0),
+        };
+        dictationText.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
+        var dictationCancel = ReminderButton("✕", primary: false);
+        dictationCancel.Margin = new Thickness(12, 0, 0, 0);
+        dictationCancel.MouseLeftButtonUp += (_, _) => DictationCancelRequested?.Invoke();
+        _dictationContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 12, 0) };
+        _dictationContent.Children.Add(_dictationDot);
+        _dictationContent.Children.Add(dictationText);
+        _dictationContent.Children.Add(dictationCancel);
+
         var host = new Grid();
         host.Children.Add(_collapsedDot);
         host.Children.Add(_expandedContent);
         host.Children.Add(_toastContent);
         host.Children.Add(_reminderContent);
+        host.Children.Add(_dictationContent);
 
         _pill = new Border
         {
@@ -236,7 +265,7 @@ sealed class DockWindow : Window
         _toastTimer.Tick += (_, _) =>
         {
             _toastTimer.Stop();
-            if (_state == DockState.Toast) SetState(_pill.IsMouseOver ? DockState.Expanded : DockState.Collapsed);
+            if (_state == DockState.Toast) SetState(RestState());
         };
         _fullscreenPoll = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
         _fullscreenPoll.Tick += (_, _) => UpdateFullscreenHidden();
@@ -245,7 +274,7 @@ sealed class DockWindow : Window
 
         _pill.MouseEnter += (_, _) =>
         {
-            if (_state == DockState.Reminder) return; // persistent until acted on
+            if (_state is DockState.Reminder or DockState.Dictation) return; // persistent states
             _collapseDelay.Stop();
             if (_state == DockState.Collapsed) _hoverIntent.Start();
             else if (_state == DockState.Toast)
@@ -272,6 +301,11 @@ sealed class DockWindow : Window
             long ex = NativeMethods.GetWindowLongPtr(hwnd, NativeMethods.GWL_EXSTYLE).ToInt64();
             ex |= NativeMethods.WS_EX_NOACTIVATE | NativeMethods.WS_EX_TOOLWINDOW;
             NativeMethods.SetWindowLongPtr(hwnd, NativeMethods.GWL_EXSTYLE, new IntPtr(ex));
+
+            if (!NativeMethods.RegisterHotKey(hwnd, DictationHotkeyId,
+                    NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, 0x44 /* D */))
+                Log.Write("Dictation hotkey Ctrl+Alt+D unavailable (taken by another app)");
+            if (HwndSource.FromHwnd(hwnd) is { } source) source.AddHook(WndProc);
         };
     }
 
@@ -287,6 +321,13 @@ sealed class DockWindow : Window
 
     public void Shutdown()
     {
+        try
+        {
+            NativeMethods.UnregisterHotKey(new WindowInteropHelper(this).Handle, DictationHotkeyId);
+        }
+        catch
+        {
+        }
         _hoverIntent.Stop();
         _collapseDelay.Stop();
         _toastTimer.Stop();
@@ -356,18 +397,19 @@ sealed class DockWindow : Window
         };
     }
 
-    public void ShowToast(string text, bool paused, Action? onClick = null, bool showIcon = true)
+    public void ShowToast(string text, bool paused, Action? onClick = null, bool showIcon = true, bool important = false)
     {
         if (!CheckAccess())
         {
-            Dispatcher.InvokeAsync(() => ShowToast(text, paused, onClick, showIcon));
+            Dispatcher.InvokeAsync(() => ShowToast(text, paused, onClick, showIcon, important));
             return;
         }
         if (_fullscreenHidden || !IsVisible) return;
-        if (_state == DockState.Reminder) return; // a reminder outranks a toast
+        if (_state is DockState.Reminder or DockState.Dictation) return; // persistent states outrank toasts
         // Pause/resume toasts are redundant while expanded (the status line
-        // says it) — but an actionable toast must never be dropped.
-        if (_state == DockState.Expanded && onClick is null) return;
+        // says it) — but actionable or important toasts must never be dropped:
+        // the user hovering the dock is exactly who's waiting for the outcome.
+        if (_state == DockState.Expanded && onClick is null && !important) return;
 
         _toastText.Text = text;
         _toastIcon.Data = paused ? PauseGlyph : PlayGlyph;
@@ -385,6 +427,55 @@ sealed class DockWindow : Window
         }
         SetState(DockState.Toast);
     }
+
+    IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == NativeMethods.WM_HOTKEY && wParam.ToInt32() == DictationHotkeyId)
+        {
+            DictationToggleRequested?.Invoke();
+            handled = true;
+        }
+        return IntPtr.Zero;
+    }
+
+    // ---- dictation --------------------------------------------------------------
+
+    public void SetDictation(bool active)
+    {
+        if (!CheckAccess())
+        {
+            Dispatcher.InvokeAsync(() => SetDictation(active));
+            return;
+        }
+        _dictationActive = active;
+        if (active)
+        {
+            if (_state != DockState.Reminder) SetState(DockState.Dictation);
+        }
+        else if (_state == DockState.Dictation)
+        {
+            SetState(_pill.IsMouseOver ? DockState.Expanded : DockState.Collapsed);
+        }
+    }
+
+    void StartDictationPulse() => _dictationDot.BeginAnimation(OpacityProperty,
+        new DoubleAnimation(1, 0.35, TimeSpan.FromMilliseconds(700))
+        {
+            AutoReverse = true,
+            RepeatBehavior = RepeatBehavior.Forever,
+        });
+
+    void StopDictationPulse()
+    {
+        _dictationDot.BeginAnimation(OpacityProperty, null);
+        _dictationDot.Opacity = 1;
+    }
+
+    /// <summary>Where the dock settles when a transient state ends.</summary>
+    DockState RestState() =>
+        _dictationActive ? DockState.Dictation
+        : _pill.IsMouseOver ? DockState.Expanded
+        : DockState.Collapsed;
 
     // ---- reminders -------------------------------------------------------------
 
@@ -429,7 +520,7 @@ sealed class DockWindow : Window
             AnimatePillTo(MeasureWidth(_reminderContent), ExpandedHeight, 150, Motion.Out);
             return;
         }
-        SetState(_pill.IsMouseOver ? DockState.Expanded : DockState.Collapsed);
+        SetState(RestState());
     }
 
     void UpdateReminderContent()
@@ -488,6 +579,11 @@ sealed class DockWindow : Window
         _chipsPanel.Children.Clear();
         foreach (var snippet in SnippetStore.Load().Take(5))
             _chipsPanel.Children.Add(MakeChip(snippet));
+
+        var dictate = MakeChipShell("🎙");
+        dictate.ToolTip = "Dictate (Ctrl+Alt+D) — speak, and the text is typed where your cursor is";
+        dictate.MouseLeftButtonUp += (_, _) => DictationToggleRequested?.Invoke();
+        _chipsPanel.Children.Add(dictate);
 
         var remind = MakeChipShell("⏰");
         remind.ToolTip = "Remind me to call someone back";
@@ -572,6 +668,7 @@ sealed class DockWindow : Window
     void SetState(DockState state)
     {
         if (_state == state) return;
+        if (_state == DockState.Dictation) StopDictationPulse();
         _state = state;
         ApplyContentVisibility();
 
@@ -602,6 +699,14 @@ sealed class DockWindow : Window
                 _pill.BeginAnimation(OpacityProperty, Motion.Fade(1.0, Motion.Fast));
                 FadeInContent(_reminderContent);
                 break;
+            case DockState.Dictation:
+                Reposition();
+                _pill.CornerRadius = new CornerRadius(20);
+                AnimatePillTo(MeasureWidth(_dictationContent), ExpandedHeight, Motion.Slow, Motion.Overshoot);
+                _pill.BeginAnimation(OpacityProperty, Motion.Fade(1.0, Motion.Fast));
+                FadeInContent(_dictationContent);
+                StartDictationPulse();
+                break;
         }
     }
 
@@ -611,6 +716,7 @@ sealed class DockWindow : Window
         _expandedContent.Visibility = _state == DockState.Expanded ? Visibility.Visible : Visibility.Collapsed;
         _toastContent.Visibility = _state == DockState.Toast ? Visibility.Visible : Visibility.Collapsed;
         _reminderContent.Visibility = _state == DockState.Reminder ? Visibility.Visible : Visibility.Collapsed;
+        _dictationContent.Visibility = _state == DockState.Dictation ? Visibility.Visible : Visibility.Collapsed;
     }
 
     double RestingOpacityFor() => _callState == CallState.Disabled ? DisabledOpacity : RestingOpacity;

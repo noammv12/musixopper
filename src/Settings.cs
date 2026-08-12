@@ -118,6 +118,36 @@ static class Settings
         }
     }
 
+    /// <summary>Groq API key for fast cloud transcription — DPAPI-protected like the DeepSeek key.</summary>
+    public static string? GroqKey
+    {
+        get
+        {
+            try
+            {
+                var stored = Read("GroqKey");
+                if (string.IsNullOrEmpty(stored)) return null;
+                var bytes = ProtectedData.Unprotect(Convert.FromBase64String(stored), null, DataProtectionScope.CurrentUser);
+                var key = Encoding.UTF8.GetString(bytes);
+                return key.Length == 0 ? null : key;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                DeleteValue("GroqKey");
+                return;
+            }
+            var protectedBytes = ProtectedData.Protect(Encoding.UTF8.GetBytes(value.Trim()), null, DataProtectionScope.CurrentUser);
+            WriteValue("GroqKey", Convert.ToBase64String(protectedBytes));
+        }
+    }
+
     /// <summary>Set when this run inherited settings from a Musixopper install.</summary>
     public static bool JustMigrated { get; private set; }
 

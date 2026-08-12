@@ -17,6 +17,7 @@ sealed class Shell : IDisposable
     readonly DockWindow _dock;
     readonly ReminderScheduler _reminders;
     readonly NotesPipeline _notes;
+    readonly Dictation _dictation;
     readonly DispatcherTimer _ticker;
     readonly EventWaitHandle _showFlyoutSignal;
     readonly RegisteredWaitHandle _showFlyoutWait;
@@ -44,14 +45,22 @@ sealed class Shell : IDisposable
 
         _notes = new NotesPipeline(_engine)
         {
-            Transcriber = new WhisperTranscriber(),
-            TranscriberReady = () => WhisperTranscriber.Ready,
+            Transcriber = new ChainTranscriber(),
+            TranscriberReady = () => ChainTranscriber.Ready,
         };
-        _notes.ToastRequested += message => _dock.ShowToast(message, paused: false, showIcon: false);
+        _notes.ToastRequested += message => _dock.ShowToast(message, paused: false, showIcon: false, important: true);
         _notes.StatusChanged += status => _dock.SetProcessingStatus(status);
         _notes.NoteReady += _ => _dock.ShowToast("Notes ready — click to view", paused: false,
-            onClick: () => _flyout.ShowNotes(), showIcon: false);
+            onClick: () => _flyout.ShowNotes(), showIcon: false, important: true);
         _notes.SweepRecoveredSessions();
+
+        _dictation = new Dictation();
+        _dictation.Started += () => _dock.SetDictation(true);
+        _dictation.Stopped += () => _dock.SetDictation(false);
+        _dictation.StatusChanged += status => _dock.SetProcessingStatus(status);
+        _dictation.ToastRequested += message => _dock.ShowToast(message, paused: false, showIcon: false, important: true);
+        _dock.DictationToggleRequested += _dictation.Toggle;
+        _dock.DictationCancelRequested += _dictation.Cancel;
 
         _engine.StateChanged += () =>
         {
@@ -107,6 +116,7 @@ sealed class Shell : IDisposable
     public void Dispose()
     {
         _ticker.Stop();
+        _dictation.Dispose();
         _notes.Dispose();
         _reminders.Dispose();
         _showFlyoutWait.Unregister(null);

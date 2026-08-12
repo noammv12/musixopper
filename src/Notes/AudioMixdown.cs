@@ -37,6 +37,7 @@ static class AudioMixdown
                     continue;
                 }
                 readers.Add(reader);
+                Log.Write($"Mixdown: {Path.GetFileName(path)} {reader.TotalTime.TotalSeconds:0.#}s {reader.WaveFormat}");
 
                 ISampleProvider samples = reader.ToSampleProvider();
                 if (samples.WaveFormat.Channels > 1) samples = new MonoAverageSampleProvider(samples);
@@ -69,6 +70,25 @@ static class AudioMixdown
                 {
                 }
             }
+        }
+    }
+
+    /// <summary>Converts a single WAV to the 16 kHz mono PCM16 Whisper format.</summary>
+    public static string? SingleTo16kMono(string wavPath, string outPath)
+    {
+        try
+        {
+            using var reader = new WaveFileReader(wavPath);
+            ISampleProvider samples = reader.ToSampleProvider();
+            if (samples.WaveFormat.Channels > 1) samples = new MonoAverageSampleProvider(samples);
+            samples = new WdlResamplingSampleProvider(samples, 16000);
+            WaveFileWriter.CreateWaveFile16(outPath, samples);
+            return outPath;
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Mixdown (single) failed: {ex.Message}");
+            return null;
         }
     }
 
