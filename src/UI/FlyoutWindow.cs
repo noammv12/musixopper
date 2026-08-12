@@ -406,9 +406,11 @@ sealed class FlyoutWindow : Window
         if (_editingIndex == index)
         {
             var labelBox = Ui.TextBox(snippet.Label);
+            labelBox.MaxLength = SnippetStore.MaxLabelLength;
             labelBox.Margin = new Thickness(0, 8, 0, 0);
             stack.Children.Add(labelBox);
             var textBox = Ui.TextBox(snippet.Text, multiline: true);
+            textBox.MaxLength = SnippetStore.MaxTextLength;
             textBox.Margin = new Thickness(0, 6, 0, 0);
             stack.Children.Add(textBox);
 
@@ -477,8 +479,9 @@ sealed class FlyoutWindow : Window
 
     void CommitSnippets()
     {
-        SnippetStore.Save(_snippets);
-        _snippets = SnippetStore.Load();
+        // On a failed write keep the in-memory edit visible for the session
+        // instead of silently reverting to the on-disk state.
+        if (SnippetStore.Save(_snippets)) _snippets = SnippetStore.Load();
         RebuildSnippetList();
     }
 
@@ -492,7 +495,7 @@ sealed class FlyoutWindow : Window
         _snippets = SnippetStore.Load();
         _editingIndex = -1;
         RebuildSnippetList();
-        ShowFlyout();
+        ShowFlyoutCore(onboarding: false, force: true);
         ShowPanel(_snippetsPanel);
     }
 
@@ -505,7 +508,7 @@ sealed class FlyoutWindow : Window
         }
         _softphoneNotice.Text = notice ?? "";
         _softphoneNotice.Visibility = string.IsNullOrEmpty(notice) ? Visibility.Collapsed : Visibility.Visible;
-        ShowFlyout();
+        ShowFlyoutCore(onboarding: false, force: true);
         ShowPanel(_softphonePanel);
     }
 
@@ -623,15 +626,25 @@ sealed class FlyoutWindow : Window
 
     // ---- show / hide -----------------------------------------------------
 
-    public void ShowFlyout(bool onboarding = false)
+    public void ShowFlyout(bool onboarding = false) => ShowFlyoutCore(onboarding, force: false);
+
+    void ShowFlyoutCore(bool onboarding, bool force)
     {
         if (!CheckAccess())
         {
-            Dispatcher.InvokeAsync(() => ShowFlyout(onboarding));
+            Dispatcher.InvokeAsync(() => ShowFlyoutCore(onboarding, force));
             return;
         }
         if (IsVisible)
         {
+            if (_hiding)
+            {
+                // Cancel the in-flight hide: replacing the animation removes
+                // its Completed callback, so the pending Hide() never runs.
+                BeginAnimation(OpacityProperty, null);
+                Opacity = 1;
+                _hiding = false;
+            }
             // Already open (e.g. the user clicked the tray before the
             // first-run timer fired): still surface the requested panel.
             if (onboarding) ShowPanel(_welcomePanel);
@@ -640,8 +653,8 @@ sealed class FlyoutWindow : Window
         }
         // Clicking the tray icon while open fires Deactivated (hide) then
         // MouseUp (show) — without this guard the flyout flickers reopen.
-        // Onboarding is never swallowed by it.
-        if (!onboarding && (DateTime.UtcNow - _lastHiddenAt).TotalMilliseconds < 250) return;
+        // Explicit requests (onboarding, dock chips) are never swallowed by it.
+        if (!onboarding && !force && (DateTime.UtcNow - _lastHiddenAt).TotalMilliseconds < 250) return;
 
         ShowPanel(onboarding ? _welcomePanel : _mainPanel);
         SyncFromEngine();
@@ -694,14 +707,7 @@ sealed class FlyoutWindow : Window
         var wa = screen.WorkingArea;
         var bounds = screen.Bounds;
 
-        var hwnd = new WindowInteropHelper(this).EnsureHandle();
-        // Rough-move onto the target monitor first so GetDpiForWindow
-        // reports that monitor's DPI (PerMonitorV2).
-        NativeMethods.SetWindowPos(hwnd, IntPtr.Zero,
-            wa.Left + wa.Width / 2, wa.Top + wa.Height / 2, 0, 0,
-            NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOZORDER | NativeMethods.SWP_NOACTIVATE);
-        double scale = NativeMethods.GetDpiForWindow(hwnd) / 96.0;
-        if (scale <= 0) scale = 1;
+        var scale = Dpi.MoveToAndGetScale(this, wa);
 
         UpdateLayout();
         double w = ActualWidth * scale;

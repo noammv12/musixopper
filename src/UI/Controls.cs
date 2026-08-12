@@ -308,17 +308,10 @@ static class Ui
         };
         copy.MouseLeftButtonUp += (_, _) =>
         {
-            try
-            {
-                Clipboard.SetText(command);
-                copy.Text = "Copied ✓";
-                revert.Stop();
-                revert.Start();
-            }
-            catch
-            {
-                // Clipboard can be momentarily locked by another app.
-            }
+            if (!SnippetPaster.TrySetClipboard(command)) return;
+            copy.Text = "Copied ✓";
+            revert.Stop();
+            revert.Start();
         };
         line.Children.Add(copy);
         stack.Children.Add(line);

@@ -87,7 +87,19 @@ static class Settings
             foreach (var name in new[] { "TriggerMode", "Enabled", "OnboardingDone" })
                 if (old.GetValue(name)?.ToString() is { } value)
                     dest.SetValue(name, value);
-            JustMigrated = true; // old key deliberately left in place
+
+            // Carry over autostart, and drop the retired exe's Run entry so
+            // it doesn't keep launching at boot and fighting this app.
+            using (var run = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true))
+            {
+                if (run?.GetValue("Musixopper") is not null)
+                {
+                    run.DeleteValue("Musixopper", throwOnMissingValue: false);
+                    if (Environment.ProcessPath is { } path) run.SetValue(RunValueName, $"\"{path}\"");
+                }
+            }
+
+            JustMigrated = true; // old settings key deliberately left in place
             Log.Write("Migrated settings from Musixopper");
         }
         catch (Exception ex)

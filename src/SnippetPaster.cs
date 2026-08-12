@@ -46,13 +46,17 @@ static class SnippetPaster
         var inputs = new List<NativeMethods.INPUT>();
         // Release any modifiers the user is physically holding, so the
         // injected Ctrl+V can't turn into Ctrl+Shift+V etc.
-        foreach (var vk in PhysicalModifiers)
-            if ((NativeMethods.GetAsyncKeyState(vk) & 0x8000) != 0)
-                inputs.Add(Key(vk, up: true));
+        var heldModifiers = PhysicalModifiers
+            .Where(vk => (NativeMethods.GetAsyncKeyState(vk) & 0x8000) != 0)
+            .ToList();
+        foreach (var vk in heldModifiers) inputs.Add(Key(vk, up: true));
         inputs.Add(Key(VK_CONTROL, up: false));
         inputs.Add(Key(VK_V, up: false));
         inputs.Add(Key(VK_V, up: true));
         inputs.Add(Key(VK_CONTROL, up: true));
+        // Re-press what the user is (still) physically holding so the OS
+        // keyboard state matches their hands again after the paste.
+        foreach (var vk in heldModifiers) inputs.Add(Key(vk, up: false));
 
         var array = inputs.ToArray();
         var sent = NativeMethods.SendInput((uint)array.Length, array, Marshal.SizeOf<NativeMethods.INPUT>());
@@ -72,7 +76,7 @@ static class SnippetPaster
         return PasteResult.CopiedOnly;
     }
 
-    static bool TrySetClipboard(string text)
+    public static bool TrySetClipboard(string text)
     {
         // Another app (or the Win+V history service) can hold the clipboard
         // open momentarily — retry a few times before giving up.

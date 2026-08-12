@@ -91,7 +91,12 @@ static class MediaController
     {
         var paused = await PauseAllPlayingSessionsAsync();
         Directory.CreateDirectory(Path.GetDirectoryName(StateFile)!);
-        await File.WriteAllLinesAsync(StateFile, paused.Select(s => s.SourceAppUserModelId));
+        var ids = paused.Select(s => s.SourceAppUserModelId);
+        // A second "pause" before the matching "resume" (back-to-back calls)
+        // must not wipe the record of what the first one paused.
+        if (File.Exists(StateFile))
+            ids = ids.Union(await File.ReadAllLinesAsync(StateFile), StringComparer.OrdinalIgnoreCase);
+        await File.WriteAllLinesAsync(StateFile, ids);
     }
 
     public static async Task CliResumeAsync()

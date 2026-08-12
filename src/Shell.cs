@@ -53,6 +53,7 @@ sealed class Shell : IDisposable
             null, Timeout.Infinite, executeOnlyOnce: false);
 
         _dock.ShowDock();
+        _dock.SyncState(_engine.State); // StateChanged won't fire until the state moves
 
         if (!Settings.OnboardingDone)
         {

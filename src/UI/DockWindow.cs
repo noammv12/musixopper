@@ -109,7 +109,7 @@ sealed class DockWindow : Window
 
         _statusDot = new Ellipse { Width = 8, Height = 8, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
         _statusDot.SetResourceReference(Shape.FillProperty, "AccentBrush");
-        _statusText = new TextBlock { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
+        _statusText = new TextBlock { Text = "Listening for calls", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
         _statusText.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
 
         var divider = new Border { Width = 1, Height = 16, Margin = new Thickness(12, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center };
@@ -281,6 +281,12 @@ sealed class DockWindow : Window
 
         _toastTimer.Stop();
         _toastTimer.Start();
+        if (_state == DockState.Toast)
+        {
+            // Toast replacing a toast: resize the pill for the new text.
+            AnimatePillTo(MeasureWidth(_toastContent), ToastHeight, 150, easeOut: true);
+            return;
+        }
         SetState(DockState.Toast);
     }
 
@@ -497,13 +503,7 @@ sealed class DockWindow : Window
     {
         if (_dragging) return;
         var wa = (WinF.Screen.PrimaryScreen ?? WinF.Screen.AllScreens[0]).WorkingArea;
-        var hwnd = new WindowInteropHelper(this).EnsureHandle();
-        // Rough-move onto the target monitor first so GetDpiForWindow
-        // reports that monitor's DPI (PerMonitorV2).
-        NativeMethods.SetWindowPos(hwnd, IntPtr.Zero,
-            wa.Left + wa.Width / 2, wa.Top + wa.Height / 2, 0, 0,
-            NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOZORDER | NativeMethods.SWP_NOACTIVATE);
-        var scale = CurrentScale();
+        var scale = Dpi.MoveToAndGetScale(this, wa);
 
         double windowWidthPx = Width * scale;
         double windowHeightPx = Height * scale;

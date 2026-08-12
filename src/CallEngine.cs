@@ -71,11 +71,16 @@ sealed class CallEngine : IDisposable
         {
             // Drain pending softphone signals even when they end up unused,
             // so a stale signal can't fire after a mode switch or re-enable.
-            // End is drained first: if a stale "call end" and a fresh "call
-            // answered" are both pending (back-to-back calls between ticks),
-            // the answered call must win or music resumes into it.
-            if (_callEndSignal.WaitOne(0)) _signaledOnCall = false;
-            if (_callStartSignal.WaitOne(0)) _signaledOnCall = true;
+            // When both arrived within one tick the real order is unknowable:
+            // already on a call, the end closed the old call and the start
+            // opened a new one (stay on call); idle, a sub-tick call was
+            // answered and already ended (stay idle). Both cases keep the
+            // previous value.
+            var endSignaled = _callEndSignal.WaitOne(0);
+            var startSignaled = _callStartSignal.WaitOne(0);
+            if (startSignaled && endSignaled) Log.Write($"Coalesced call signals (on call stays {_signaledOnCall})");
+            else if (endSignaled) _signaledOnCall = false;
+            else if (startSignaled) _signaledOnCall = true;
 
             if (!Enabled)
             {

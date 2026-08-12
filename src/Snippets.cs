@@ -13,8 +13,8 @@ sealed record Snippet(string Label, string Text);
 static class SnippetStore
 {
     public const int MaxSnippets = 15;
-    const int MaxLabelLength = 24;
-    const int MaxTextLength = 4000;
+    public const int MaxLabelLength = 24;
+    public const int MaxTextLength = 4000;
 
     static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -52,8 +52,11 @@ static class SnippetStore
         {
             if (!File.Exists(FilePath))
             {
+                // Seed quietly — no Changed event, or a Load called from a
+                // chip refresh would re-enter that same refresh (and a
+                // persistent write failure would recurse Load<->Save).
                 var seed = Defaults();
-                Save(seed);
+                TryWrite(seed);
                 return seed;
             }
             var envelope = JsonSerializer.Deserialize<Envelope>(File.ReadAllText(FilePath), JsonOptions);
@@ -68,24 +71,33 @@ static class SnippetStore
         }
     }
 
-    public static void Save(IReadOnlyList<Snippet> snippets)
+    /// <summary>Persists the list; Changed fires only when the write succeeded.</summary>
+    public static bool Save(IReadOnlyList<Snippet> snippets)
+    {
+        if (!TryWrite(Clamp(snippets))) return false;
+        Changed?.Invoke();
+        return true;
+    }
+
+    static bool TryWrite(IReadOnlyList<Snippet> snippets)
     {
         try
         {
             Directory.CreateDirectory(Dir);
             var envelope = new Envelope
             {
-                Snippets = Clamp(snippets).Select(s => new Entry { Label = s.Label, Text = s.Text }).ToList(),
+                Snippets = snippets.Select(s => new Entry { Label = s.Label, Text = s.Text }).ToList(),
             };
             var tmp = FilePath + ".tmp";
             File.WriteAllText(tmp, JsonSerializer.Serialize(envelope, JsonOptions));
             File.Move(tmp, FilePath, overwrite: true);
+            return true;
         }
         catch (Exception ex)
         {
             Log.Write($"Snippets save failed: {ex.Message}");
+            return false;
         }
-        Changed?.Invoke();
     }
 
     static List<Snippet> Clamp(IEnumerable<Snippet> snippets) => snippets
