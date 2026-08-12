@@ -28,6 +28,12 @@ jobs:
           -p:EnableCompressionInSingleFile=true
           -o publish
 
+      - name: Verify single-file artifact
+        shell: pwsh
+        run: |
+          $extras = Get-ChildItem publish -Recurse -File | Where-Object { $_.Name -notin @('Saley.exe','Saley.pdb') }
+          if ($extras) { $extras | ForEach-Object { Write-Host "unexpected publish output: $($_.FullName)" }; exit 1 }
+
       - uses: actions/upload-artifact@v4
         with:
           name: Saley-win-x64

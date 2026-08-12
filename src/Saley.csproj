@@ -33,6 +33,16 @@
     <!-- NAudio.Wasapi (not the metapackage) is pure managed — single-file safe. -->
     <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+    <PackageReference Include="Whisper.net" Version="1.9.1" />
+    <!-- The runtime package ships its natives as loose content files that a
+         single-file publish would drop next to the exe; exclude its targets
+         and embed the DLLs instead — WhisperRuntime extracts and loads them. -->
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" GeneratePathProperty="true" ExcludeAssets="build" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="$(PkgWhisper_net_Runtime)\build\win-x64\*.dll"
+                      LogicalName="Saley.WhisperNative.%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>
