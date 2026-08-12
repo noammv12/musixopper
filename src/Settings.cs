@@ -91,61 +91,43 @@ static class Settings
     /// </summary>
     public static string? DeepSeekKey
     {
-        get
+        get => GetProtectedValue("DeepSeekKey");
+        set => SetProtectedValue("DeepSeekKey", value);
+    }
+
+    /// <summary>Groq API key for fast cloud transcription.</summary>
+    public static string? GroqKey
+    {
+        get => GetProtectedValue("GroqKey");
+        set => SetProtectedValue("GroqKey", value);
+    }
+
+    /// <summary>DPAPI-protected secret, bound to this Windows user; unreadable values read as unset.</summary>
+    static string? GetProtectedValue(string name)
+    {
+        try
         {
-            try
-            {
-                var stored = Read("DeepSeekKey");
-                if (string.IsNullOrEmpty(stored)) return null;
-                var bytes = ProtectedData.Unprotect(Convert.FromBase64String(stored), null, DataProtectionScope.CurrentUser);
-                var key = Encoding.UTF8.GetString(bytes);
-                return key.Length == 0 ? null : key;
-            }
-            catch
-            {
-                return null; // wrong user/machine or corrupt value — treat as unset
-            }
+            var stored = Read(name);
+            if (string.IsNullOrEmpty(stored)) return null;
+            var bytes = ProtectedData.Unprotect(Convert.FromBase64String(stored), null, DataProtectionScope.CurrentUser);
+            var value = Encoding.UTF8.GetString(bytes);
+            return value.Length == 0 ? null : value;
         }
-        set
+        catch
         {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                DeleteValue("DeepSeekKey");
-                return;
-            }
-            var protectedBytes = ProtectedData.Protect(Encoding.UTF8.GetBytes(value.Trim()), null, DataProtectionScope.CurrentUser);
-            WriteValue("DeepSeekKey", Convert.ToBase64String(protectedBytes));
+            return null;
         }
     }
 
-    /// <summary>Groq API key for fast cloud transcription — DPAPI-protected like the DeepSeek key.</summary>
-    public static string? GroqKey
+    static void SetProtectedValue(string name, string? value)
     {
-        get
+        if (string.IsNullOrWhiteSpace(value))
         {
-            try
-            {
-                var stored = Read("GroqKey");
-                if (string.IsNullOrEmpty(stored)) return null;
-                var bytes = ProtectedData.Unprotect(Convert.FromBase64String(stored), null, DataProtectionScope.CurrentUser);
-                var key = Encoding.UTF8.GetString(bytes);
-                return key.Length == 0 ? null : key;
-            }
-            catch
-            {
-                return null;
-            }
+            DeleteValue(name);
+            return;
         }
-        set
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                DeleteValue("GroqKey");
-                return;
-            }
-            var protectedBytes = ProtectedData.Protect(Encoding.UTF8.GetBytes(value.Trim()), null, DataProtectionScope.CurrentUser);
-            WriteValue("GroqKey", Convert.ToBase64String(protectedBytes));
-        }
+        var protectedBytes = ProtectedData.Protect(Encoding.UTF8.GetBytes(value.Trim()), null, DataProtectionScope.CurrentUser);
+        WriteValue(name, Convert.ToBase64String(protectedBytes));
     }
 
     /// <summary>Set when this run inherited settings from a Musixopper install.</summary>

@@ -105,6 +105,7 @@ static class NativeMethods
     public const int WM_HOTKEY = 0x0312;
     public const uint MOD_ALT = 0x1;
     public const uint MOD_CONTROL = 0x2;
+    public const uint MOD_NOREPEAT = 0x4000;
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool RegisterHotKey(IntPtr hwnd, int id, uint modifiers, uint vk);

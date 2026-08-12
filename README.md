@@ -64,7 +64,7 @@ The log at `%LOCALAPPDATA%\Saley\log.txt` narrates every step of note processing
 
 ## Dictation
 
-Press **Ctrl+Alt+D** (or the 🎙 chip in the dock), speak, press it again — the text is typed straight into whatever app your cursor is in. Hebrew by default, powered by the same Groq/local engine as call notes (needs a Groq key or the offline model). ✕ on the dock cancels. Works mid-call.
+Press **Ctrl+Alt+Space** (or the 🎙 chip in the dock), speak, press it again (or click Finish) — the text is typed straight into whatever app your cursor is in. Hebrew by default, powered by the same Groq/local engine as call notes (needs a Groq key or the offline model). ✕ on the dock cancels. Works mid-call.
 
 ## Network use
 

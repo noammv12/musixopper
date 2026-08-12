@@ -20,7 +20,7 @@ sealed class ChainTranscriber : ITranscriber
             {
                 return await _groq.TranscribeAsync(wav16kMonoPath, language, ct);
             }
-            catch (Exception ex) when (WhisperTranscriber.Ready)
+            catch (Exception ex) when (ex is not OperationCanceledException && WhisperTranscriber.Ready)
             {
                 Log.Write($"Groq failed ({ex.Message}) — falling back to the local model");
             }

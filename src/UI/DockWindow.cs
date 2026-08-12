@@ -75,7 +75,9 @@ sealed class DockWindow : Window
     CallState _callState = CallState.Idle;
     bool _fullscreenHidden;
     Action? _toastAction;
-    string _processingStatus = "";
+    string _notesStatus = "";
+    string _dictationStatus = "";
+    (string Text, bool Paused, Action? OnClick, bool ShowIcon)? _pendingToast;
 
     // drag
     bool _dragging;
@@ -200,19 +202,22 @@ sealed class DockWindow : Window
         _dictationDot.SetResourceReference(Shape.FillProperty, "StatusGoodBrush");
         var dictationText = new TextBlock
         {
-            Text = "Listening — Ctrl+Alt+D to finish",
+            Text = "Listening — Ctrl+Alt+Space to finish",
             FontSize = 12.5,
             FontWeight = FontWeights.Medium,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(8, 0, 0, 0),
         };
         dictationText.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
+        var dictationFinish = ReminderButton("Finish", primary: true);
+        dictationFinish.Margin = new Thickness(12, 0, 0, 0);
+        dictationFinish.MouseLeftButtonUp += (_, _) => DictationToggleRequested?.Invoke();
         var dictationCancel = ReminderButton("✕", primary: false);
-        dictationCancel.Margin = new Thickness(12, 0, 0, 0);
         dictationCancel.MouseLeftButtonUp += (_, _) => DictationCancelRequested?.Invoke();
         _dictationContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 12, 0) };
         _dictationContent.Children.Add(_dictationDot);
         _dictationContent.Children.Add(dictationText);
+        _dictationContent.Children.Add(dictationFinish);
         _dictationContent.Children.Add(dictationCancel);
 
         var host = new Grid();
@@ -303,8 +308,8 @@ sealed class DockWindow : Window
             NativeMethods.SetWindowLongPtr(hwnd, NativeMethods.GWL_EXSTYLE, new IntPtr(ex));
 
             if (!NativeMethods.RegisterHotKey(hwnd, DictationHotkeyId,
-                    NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, 0x44 /* D */))
-                Log.Write("Dictation hotkey Ctrl+Alt+D unavailable (taken by another app)");
+                    NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT | NativeMethods.MOD_NOREPEAT, 0x20 /* Space */))
+                Log.Write("Dictation hotkey Ctrl+Alt+Space unavailable (taken by another app)");
             if (HwndSource.FromHwnd(hwnd) is { } source) source.AddHook(WndProc);
         };
     }
@@ -374,14 +379,25 @@ sealed class DockWindow : Window
     }
 
     /// <summary>Shown in the expanded status line while a note is being processed.</summary>
-    public void SetProcessingStatus(string status)
+    public void SetNotesStatus(string status)
     {
         if (!CheckAccess())
         {
-            Dispatcher.InvokeAsync(() => SetProcessingStatus(status));
+            Dispatcher.InvokeAsync(() => SetNotesStatus(status));
             return;
         }
-        _processingStatus = status;
+        _notesStatus = status;
+        UpdateStatusText();
+    }
+
+    public void SetDictationStatus(string status)
+    {
+        if (!CheckAccess())
+        {
+            Dispatcher.InvokeAsync(() => SetDictationStatus(status));
+            return;
+        }
+        _dictationStatus = status;
         UpdateStatusText();
     }
 
@@ -393,7 +409,9 @@ sealed class DockWindow : Window
                 ? $"On a call — {elapsed:hh\\:mm\\:ss}"
                 : $"On a call — {DateTime.UtcNow - _callStartedUtc:mm\\:ss}",
             CallState.Disabled => "Paused",
-            _ => _processingStatus.Length > 0 ? _processingStatus : "Listening for calls",
+            _ => _dictationStatus.Length > 0 ? _dictationStatus
+                : _notesStatus.Length > 0 ? _notesStatus
+                : "Listening for calls",
         };
     }
 
@@ -404,8 +422,13 @@ sealed class DockWindow : Window
             Dispatcher.InvokeAsync(() => ShowToast(text, paused, onClick, showIcon, important));
             return;
         }
-        if (_fullscreenHidden || !IsVisible) return;
-        if (_state is DockState.Reminder or DockState.Dictation) return; // persistent states outrank toasts
+        if (_fullscreenHidden || !IsVisible || _state is DockState.Reminder or DockState.Dictation)
+        {
+            // Blocked right now — important toasts are held and replayed when
+            // the dock returns to a normal state, never dropped.
+            if (important || onClick is not null) _pendingToast = (text, paused, onClick, showIcon);
+            return;
+        }
         // Pause/resume toasts are redundant while expanded (the status line
         // says it) — but actionable or important toasts must never be dropped:
         // the user hovering the dock is exactly who's waiting for the outcome.
@@ -581,7 +604,7 @@ sealed class DockWindow : Window
             _chipsPanel.Children.Add(MakeChip(snippet));
 
         var dictate = MakeChipShell("🎙");
-        dictate.ToolTip = "Dictate (Ctrl+Alt+D) — speak, and the text is typed where your cursor is";
+        dictate.ToolTip = "Dictate (Ctrl+Alt+Space) — speak, and the text is typed where your cursor is";
         dictate.MouseLeftButtonUp += (_, _) => DictationToggleRequested?.Invoke();
         _chipsPanel.Children.Add(dictate);
 
@@ -671,6 +694,11 @@ sealed class DockWindow : Window
         if (_state == DockState.Dictation) StopDictationPulse();
         _state = state;
         ApplyContentVisibility();
+        if (state is DockState.Collapsed or DockState.Expanded && _pendingToast is { } held)
+        {
+            _pendingToast = null;
+            Dispatcher.InvokeAsync(() => ShowToast(held.Text, held.Paused, held.OnClick, held.ShowIcon, important: true));
+        }
 
         switch (state)
         {
@@ -853,6 +881,11 @@ sealed class DockWindow : Window
         {
             Reposition();
             TryShowReminder();
+            if (_state is DockState.Collapsed or DockState.Expanded && _pendingToast is { } held)
+            {
+                _pendingToast = null;
+                Dispatcher.InvokeAsync(() => ShowToast(held.Text, held.Paused, held.OnClick, held.ShowIcon, important: true));
+            }
         }
     }
 }

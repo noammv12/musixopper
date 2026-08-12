@@ -49,7 +49,7 @@ sealed class Shell : IDisposable
             TranscriberReady = () => ChainTranscriber.Ready,
         };
         _notes.ToastRequested += message => _dock.ShowToast(message, paused: false, showIcon: false, important: true);
-        _notes.StatusChanged += status => _dock.SetProcessingStatus(status);
+        _notes.StatusChanged += status => _dock.SetNotesStatus(status);
         _notes.NoteReady += _ => _dock.ShowToast("Notes ready — click to view", paused: false,
             onClick: () => _flyout.ShowNotes(), showIcon: false, important: true);
         _notes.SweepRecoveredSessions();
@@ -57,7 +57,7 @@ sealed class Shell : IDisposable
         _dictation = new Dictation();
         _dictation.Started += () => _dock.SetDictation(true);
         _dictation.Stopped += () => _dock.SetDictation(false);
-        _dictation.StatusChanged += status => _dock.SetProcessingStatus(status);
+        _dictation.StatusChanged += status => _dock.SetDictationStatus(status);
         _dictation.ToastRequested += message => _dock.ShowToast(message, paused: false, showIcon: false, important: true);
         _dock.DictationToggleRequested += _dictation.Toggle;
         _dock.DictationCancelRequested += _dictation.Cancel;

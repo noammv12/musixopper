@@ -19,7 +19,8 @@ sealed class GroqTranscriber : ITranscriber
     static readonly TimeSpan ChunkLength = TimeSpan.FromMinutes(10);
     static readonly TimeSpan MaxSingleFile = TimeSpan.FromMinutes(12);
 
-    static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(120) };
+    // Covers a ~20 MB upload on a slow uplink plus server-side processing.
+    static readonly HttpClient Http = new() { Timeout = TimeSpan.FromMinutes(6) };
 
     public async Task<string> TranscribeAsync(string wav16kMonoPath, string language, CancellationToken ct)
     {

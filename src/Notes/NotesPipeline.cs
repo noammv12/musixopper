@@ -56,6 +56,18 @@ sealed class NotesPipeline : IDisposable
             try
             {
                 if (!Directory.Exists(NotesStore.TmpDir)) return;
+                // Loose dictation temp files (crash mid-dictation) are only
+                // valid while recording — delete them.
+                foreach (var file in Directory.GetFiles(NotesStore.TmpDir, "dictation-*"))
+                {
+                    try
+                    {
+                        File.Delete(file);
+                    }
+                    catch
+                    {
+                    }
+                }
                 foreach (var dir in Directory.GetDirectories(NotesStore.TmpDir))
                 {
                     var mic = Path.Combine(dir, "mic.wav");
@@ -139,6 +151,7 @@ sealed class NotesPipeline : IDisposable
         {
             await Task.Run(async () =>
             {
+                var keepForRetry = false;
                 try
                 {
                     StatusChanged?.Invoke("Preparing audio…");
@@ -190,11 +203,18 @@ sealed class NotesPipeline : IDisposable
                 catch (Exception ex)
                 {
                     Log.Write($"Notes processing failed: {ex}");
-                    ToastRequested?.Invoke("Notes failed — see log");
+                    // Transient failure (e.g. Groq unreachable, no offline
+                    // model): keep the audio and retry on next launch instead
+                    // of deleting the only copy. A recovered session that
+                    // fails again is dropped — no infinite retry pile.
+                    keepForRetry = !recovered;
+                    ToastRequested?.Invoke(keepForRetry
+                        ? "Notes failed — will retry on next launch"
+                        : "Notes failed — see log");
                 }
                 finally
                 {
-                    CleanupSession(session);
+                    if (!keepForRetry) CleanupSession(session);
                     StatusChanged?.Invoke("");
                 }
             });
