@@ -1,4 +1,4 @@
-using System.IO;
+using Windows.Media.Control;
 
 namespace Musixopper;
 
@@ -27,14 +27,14 @@ sealed class CallEngine : IDisposable
     bool _signaledOnCall;
     bool _micWasInUse;
     bool _pausedForCall;
-    IReadOnlyList<string> _pausedSessions = Array.Empty<string>();
+    IReadOnlyList<GlobalSystemMediaTransportControlsSession> _pausedSessions =
+        Array.Empty<GlobalSystemMediaTransportControlsSession>();
     DateTime? _resumePendingSince;
     bool _ticking;
 
     public TriggerMode Mode { get; private set; } = Settings.Trigger;
     public bool Enabled { get; private set; } = Settings.Enabled;
     public CallState State { get; private set; } = CallState.Idle;
-    public string? OnCallApp { get; private set; }
 
     public event Action? StateChanged;
     public event Action? MusicPaused;
@@ -46,6 +46,11 @@ sealed class CallEngine : IDisposable
         Mode = mode;
         _signaledOnCall = false;
         _micWasInUse = false;
+        // Switching modes mid-call: forget what we paused rather than letting
+        // the next tick resume it into the ongoing call.
+        _pausedForCall = false;
+        _pausedSessions = Array.Empty<GlobalSystemMediaTransportControlsSession>();
+        _resumePendingSince = null;
         Settings.Trigger = mode;
         Log.Write($"Trigger mode -> {mode}");
     }
@@ -66,15 +71,18 @@ sealed class CallEngine : IDisposable
         {
             // Drain pending softphone signals even when they end up unused,
             // so a stale signal can't fire after a mode switch or re-enable.
-            if (_callStartSignal.WaitOne(0)) _signaledOnCall = true;
+            // End is drained first: if a stale "call end" and a fresh "call
+            // answered" are both pending (back-to-back calls between ticks),
+            // the answered call must win or music resumes into it.
             if (_callEndSignal.WaitOne(0)) _signaledOnCall = false;
+            if (_callStartSignal.WaitOne(0)) _signaledOnCall = true;
 
             if (!Enabled)
             {
                 // Disabled mid-call: forget what we paused but don't resume it,
                 // that would blast music into the ongoing call.
                 _pausedForCall = false;
-                _pausedSessions = Array.Empty<string>();
+                _pausedSessions = Array.Empty<GlobalSystemMediaTransportControlsSession>();
                 _resumePendingSince = null;
                 _signaledOnCall = false;
                 _micWasInUse = false;
@@ -83,20 +91,18 @@ sealed class CallEngine : IDisposable
             }
 
             bool onCall;
-            string? callerApp = null;
             if (Mode == TriggerMode.SoftphoneEvents)
             {
                 onCall = _signaledOnCall;
             }
             else
             {
-                var micInUse = MicMonitor.IsMicInUse(out var users);
+                var micInUse = MicMonitor.IsMicInUse(out _);
                 // A "call answered" signal without a matching "call end"
                 // shouldn't outlive the call: once the mic closes, it's over.
                 if (_signaledOnCall && _micWasInUse && !micInUse) _signaledOnCall = false;
                 _micWasInUse = micInUse;
                 onCall = micInUse || _signaledOnCall;
-                if (micInUse && users.Count > 0) callerApp = Path.GetFileName(users[0]);
             }
 
             if (onCall)
@@ -105,11 +111,11 @@ sealed class CallEngine : IDisposable
                 if (!_pausedForCall)
                 {
                     _pausedForCall = true;
-                    _pausedSessions = await MediaController.PauseAllPlayingAsync();
+                    _pausedSessions = await MediaController.PauseAllPlayingSessionsAsync();
                     Log.Write($"Call started — paused {_pausedSessions.Count} session(s)");
                     if (_pausedSessions.Count > 0) MusicPaused?.Invoke();
                 }
-                SetState(CallState.OnCall, callerApp);
+                SetState(CallState.OnCall);
             }
             else if (_pausedForCall)
             {
@@ -118,21 +124,17 @@ sealed class CallEngine : IDisposable
                 {
                     var toResume = _pausedSessions;
                     _pausedForCall = false;
-                    _pausedSessions = Array.Empty<string>();
+                    _pausedSessions = Array.Empty<GlobalSystemMediaTransportControlsSession>();
                     _resumePendingSince = null;
                     if (toResume.Count > 0)
                     {
-                        await MediaController.ResumeAsync(toResume);
+                        await MediaController.ResumeSessionsAsync(toResume);
                         Log.Write($"Call ended — resumed {toResume.Count} session(s)");
                         MusicResumed?.Invoke();
                     }
                     SetState(CallState.Idle);
                 }
-                else
-                {
-                    // Call just ended; stay visually "on call" through the grace period.
-                    SetState(CallState.OnCall, OnCallApp);
-                }
+                // else: call just ended; stay visually "on call" through the grace period.
             }
             else
             {
@@ -150,11 +152,10 @@ sealed class CallEngine : IDisposable
         }
     }
 
-    void SetState(CallState state, string? callerApp = null)
+    void SetState(CallState state)
     {
-        if (State == state && OnCallApp == callerApp) return;
+        if (State == state) return;
         State = state;
-        OnCallApp = callerApp;
         StateChanged?.Invoke();
     }
 

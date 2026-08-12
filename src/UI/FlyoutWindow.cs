@@ -402,12 +402,16 @@ sealed class FlyoutWindow : Window
         }
         if (IsVisible)
         {
+            // Already open (e.g. the user clicked the tray before the
+            // first-run timer fired): still surface the requested panel.
+            if (onboarding) ShowPanel(_welcomePanel);
             Activate();
             return;
         }
         // Clicking the tray icon while open fires Deactivated (hide) then
         // MouseUp (show) — without this guard the flyout flickers reopen.
-        if ((DateTime.UtcNow - _lastHiddenAt).TotalMilliseconds < 250) return;
+        // Onboarding is never swallowed by it.
+        if (!onboarding && (DateTime.UtcNow - _lastHiddenAt).TotalMilliseconds < 250) return;
 
         ShowPanel(onboarding ? _welcomePanel : _mainPanel);
         SyncFromEngine();

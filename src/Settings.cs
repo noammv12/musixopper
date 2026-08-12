@@ -46,8 +46,16 @@ static class Settings
         set
         {
             using var key = Registry.CurrentUser.CreateSubKey(RunKeyPath);
-            if (value && Environment.ProcessPath is { } path) key.SetValue(RunValueName, $"\"{path}\"");
-            else key.DeleteValue(RunValueName, throwOnMissingValue: false);
+            if (!value)
+            {
+                key.DeleteValue(RunValueName, throwOnMissingValue: false);
+            }
+            else if (Environment.ProcessPath is { } path)
+            {
+                // No path (unusual host) -> leave any existing entry alone
+                // rather than silently deleting what the user asked to enable.
+                key.SetValue(RunValueName, $"\"{path}\"");
+            }
         }
     }
 

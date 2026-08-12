@@ -14,11 +14,11 @@ static class MediaController
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Musixopper", "paused-sessions.txt");
 
-    /// <summary>Pauses every currently playing session and returns their app ids.</summary>
-    public static async Task<IReadOnlyList<string>> PauseAllPlayingAsync()
+    /// <summary>Pauses every currently playing session and returns those session objects.</summary>
+    public static async Task<IReadOnlyList<GlobalSystemMediaTransportControlsSession>> PauseAllPlayingSessionsAsync()
     {
         var manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
-        var paused = new List<string>();
+        var paused = new List<GlobalSystemMediaTransportControlsSession>();
         foreach (var session in manager.GetSessions())
         {
             try
@@ -27,7 +27,7 @@ static class MediaController
                         GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing
                     && await session.TryPauseAsync())
                 {
-                    paused.Add(session.SourceAppUserModelId);
+                    paused.Add(session);
                 }
             }
             catch
@@ -38,8 +38,31 @@ static class MediaController
         return paused;
     }
 
-    /// <summary>Resumes only the sessions in <paramref name="appIds"/> that are still paused.</summary>
-    public static async Task ResumeAsync(IEnumerable<string> appIds)
+    /// <summary>
+    /// Resumes exactly the given sessions — never a sibling session of the
+    /// same app that the user paused themselves — and only if still paused.
+    /// </summary>
+    public static async Task ResumeSessionsAsync(IEnumerable<GlobalSystemMediaTransportControlsSession> sessions)
+    {
+        foreach (var session in sessions)
+        {
+            try
+            {
+                if (session.GetPlaybackInfo().PlaybackStatus ==
+                        GlobalSystemMediaTransportControlsSessionPlaybackStatus.Paused)
+                {
+                    await session.TryPlayAsync();
+                }
+            }
+            catch
+            {
+                // Session died since we paused it; nothing to resume.
+            }
+        }
+    }
+
+    /// <summary>Resume by app id — the CLI fallback, where the pausing process is gone.</summary>
+    public static async Task ResumeByAppIdAsync(IEnumerable<string> appIds)
     {
         var wanted = new HashSet<string>(appIds, StringComparer.OrdinalIgnoreCase);
         if (wanted.Count == 0) return;
@@ -66,9 +89,9 @@ static class MediaController
     // remembered on disk between the "pause" and "resume" invocations.
     public static async Task CliPauseAsync()
     {
-        var paused = await PauseAllPlayingAsync();
+        var paused = await PauseAllPlayingSessionsAsync();
         Directory.CreateDirectory(Path.GetDirectoryName(StateFile)!);
-        await File.WriteAllLinesAsync(StateFile, paused);
+        await File.WriteAllLinesAsync(StateFile, paused.Select(s => s.SourceAppUserModelId));
     }
 
     public static async Task CliResumeAsync()
@@ -76,6 +99,6 @@ static class MediaController
         if (!File.Exists(StateFile)) return;
         var ids = await File.ReadAllLinesAsync(StateFile);
         File.Delete(StateFile);
-        await ResumeAsync(ids);
+        await ResumeByAppIdAsync(ids);
     }
 }

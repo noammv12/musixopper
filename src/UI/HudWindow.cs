@@ -168,6 +168,12 @@ sealed class HudWindow : Window
     {
         var wa = (WinF.Screen.PrimaryScreen ?? WinF.Screen.AllScreens[0]).WorkingArea;
         var hwnd = new WindowInteropHelper(this).EnsureHandle();
+        // Rough-move onto the target monitor first so GetDpiForWindow
+        // reports that monitor's DPI (PerMonitorV2), not the DPI of
+        // wherever the window happens to sit.
+        NativeMethods.SetWindowPos(hwnd, IntPtr.Zero,
+            wa.Left + wa.Width / 2, wa.Top + wa.Height / 2, 0, 0,
+            NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOZORDER | NativeMethods.SWP_NOACTIVATE);
         double scale = NativeMethods.GetDpiForWindow(hwnd) / 96.0;
         if (scale <= 0) scale = 1;
 

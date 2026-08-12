@@ -23,9 +23,6 @@ static class NativeMethods
     [DllImport("user32.dll")]
     public static extern uint GetDpiForWindow(IntPtr hwnd);
 
-    [DllImport("user32.dll")]
-    public static extern bool DestroyIcon(IntPtr hIcon);
-
     // win-x64 only, so the Ptr variants always exist.
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     public static extern IntPtr GetWindowLongPtr(IntPtr hwnd, int index);

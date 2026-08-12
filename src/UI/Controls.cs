@@ -51,7 +51,9 @@ sealed class PillSwitch : Grid
 
     public void Set(bool on, bool animate)
     {
-        if (_isOn == on && animate) return;
+        // No-op on same value even for animate:false syncs — reapplying
+        // would cancel an in-flight toggle animation and snap the knob.
+        if (_isOn == on) return;
         _isOn = on;
         ApplyVisual(animate);
     }
