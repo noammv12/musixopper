@@ -13,6 +13,12 @@ static class MicMonitor
     const string ConsentStore =
         @"SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone";
 
+    // Saley's own call recording opens the mic too; without excluding
+    // ourselves, Microphone mode would see Saley as a caller and the call
+    // would never end while notes are recording. NonPackaged subkey names
+    // encode the exe path with '#' in place of '\'.
+    static readonly string? SelfEntryName = Environment.ProcessPath?.Replace('\\', '#');
+
     public static bool IsMicInUse(out List<string> users)
     {
         users = new List<string>();
@@ -31,6 +37,7 @@ static class MicMonitor
         foreach (var name in key.GetSubKeyNames())
         {
             if (name.Equals("NonPackaged", StringComparison.OrdinalIgnoreCase)) continue;
+            if (SelfEntryName is not null && name.Equals(SelfEntryName, StringComparison.OrdinalIgnoreCase)) continue;
             using var sub = key.OpenSubKey(name);
             if (sub?.GetValue("LastUsedTimeStart") is long start && start != 0 &&
                 sub.GetValue("LastUsedTimeStop") is long stop && stop == 0)

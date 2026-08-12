@@ -205,6 +205,21 @@ static class Ui
         return box;
     }
 
+    public static PasswordBox PasswordBox()
+    {
+        var box = new PasswordBox
+        {
+            FontSize = 12,
+            Padding = new Thickness(6, 4, 6, 4),
+            BorderThickness = new Thickness(1),
+        };
+        box.SetResourceReference(Control.BackgroundProperty, "ControlFillBrush");
+        box.SetResourceReference(Control.ForegroundProperty, "TextPrimaryBrush");
+        box.SetResourceReference(Control.BorderBrushProperty, "DividerBrush");
+        box.SetResourceReference(System.Windows.Controls.PasswordBox.CaretBrushProperty, "TextPrimaryBrush");
+        return box;
+    }
+
     /// <summary>A silver text link that brightens to white on hover.</summary>
     public static TextBlock Link(string text, double size, FontWeight? weight = null)
     {

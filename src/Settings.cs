@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Win32;
 
 namespace Saley;
@@ -69,6 +71,53 @@ static class Settings
         set => WriteValue("DockX", value.ToString("0.###", CultureInfo.InvariantCulture));
     }
 
+    /// <summary>Call notes are strictly opt-in.</summary>
+    public static bool NotesEnabled
+    {
+        get => Read("NotesEnabled") == "1";
+        set => WriteValue("NotesEnabled", value ? "1" : "0");
+    }
+
+    /// <summary>"he" (default) or "auto".</summary>
+    public static string NotesLanguage
+    {
+        get => Read("NotesLanguage") == "auto" ? "auto" : "he";
+        set => WriteValue("NotesLanguage", value == "auto" ? "auto" : "he");
+    }
+
+    /// <summary>
+    /// DeepSeek API key, DPAPI-encrypted and bound to this Windows user —
+    /// it never exists in plaintext outside this machine (the repo is public).
+    /// </summary>
+    public static string? DeepSeekKey
+    {
+        get
+        {
+            try
+            {
+                var stored = Read("DeepSeekKey");
+                if (string.IsNullOrEmpty(stored)) return null;
+                var bytes = ProtectedData.Unprotect(Convert.FromBase64String(stored), null, DataProtectionScope.CurrentUser);
+                var key = Encoding.UTF8.GetString(bytes);
+                return key.Length == 0 ? null : key;
+            }
+            catch
+            {
+                return null; // wrong user/machine or corrupt value — treat as unset
+            }
+        }
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                DeleteValue("DeepSeekKey");
+                return;
+            }
+            var protectedBytes = ProtectedData.Protect(Encoding.UTF8.GetBytes(value.Trim()), null, DataProtectionScope.CurrentUser);
+            WriteValue("DeepSeekKey", Convert.ToBase64String(protectedBytes));
+        }
+    }
+
     /// <summary>Set when this run inherited settings from a Musixopper install.</summary>
     public static bool JustMigrated { get; private set; }
 
@@ -118,5 +167,11 @@ static class Settings
     {
         using var key = Registry.CurrentUser.CreateSubKey(KeyPath);
         key.SetValue(name, value);
+    }
+
+    static void DeleteValue(string name)
+    {
+        using var key = Registry.CurrentUser.CreateSubKey(KeyPath);
+        key.DeleteValue(name, throwOnMissingValue: false);
     }
 }
