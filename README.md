@@ -31,15 +31,17 @@ When music pauses or resumes, a small pill appears bottom-center for two seconds
 
 ## Connecting Softphone.Pro (Call events mode)
 
-The app shows these steps with copy buttons (flyout → *Set up Softphone.Pro…*), but for reference: in Softphone.Pro open *Settings → Integration → Third-party systems* and add three handlers (Account: *All*, action: run a program):
+The app shows these steps with copy buttons (flyout → *Set up Softphone.Pro…*), but for reference: in Softphone.Pro open *Settings → Integration → Third-party systems* and add three handlers (SIP account: *All*, Action: *Launch a program*):
 
-| Event                  | Program                              |
-|------------------------|--------------------------------------|
-| `Outgoing call answer` | `"C:\path\to\Musixopper.exe" pause`  |
-| `Incoming call answer` | `"C:\path\to\Musixopper.exe" pause`  |
-| `Call end`             | `"C:\path\to\Musixopper.exe" resume` |
+| Event                  | URL/Program                        |
+|------------------------|------------------------------------|
+| `Outgoing call answer` | `C:\path\to\Musixopper.exe pause`  |
+| `Incoming call answer` | `C:\path\to\Musixopper.exe pause`  |
+| `Call end`             | `C:\path\to\Musixopper.exe resume` |
 
-Event names can vary slightly between Softphone.Pro versions — pick the "answer" events, **not** "ring". Any other softphone that can run a program on call events works the same way.
+**Don't quote the path** — Softphone.Pro launches the string as-is (its own example is unquoted). If your path contains spaces, move the exe to a folder without them (e.g. `C:\Tools`). Event names can vary slightly between versions — pick the "answer" events, **not** "ring". Any other softphone that can run a program on call events works the same way.
+
+Troubleshooting: the Handler Settings dialog has a **Test** button — click it while music plays (Musixopper in *Call events* mode) and the music should pause. Every received command is also logged to `%LOCALAPPDATA%\Musixopper\log.txt`; if no "CLI 'pause' received" line appears after Test, Softphone.Pro never launched the exe (check the command format).
 
 ## Testing your setup
 

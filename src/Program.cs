@@ -7,7 +7,8 @@ static class Program
     [STAThread]
     static int Main(string[] args)
     {
-        if (args.Length > 0) return RunCli(args[0].Trim().ToLowerInvariant());
+        // Trim stray quotes too — some dialer integrations pass them through.
+        if (args.Length > 0) return RunCli(args[0].Trim().Trim('"').ToLowerInvariant());
 
         using var mutex = new Mutex(initiallyOwned: true, "Musixopper.Tray.SingleInstance", out var isFirstInstance);
         if (!isFirstInstance)
@@ -49,19 +50,20 @@ static class Program
 
     static int RunCli(string verb) => verb switch
     {
-        "pause" => SignalOrRun(TraySignals.CallStartName, MediaController.CliPauseAsync),
-        "resume" or "play" => SignalOrRun(TraySignals.CallEndName, MediaController.CliResumeAsync),
+        "pause" => SignalOrRun(verb, TraySignals.CallStartName, MediaController.CliPauseAsync),
+        "resume" or "play" => SignalOrRun(verb, TraySignals.CallEndName, MediaController.CliResumeAsync),
         "test" => RunTest(),
-        _ => Usage(),
+        _ => Usage(verb),
     };
 
-    static int SignalOrRun(string signalName, Func<Task> standalone)
+    static int SignalOrRun(string verb, string signalName, Func<Task> standalone)
     {
         // If the tray app is running, hand it the event so it keeps the
         // paused-session state (and the UI) in one place.
         if (EventWaitHandle.TryOpenExisting(signalName, out var signal))
         {
             using (signal) signal.Set();
+            Log.Write($"CLI '{verb}' received — signaled the running app");
             return 0;
         }
 
@@ -70,11 +72,12 @@ static class Program
         try
         {
             Task.Run(standalone).GetAwaiter().GetResult();
+            Log.Write($"CLI '{verb}' received — handled standalone (app not running)");
             return 0;
         }
         catch (Exception ex)
         {
-            Log.Write($"CLI '{signalName}' failed: {ex.Message}");
+            Log.Write($"CLI '{verb}' failed: {ex.Message}");
             return 1;
         }
     }
@@ -111,8 +114,9 @@ static class Program
         }
     }
 
-    static int Usage()
+    static int Usage(string verb)
     {
+        Log.Write($"CLI: unknown verb '{verb}'");
         NativeMethods.AttachConsole(NativeMethods.ATTACH_PARENT_PROCESS);
         TryWriteLine("Usage: Musixopper.exe [pause | resume | test]   (no arguments starts the app)");
         return 2;

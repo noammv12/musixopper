@@ -245,12 +245,16 @@ sealed class FlyoutWindow : Window
         body.Margin = new Thickness(0, 6, 0, 0);
         panel.Children.Add(body);
 
+        // Softphone.Pro launches the string as "path + arguments" without
+        // shell-style quote stripping, so quote only when unavoidable.
         var exe = Environment.ProcessPath ?? "Musixopper.exe";
+        var hasSpaces = exe.Contains(' ');
+        if (hasSpaces) exe = $"\"{exe}\"";
         var rows = new (string Caption, string Command)[]
         {
-            ("Outgoing call answer", $"\"{exe}\" pause"),
-            ("Incoming call answer", $"\"{exe}\" pause"),
-            ("Call end", $"\"{exe}\" resume"),
+            ("Outgoing call answer", $"{exe} pause"),
+            ("Incoming call answer", $"{exe} pause"),
+            ("Call end", $"{exe} resume"),
         };
         double top = 12;
         foreach (var (caption, command) in rows)
@@ -259,6 +263,13 @@ sealed class FlyoutWindow : Window
             row.Margin = new Thickness(0, top, 0, 0);
             top = 8;
             panel.Children.Add(row);
+        }
+        if (hasSpaces)
+        {
+            var spaceHint = Ui.Text("If a handler doesn't fire, move Musixopper.exe to a folder without spaces (e.g. C:\\Tools) — some softphones don't handle quoted paths.", 10.5, "TextSecondaryBrush");
+            spaceHint.TextWrapping = TextWrapping.Wrap;
+            spaceHint.Margin = new Thickness(0, 8, 0, 0);
+            panel.Children.Add(spaceHint);
         }
 
         var hint = Ui.Text("Tip: run “Musixopper test” in a terminal — your music pauses for 8 seconds, then resumes.", 11, "TextSecondaryBrush");
