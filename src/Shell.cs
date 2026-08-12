@@ -14,6 +14,7 @@ sealed class Shell : IDisposable
     readonly TrayHost _tray;
     readonly FlyoutWindow _flyout;
     readonly DockWindow _dock;
+    readonly ReminderScheduler _reminders;
     readonly DispatcherTimer _ticker;
     readonly EventWaitHandle _showFlyoutSignal;
     readonly RegisteredWaitHandle _showFlyoutWait;
@@ -31,6 +32,13 @@ sealed class Shell : IDisposable
         _tray.QuitRequested += Quit;
         _flyout.QuitRequested += Quit;
         _dock.OpenFlyoutRequested += () => _flyout.ShowSnippets();
+        _dock.OpenRemindersRequested += () => _flyout.ShowReminders();
+
+        _reminders = new ReminderScheduler(_engine);
+        _reminders.ReminderDue += (reminder, missed) => _dock.ShowReminder(reminder, missed);
+        _dock.ReminderOpenRequested += _reminders.Open;
+        _dock.ReminderSnoozeRequested += _reminders.Snooze;
+        _dock.ReminderDismissRequested += _reminders.Dismiss;
 
         _engine.StateChanged += () =>
         {
@@ -86,6 +94,7 @@ sealed class Shell : IDisposable
     public void Dispose()
     {
         _ticker.Stop();
+        _reminders.Dispose();
         _showFlyoutWait.Unregister(null);
         _showFlyoutSignal.Dispose();
         _dock.Shutdown();

@@ -18,6 +18,7 @@ enum DockState
     Collapsed,
     Expanded,
     Toast,
+    Reminder,
 }
 
 /// <summary>
@@ -56,6 +57,9 @@ sealed class DockWindow : Window
     readonly StackPanel _chipsPanel;
     readonly ShapePath _toastIcon;
     readonly TextBlock _toastText;
+    readonly StackPanel _reminderContent;
+    readonly TextBlock _reminderLabel;
+    readonly TextBlock _reminderCount;
 
     readonly DispatcherTimer _hoverIntent;
     readonly DispatcherTimer _collapseDelay;
@@ -73,6 +77,13 @@ sealed class DockWindow : Window
     double _dragScale = 1;
 
     public event Action? OpenFlyoutRequested;
+    public event Action? OpenRemindersRequested;
+    public event Action<Reminder>? ReminderOpenRequested;
+    public event Action<Reminder>? ReminderSnoozeRequested;
+    public event Action<Reminder>? ReminderDismissRequested;
+
+    readonly Queue<(Reminder Reminder, bool Missed)> _reminderQueue = new();
+    (Reminder Reminder, bool Missed)? _currentReminder;
 
     public DockWindow()
     {
@@ -133,10 +144,42 @@ sealed class DockWindow : Window
         _toastContent.Children.Add(_toastIcon);
         _toastContent.Children.Add(_toastText);
 
+        // -- reminder content ---------------------------------------------
+        var phone = new TextBlock { Text = "📞", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+        _reminderLabel = new TextBlock
+        {
+            FontSize = 12.5,
+            FontWeight = FontWeights.Medium,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(8, 0, 0, 0),
+            MaxWidth = 190,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+        };
+        _reminderLabel.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
+        _reminderCount = new TextBlock { FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
+        _reminderCount.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
+
+        var openButton = ReminderButton("Open", primary: true);
+        openButton.Margin = new Thickness(12, 0, 0, 0);
+        openButton.MouseLeftButtonUp += (_, _) => ActOnCurrentReminder(r => ReminderOpenRequested?.Invoke(r));
+        var snoozeButton = ReminderButton("10m", primary: false);
+        snoozeButton.MouseLeftButtonUp += (_, _) => ActOnCurrentReminder(r => ReminderSnoozeRequested?.Invoke(r));
+        var dismissButton = ReminderButton("✕", primary: false);
+        dismissButton.MouseLeftButtonUp += (_, _) => ActOnCurrentReminder(r => ReminderDismissRequested?.Invoke(r));
+
+        _reminderContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 12, 0) };
+        _reminderContent.Children.Add(phone);
+        _reminderContent.Children.Add(_reminderLabel);
+        _reminderContent.Children.Add(_reminderCount);
+        _reminderContent.Children.Add(openButton);
+        _reminderContent.Children.Add(snoozeButton);
+        _reminderContent.Children.Add(dismissButton);
+
         var host = new Grid();
         host.Children.Add(_collapsedDot);
         host.Children.Add(_expandedContent);
         host.Children.Add(_toastContent);
+        host.Children.Add(_reminderContent);
 
         _pill = new Border
         {
@@ -169,7 +212,7 @@ sealed class DockWindow : Window
         _hoverIntent.Tick += (_, _) =>
         {
             _hoverIntent.Stop();
-            if (_pill.IsMouseOver) SetState(DockState.Expanded);
+            if (_pill.IsMouseOver && _state == DockState.Collapsed) SetState(DockState.Expanded);
         };
         _collapseDelay = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
         _collapseDelay.Tick += (_, _) =>
@@ -188,6 +231,7 @@ sealed class DockWindow : Window
 
         _pill.MouseEnter += (_, _) =>
         {
+            if (_state == DockState.Reminder) return; // persistent until acted on
             _collapseDelay.Stop();
             if (_state == DockState.Collapsed) _hoverIntent.Start();
             else if (_state == DockState.Toast)
@@ -277,6 +321,7 @@ sealed class DockWindow : Window
         }
         if (_fullscreenHidden || !IsVisible) return;
 
+        if (_state == DockState.Reminder) return; // a reminder outranks a toast
         _toastText.Text = text;
         _toastIcon.Data = paused ? PauseGlyph : PlayGlyph;
         if (_state == DockState.Expanded) return; // status text already tells the story
@@ -292,6 +337,96 @@ sealed class DockWindow : Window
         SetState(DockState.Toast);
     }
 
+    // ---- reminders -------------------------------------------------------------
+
+    public void ShowReminder(Reminder reminder, bool missed)
+    {
+        if (!CheckAccess())
+        {
+            Dispatcher.InvokeAsync(() => ShowReminder(reminder, missed));
+            return;
+        }
+        _reminderQueue.Enqueue((reminder, missed));
+        TryShowReminder();
+    }
+
+    void TryShowReminder()
+    {
+        if (_fullscreenHidden || !IsVisible)
+        {
+            return; // held in the queue; surfaced when the dock returns
+        }
+        if (_state == DockState.Reminder)
+        {
+            UpdateReminderContent();
+            return;
+        }
+        if (_reminderQueue.Count == 0 || _currentReminder is not null) return;
+        _currentReminder = _reminderQueue.Dequeue();
+        UpdateReminderContent();
+        _toastTimer.Stop();
+        SetState(DockState.Reminder);
+    }
+
+    void ActOnCurrentReminder(Action<Reminder> action)
+    {
+        if (_currentReminder is not { } current) return;
+        _currentReminder = null;
+        action(current.Reminder);
+        if (_reminderQueue.Count > 0)
+        {
+            _currentReminder = _reminderQueue.Dequeue();
+            UpdateReminderContent();
+            AnimatePillTo(MeasureWidth(_reminderContent), ExpandedHeight, 150, Motion.Out);
+            return;
+        }
+        SetState(_pill.IsMouseOver ? DockState.Expanded : DockState.Collapsed);
+    }
+
+    void UpdateReminderContent()
+    {
+        if (_currentReminder is not { } current) return;
+        _reminderLabel.Text = (current.Missed ? "Missed · " : "") + current.Reminder.DisplayLabel;
+        _reminderCount.Text = _reminderQueue.Count > 0 ? $"+{_reminderQueue.Count}" : "";
+        if (_state == DockState.Reminder)
+            AnimatePillTo(MeasureWidth(_reminderContent), ExpandedHeight, 150, Motion.Out);
+    }
+
+    Border ReminderButton(string text, bool primary)
+    {
+        var label = new TextBlock
+        {
+            Text = text,
+            FontSize = 11.5,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        label.SetResourceReference(TextBlock.ForegroundProperty, primary ? "OnAccentBrush" : "TextPrimaryBrush");
+        var button = new Border
+        {
+            CornerRadius = new CornerRadius(11),
+            Padding = new Thickness(10, 4, 10, 5),
+            Margin = new Thickness(6, 0, 0, 0),
+            Cursor = Cursors.Hand,
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = label,
+        };
+        if (primary)
+        {
+            button.SetResourceReference(Border.BackgroundProperty, "AccentBrush");
+            button.MouseEnter += (_, _) => button.Opacity = 0.9;
+            button.MouseLeave += (_, _) => button.Opacity = 1.0;
+        }
+        else
+        {
+            button.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
+            Ui.HoverFill(button);
+        }
+        button.MouseLeftButtonDown += (_, e) => e.Handled = true;
+        return button;
+    }
+
     // ---- chips -----------------------------------------------------------------
 
     void RefreshChips()
@@ -304,6 +439,11 @@ sealed class DockWindow : Window
         _chipsPanel.Children.Clear();
         foreach (var snippet in SnippetStore.Load().Take(5))
             _chipsPanel.Children.Add(MakeChip(snippet));
+
+        var remind = MakeChipShell("⏰");
+        remind.ToolTip = "Remind me to call someone back";
+        remind.MouseLeftButtonUp += (_, _) => OpenRemindersRequested?.Invoke();
+        _chipsPanel.Children.Add(remind);
 
         var more = MakeChipShell("…");
         more.MouseLeftButtonUp += (_, _) => OpenFlyoutRequested?.Invoke();
@@ -406,6 +546,13 @@ sealed class DockWindow : Window
                 _pill.BeginAnimation(OpacityProperty, Motion.Fade(1.0, Motion.Fast));
                 FadeInContent(_toastContent);
                 break;
+            case DockState.Reminder:
+                Reposition();
+                _pill.CornerRadius = new CornerRadius(20);
+                AnimatePillTo(MeasureWidth(_reminderContent), ExpandedHeight, Motion.Slow, Motion.Overshoot);
+                _pill.BeginAnimation(OpacityProperty, Motion.Fade(1.0, Motion.Fast));
+                FadeInContent(_reminderContent);
+                break;
         }
     }
 
@@ -414,6 +561,7 @@ sealed class DockWindow : Window
         _collapsedDot.Visibility = _state == DockState.Collapsed ? Visibility.Visible : Visibility.Collapsed;
         _expandedContent.Visibility = _state == DockState.Expanded ? Visibility.Visible : Visibility.Collapsed;
         _toastContent.Visibility = _state == DockState.Toast ? Visibility.Visible : Visibility.Collapsed;
+        _reminderContent.Visibility = _state == DockState.Reminder ? Visibility.Visible : Visibility.Collapsed;
     }
 
     double RestingOpacityFor() => _callState == CallState.Disabled ? DisabledOpacity : RestingOpacity;
@@ -546,6 +694,10 @@ sealed class DockWindow : Window
         if (hide == _fullscreenHidden) return;
         _fullscreenHidden = hide;
         Visibility = hide ? Visibility.Hidden : Visibility.Visible;
-        if (!hide) Reposition();
+        if (!hide)
+        {
+            Reposition();
+            TryShowReminder();
+        }
     }
 }

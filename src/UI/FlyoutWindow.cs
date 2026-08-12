@@ -17,7 +17,7 @@ namespace Saley.UI;
 /// two first-run onboarding panels. Opens near the tray icon, dismisses on
 /// focus loss.
 /// </summary>
-sealed class FlyoutWindow : Window
+sealed partial class FlyoutWindow : Window
 {
     const double ShadowMargin = 20;  // room around the card for the drop shadow
     const double EdgeGap = 8;        // visual gap between the card and the taskbar
@@ -90,11 +90,13 @@ sealed class FlyoutWindow : Window
         _welcomePanel = BuildWelcomePanel();
         _softphonePanel = BuildSoftphonePanel();
         _snippetsPanel = BuildSnippetsPanel();
+        _remindersPanel = BuildRemindersPanel();
         var host = new Grid();
         host.Children.Add(_mainPanel);
         host.Children.Add(_welcomePanel);
         host.Children.Add(_softphonePanel);
         host.Children.Add(_snippetsPanel);
+        host.Children.Add(_remindersPanel);
 
         _root = new Border
         {
@@ -198,6 +200,11 @@ sealed class FlyoutWindow : Window
         snippetsLink.Margin = new Thickness(2, 12, 2, 0);
         snippetsLink.MouseLeftButtonUp += (_, _) => ShowSnippets();
         panel.Children.Add(snippetsLink);
+
+        var remindersLink = Ui.Link("Reminders…", 11);
+        remindersLink.Margin = new Thickness(2, 8, 2, 0);
+        remindersLink.MouseLeftButtonUp += (_, _) => ShowReminders();
+        panel.Children.Add(remindersLink);
 
         panel.Children.Add(Ui.Divider(12, 10));
 
