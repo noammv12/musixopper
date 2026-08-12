@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace Musixopper;
 
 /// <summary>Minimal size-capped file log: %LOCALAPPDATA%\Musixopper\log.txt.</summary>
