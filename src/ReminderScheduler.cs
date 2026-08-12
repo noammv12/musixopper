@@ -66,7 +66,12 @@ sealed class ReminderScheduler : IDisposable
         }
         catch (Exception ex)
         {
+            // Launch failed (broken browser association?) — don't consume the
+            // reminder; re-arm it shortly instead of marking it Done.
             Log.Write($"Reminder open failed: {ex.Message}");
+            _delivered.Remove(reminder.Id);
+            ReminderStore.Update(reminder with { DueAtUtc = DateTime.UtcNow.AddMinutes(2) });
+            return;
         }
         ReminderStore.Update(reminder with { State = ReminderState.Done });
     }

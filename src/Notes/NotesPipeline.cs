@@ -162,6 +162,8 @@ sealed class NotesPipeline : IDisposable
                         if (!recovered) ToastRequested?.Invoke("Notes: nothing heard on the call");
                         return;
                     }
+                    if (session.MicUnavailable)
+                        transcript = "(Microphone wasn't recorded — your side of the call may be missing.)\n" + transcript;
 
                     string? summary = null;
                     if (Settings.DeepSeekKey is { } key)

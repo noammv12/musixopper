@@ -97,6 +97,11 @@ partial class FlyoutWindow
         panel.Children.Add(done);
 
         SelectTimeChip(_timeSelection);
+        // Keep the list live while dock/scheduler actions mutate the store.
+        ReminderStore.Changed += () => Dispatcher.InvokeAsync(() =>
+        {
+            if (_remindersPanel.Visibility == Visibility.Visible) RebuildReminderList();
+        });
         return panel;
     }
 

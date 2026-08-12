@@ -34,8 +34,6 @@ sealed class CallRecorder : IDisposable
     WasapiOut? _keepAlive;
     RecordingSession? _session;
 
-    public bool IsRecording => _session is not null;
-
     public RecordingSession? Start(string tmpBaseDir)
     {
         if (_session is not null) return _session;
@@ -54,17 +52,28 @@ sealed class CallRecorder : IDisposable
 
         var enumerator = new MMDeviceEnumerator();
 
+        WasapiLoopbackCapture? sys = null;
+        WaveFileWriter? sysWriter = null;
+        WasapiOut? keepAlive = null;
         try
         {
             var render = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-            var sys = new WasapiLoopbackCapture(render);
+            sys = new WasapiLoopbackCapture(render);
             var path = Path.Combine(dir, "sys.wav");
-            var writer = new WaveFileWriter(path, sys.WaveFormat);
+            var writer = sysWriter = new WaveFileWriter(path, sys.WaveFormat);
+            var lastFlush = DateTime.UtcNow;
             sys.DataAvailable += (_, e) =>
             {
                 try
                 {
                     writer.Write(e.Buffer, 0, e.BytesRecorded);
+                    // Periodic flush rewrites the RIFF header so a hard crash
+                    // still leaves a readable WAV for the recovery sweep.
+                    if ((DateTime.UtcNow - lastFlush).TotalSeconds >= 2)
+                    {
+                        lastFlush = DateTime.UtcNow;
+                        writer.Flush();
+                    }
                 }
                 catch
                 {
@@ -76,13 +85,13 @@ sealed class CallRecorder : IDisposable
                 if (e.Exception is not null) Log.Write($"Recorder: system track stopped early: {e.Exception.Message}");
             };
 
-            var keepAlive = new WasapiOut(render, AudioClientShareMode.Shared, true, 200);
+            keepAlive = new WasapiOut(render, AudioClientShareMode.Shared, true, 200);
             keepAlive.Init(new SilenceProvider(sys.WaveFormat));
             keepAlive.Play();
 
             sys.StartRecording();
             _sys = sys;
-            _sysWriter = writer;
+            _sysWriter = sysWriter;
             _keepAlive = keepAlive;
             session.SysPath = path;
             session.SysStartUtc = DateTime.UtcNow;
@@ -91,9 +100,16 @@ sealed class CallRecorder : IDisposable
         catch (Exception ex)
         {
             Log.Write($"Recorder: loopback unavailable: {ex.Message}");
-            DisposeSystemTrack();
+            TryDispose(sys);
+            TryDispose(keepAlive);
+            TryDispose(sysWriter);
+            _sys = null;
+            _sysWriter = null;
+            _keepAlive = null;
         }
 
+        WasapiCapture? mic = null;
+        WaveFileWriter? micWriter = null;
         try
         {
             MMDevice micDevice;
@@ -105,14 +121,20 @@ sealed class CallRecorder : IDisposable
             {
                 micDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Console);
             }
-            var mic = new WasapiCapture(micDevice);
+            mic = new WasapiCapture(micDevice);
             var path = Path.Combine(dir, "mic.wav");
-            var writer = new WaveFileWriter(path, mic.WaveFormat);
+            var writer = micWriter = new WaveFileWriter(path, mic.WaveFormat);
+            var lastFlush = DateTime.UtcNow;
             mic.DataAvailable += (_, e) =>
             {
                 try
                 {
                     writer.Write(e.Buffer, 0, e.BytesRecorded);
+                    if ((DateTime.UtcNow - lastFlush).TotalSeconds >= 2)
+                    {
+                        lastFlush = DateTime.UtcNow;
+                        writer.Flush();
+                    }
                 }
                 catch
                 {
@@ -124,7 +146,7 @@ sealed class CallRecorder : IDisposable
             };
             mic.StartRecording();
             _mic = mic;
-            _micWriter = writer;
+            _micWriter = micWriter;
             session.MicPath = path;
             session.MicStartUtc = DateTime.UtcNow;
             Log.Write($"Recorder: microphone via {micDevice.FriendlyName}");
@@ -132,6 +154,10 @@ sealed class CallRecorder : IDisposable
         catch (Exception ex)
         {
             Log.Write($"Recorder: microphone unavailable: {ex.Message}");
+            TryDispose(mic);
+            TryDispose(micWriter);
+            _mic = null;
+            _micWriter = null;
             session.MicUnavailable = true;
         }
 
@@ -210,6 +236,17 @@ sealed class CallRecorder : IDisposable
             {
             }
             _sysWriter = null;
+        }
+    }
+
+    static void TryDispose(IDisposable? disposable)
+    {
+        try
+        {
+            disposable?.Dispose();
+        }
+        catch
+        {
         }
     }
 

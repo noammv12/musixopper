@@ -7,7 +7,10 @@ namespace Saley.Notes;
 /// <summary>Local whisper.cpp transcription (multilingual small model).</summary>
 sealed class WhisperTranscriber : ITranscriber
 {
-    public static bool Ready => ModelStore.IsReady && WhisperRuntime.UnavailableReason is null;
+    // EnsureLoaded (not just the flag) so an AVX2-less machine is discovered
+    // BEFORE a call gets recorded, not after — a failed transcription would
+    // delete the audio without producing a note.
+    public static bool Ready => ModelStore.IsReady && WhisperRuntime.EnsureLoaded();
 
     public async Task<string> TranscribeAsync(string wav16kMonoPath, string language, CancellationToken ct)
     {

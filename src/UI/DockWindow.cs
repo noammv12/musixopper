@@ -348,7 +348,9 @@ sealed class DockWindow : Window
     {
         _statusText.Text = _callState switch
         {
-            CallState.OnCall => $"On a call — {DateTime.UtcNow - _callStartedUtc:mm\\:ss}",
+            CallState.OnCall => (DateTime.UtcNow - _callStartedUtc) is { TotalHours: >= 1 } elapsed
+                ? $"On a call — {elapsed:hh\\:mm\\:ss}"
+                : $"On a call — {DateTime.UtcNow - _callStartedUtc:mm\\:ss}",
             CallState.Disabled => "Paused",
             _ => _processingStatus.Length > 0 ? _processingStatus : "Listening for calls",
         };
@@ -362,14 +364,16 @@ sealed class DockWindow : Window
             return;
         }
         if (_fullscreenHidden || !IsVisible) return;
-
         if (_state == DockState.Reminder) return; // a reminder outranks a toast
+        // Pause/resume toasts are redundant while expanded (the status line
+        // says it) — but an actionable toast must never be dropped.
+        if (_state == DockState.Expanded && onClick is null) return;
+
         _toastText.Text = text;
         _toastIcon.Data = paused ? PauseGlyph : PlayGlyph;
         _toastIcon.Visibility = showIcon ? Visibility.Visible : Visibility.Collapsed;
         _toastAction = onClick;
         _toastContent.Cursor = onClick is null ? Cursors.Arrow : Cursors.Hand;
-        if (_state == DockState.Expanded) return; // status text already tells the story
 
         _toastTimer.Stop();
         _toastTimer.Start();

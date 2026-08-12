@@ -76,6 +76,21 @@ static class ModelStore
             if (existing > 0) request.Headers.Range = new RangeHeaderValue(existing, null);
 
             using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+            if (response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable)
+            {
+                // The .part already covers the whole file (a previous run was
+                // killed between the last byte and the final move) — or it's
+                // junk. Finalize or restart; never wedge.
+                if (existing >= MinValidBytes)
+                {
+                    File.Move(part, ModelPath, overwrite: true);
+                    Log.Write("Whisper model download finalized from existing .part");
+                    success = true;
+                    return;
+                }
+                File.Delete(part);
+                throw new IOException("resume mismatch — press Download to restart");
+            }
             response.EnsureSuccessStatusCode();
 
             var resuming = response.StatusCode == HttpStatusCode.PartialContent && existing > 0;

@@ -33,7 +33,9 @@ partial class FlyoutWindow
         _notesSwitch.Toggled += on =>
         {
             Settings.NotesEnabled = on;
-            if (on && !ModelStore.IsReady && !ModelStore.IsDownloading) ModelStore.StartDownload();
+            // Don't start a 466 MB download on a machine that can't transcribe.
+            if (on && WhisperRuntime.EnsureLoaded() && !ModelStore.IsReady && !ModelStore.IsDownloading)
+                ModelStore.StartDownload();
             UpdateModelRow();
         };
         var toggleRow = Ui.ToggleRow("Take notes on my calls", _notesSwitch);
