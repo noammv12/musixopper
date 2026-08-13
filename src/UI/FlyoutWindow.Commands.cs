@@ -18,6 +18,7 @@ partial class FlyoutWindow
     {
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
+        panel.Children.Add(BackLink());
         panel.Children.Add(Ui.Text("Commands", 15, "TextPrimaryBrush", FontWeights.SemiBold));
         var subtitle = Ui.Text("Your one-click launches — a link, an app, a folder. Once Ask Bridget is set up, saying “open Salesforce” runs them too.", 11.5, "TextSecondaryBrush");
         subtitle.TextWrapping = TextWrapping.Wrap;

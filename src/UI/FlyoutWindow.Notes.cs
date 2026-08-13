@@ -41,6 +41,7 @@ partial class FlyoutWindow
     {
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
+        panel.Children.Add(BackLink());
         panel.Children.Add(Ui.Text("Notes & dictation", 15, "TextPrimaryBrush", FontWeights.SemiBold));
         var subtitle = Ui.Text("Records your calls, types them up, and writes 3 bullets + a next step. Recording is off until you turn it on; audio is deleted right after transcription.", 11.5, "TextSecondaryBrush");
         subtitle.TextWrapping = TextWrapping.Wrap;
@@ -475,7 +476,7 @@ partial class FlyoutWindow
             var copy = Ui.Link("Copy", 10.5);
             copy.MouseLeftButtonUp += (_, _) =>
             {
-                if (SnippetPaster.TrySetClipboard(note.Summary ?? note.Transcript)) copy.Text = "Copied ✓";
+                if (SnippetPaster.TrySetClipboard(note.Summary ?? note.Transcript)) Ui.Flash(copy, "Copied ✓", "Copy");
             };
             links.Children.Add(copy);
 
@@ -530,7 +531,7 @@ partial class FlyoutWindow
         copy.Margin = new Thickness(0, 6, 0, 0);
         copy.MouseLeftButtonUp += (_, _) =>
         {
-            if (SnippetPaster.TrySetClipboard(text)) copy.Text = "Copied ✓";
+            if (SnippetPaster.TrySetClipboard(text)) Ui.Flash(copy, "Copied ✓", "Copy");
         };
         inner.Children.Add(copy);
         var box = new Border

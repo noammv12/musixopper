@@ -230,6 +230,19 @@ static class Ui
         return link;
     }
 
+    /// <summary>Standard action feedback on a link: swap the text, revert after 1.2 s.</summary>
+    public static void Flash(TextBlock link, string message, string revertTo)
+    {
+        link.Text = message;
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            link.Text = revertTo;
+        };
+        timer.Start();
+    }
+
     /// <summary>Standard hover treatment for a clickable filled surface.</summary>
     public static void HoverFill(Border element)
     {

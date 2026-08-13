@@ -14,6 +14,7 @@ partial class FlyoutWindow
     {
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
+        panel.Children.Add(BackLink());
         panel.Children.Add(Ui.Text("Call stats", 15, "TextPrimaryBrush", FontWeights.SemiBold));
         var subtitle = Ui.Text("Answered calls only; talk time is time on the line.", 11.5, "TextSecondaryBrush");
         subtitle.TextWrapping = TextWrapping.Wrap;

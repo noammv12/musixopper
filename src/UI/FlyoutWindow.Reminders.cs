@@ -30,6 +30,7 @@ partial class FlyoutWindow
     {
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
+        panel.Children.Add(BackLink());
         panel.Children.Add(Ui.Text("Reminders", 15, "TextPrimaryBrush", FontWeights.SemiBold));
         var subtitle = Ui.Text("Paste the lead's link, pick a time — Bridget pops it above the taskbar when it's time to call.", 11.5, "TextSecondaryBrush");
         subtitle.TextWrapping = TextWrapping.Wrap;

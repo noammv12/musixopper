@@ -63,6 +63,7 @@ sealed class DockWindow : Window
     readonly TextBlock _reminderCount;
     readonly StackPanel _dictationContent;
     readonly Ellipse _dictationDot;
+    readonly TextBlock _assistantGlyph;
     readonly TextBlock _dictationText;
 
     readonly DispatcherTimer _hoverIntent;
@@ -212,9 +213,16 @@ sealed class DockWindow : Window
         _reminderContent.Children.Add(snoozeButton);
         _reminderContent.Children.Add(dismissButton);
 
-        // -- dictation content ----------------------------------------------
+        // -- dictation / assistant content ------------------------------------
         _dictationDot = new Ellipse { Width = 8, Height = 8, VerticalAlignment = VerticalAlignment.Center };
         _dictationDot.SetResourceReference(Shape.FillProperty, "StatusGoodBrush");
+        _assistantGlyph = new TextBlock
+        {
+            Text = "💬",
+            FontSize = 12,
+            VerticalAlignment = VerticalAlignment.Center,
+            Visibility = Visibility.Collapsed,
+        };
         _dictationText = new TextBlock
         {
             FontSize = 12.5,
@@ -232,6 +240,7 @@ sealed class DockWindow : Window
             (_assistantActive ? AssistantCancelRequested : DictationCancelRequested)?.Invoke();
         _dictationContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 12, 0) };
         _dictationContent.Children.Add(_dictationDot);
+        _dictationContent.Children.Add(_assistantGlyph);
         _dictationContent.Children.Add(_dictationText);
         _dictationContent.Children.Add(dictationFinish);
         _dictationContent.Children.Add(dictationCancel);
@@ -451,10 +460,16 @@ sealed class DockWindow : Window
         RefreshChips(); // the 🎙/💬 chip tooltips render the same bindings
     }
 
-    void UpdateListeningText() => _dictationText.Text =
-        _assistantActive ? "Bridget is listening — ask away"
-        : DictationHotkeyLive ? $"Listening — {_dictationHotkey} to finish"
-        : "Listening — click Finish when done";
+    void UpdateListeningText()
+    {
+        // 💬 marks Bridget listening; the pulsing dot marks dictation.
+        _assistantGlyph.Visibility = _assistantActive ? Visibility.Visible : Visibility.Collapsed;
+        _dictationDot.Visibility = _assistantActive ? Visibility.Collapsed : Visibility.Visible;
+        _dictationText.Text =
+            _assistantActive ? "Bridget is listening — ask away"
+            : DictationHotkeyLive ? $"Listening — {_dictationHotkey} to finish"
+            : "Listening — click Finish when done";
+    }
 
     bool DictationHotkeyLive => !_dictationHotkey.IsOff && !_dictationHotkeyFailed;
 
@@ -868,7 +883,7 @@ sealed class DockWindow : Window
         {
             Text = text,
             FontSize = 11.5,
-            MaxWidth = 110,
+            MaxWidth = 90, // five glyph chips now share the pill's width budget
             TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center,
             HorizontalAlignment = HorizontalAlignment.Center,

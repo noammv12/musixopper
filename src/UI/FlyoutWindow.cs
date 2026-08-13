@@ -168,6 +168,17 @@ sealed partial class FlyoutWindow : Window
 
     // ---- panels ----------------------------------------------------------
 
+    /// <summary>Top-of-panel return affordance — panels can be taller than the
+    /// screen now, and the Done button lives at the (scrolled) bottom.</summary>
+    TextBlock BackLink()
+    {
+        var back = Ui.Link("‹ Back", 10.5);
+        back.Margin = new Thickness(0, 0, 0, 8);
+        back.HorizontalAlignment = HorizontalAlignment.Left;
+        back.MouseLeftButtonUp += (_, _) => ShowPanel(_mainPanel);
+        return back;
+    }
+
     StackPanel BuildMainPanel()
     {
         var panel = new StackPanel();
@@ -241,35 +252,31 @@ sealed partial class FlyoutWindow : Window
         startupRow.Margin = new Thickness(0, 10, 0, 0);
         panel.Children.Add(startupRow);
 
-        var bridgetLink = Ui.Link("Ask Bridget…", 11);
-        bridgetLink.Margin = new Thickness(2, 12, 2, 0);
-        bridgetLink.MouseLeftButtonUp += (_, _) => ShowBridget();
-        panel.Children.Add(bridgetLink);
+        // Six destinations read better as a tight two-column grid than a
+        // scrolling list of links.
+        var linkGrid = new Grid { Margin = new Thickness(2, 12, 2, 0) };
+        linkGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        linkGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        for (var r = 0; r < 3; r++)
+            linkGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        var snippetsLink = Ui.Link("Snippets…", 11);
-        snippetsLink.Margin = new Thickness(2, 8, 2, 0);
-        snippetsLink.MouseLeftButtonUp += (_, _) => ShowSnippets();
-        panel.Children.Add(snippetsLink);
+        void AddLink(string text, int row, int column, Action onClick)
+        {
+            var link = Ui.Link(text, 11);
+            link.Margin = new Thickness(0, row == 0 ? 0 : 10, 0, 0);
+            link.MouseLeftButtonUp += (_, _) => onClick();
+            Grid.SetRow(link, row);
+            Grid.SetColumn(link, column);
+            linkGrid.Children.Add(link);
+        }
 
-        var remindersLink = Ui.Link("Reminders…", 11);
-        remindersLink.Margin = new Thickness(2, 8, 2, 0);
-        remindersLink.MouseLeftButtonUp += (_, _) => ShowReminders();
-        panel.Children.Add(remindersLink);
-
-        var notesLink = Ui.Link("Notes & dictation…", 11);
-        notesLink.Margin = new Thickness(2, 8, 2, 0);
-        notesLink.MouseLeftButtonUp += (_, _) => ShowNotes();
-        panel.Children.Add(notesLink);
-
-        var commandsLink = Ui.Link("Commands…", 11);
-        commandsLink.Margin = new Thickness(2, 8, 2, 0);
-        commandsLink.MouseLeftButtonUp += (_, _) => ShowCommands();
-        panel.Children.Add(commandsLink);
-
-        var statsLink = Ui.Link("Stats…", 11);
-        statsLink.Margin = new Thickness(2, 8, 2, 0);
-        statsLink.MouseLeftButtonUp += (_, _) => ShowStats();
-        panel.Children.Add(statsLink);
+        AddLink("Ask Bridget…", 0, 0, ShowBridget);
+        AddLink("Commands…", 0, 1, ShowCommands);
+        AddLink("Snippets…", 1, 0, ShowSnippets);
+        AddLink("Reminders…", 1, 1, ShowReminders);
+        AddLink("Notes & dictation…", 2, 0, ShowNotes);
+        AddLink("Stats…", 2, 1, ShowStats);
+        panel.Children.Add(linkGrid);
 
         panel.Children.Add(Ui.Divider(12, 10));
 
@@ -295,7 +302,7 @@ sealed partial class FlyoutWindow : Window
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
         panel.Children.Add(Ui.Text("Welcome to Bridget", 15, "TextPrimaryBrush", FontWeights.SemiBold));
-        var subtitle = Ui.Text("Your music pauses when a call starts, and comes back when it ends.", 11.5, "TextSecondaryBrush");
+        var subtitle = Ui.Text("Your music pauses when a call starts and comes back when it ends — and once you're set up, press Ctrl+Alt+B and just ask.", 11.5, "TextSecondaryBrush");
         subtitle.TextWrapping = TextWrapping.Wrap;
         subtitle.Margin = new Thickness(0, 6, 0, 0);
         panel.Children.Add(subtitle);
@@ -391,6 +398,7 @@ sealed partial class FlyoutWindow : Window
     {
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
+        panel.Children.Add(BackLink());
         panel.Children.Add(Ui.Text("Snippets", 15, "TextPrimaryBrush", FontWeights.SemiBold));
         var subtitle = Ui.Text("Hover the dock above the taskbar and click a chip to paste it into the app you're working in. Right-click copies.", 11.5, "TextSecondaryBrush");
         subtitle.TextWrapping = TextWrapping.Wrap;

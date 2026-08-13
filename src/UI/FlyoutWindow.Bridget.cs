@@ -25,6 +25,7 @@ partial class FlyoutWindow
     {
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
+        panel.Children.Add(BackLink());
         panel.Children.Add(Ui.Text("Ask Bridget", 15, "TextPrimaryBrush", FontWeights.SemiBold));
         var subtitle = Ui.Text("Press the hotkey (or the 💬 chip), ask out loud — Bridget answers back, or opens one of your commands.", 11.5, "TextSecondaryBrush");
         subtitle.TextWrapping = TextWrapping.Wrap;
@@ -123,7 +124,7 @@ partial class FlyoutWindow
         _copyAnswerLink.Margin = new Thickness(0, 6, 0, 0);
         _copyAnswerLink.MouseLeftButtonUp += (_, _) =>
         {
-            if (SnippetPaster.TrySetClipboard(_lastAnswer.Text)) _copyAnswerLink.Text = "Copied ✓";
+            if (SnippetPaster.TrySetClipboard(_lastAnswer.Text)) Ui.Flash(_copyAnswerLink, "Copied ✓", "Copy");
         };
         exchangeStack.Children.Add(_copyAnswerLink);
         _exchangeCard = new Border
