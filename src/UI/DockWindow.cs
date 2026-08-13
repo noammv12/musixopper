@@ -381,6 +381,28 @@ sealed class DockWindow : Window
         return ok;
     }
 
+    /// <summary>
+    /// Temporarily releases every global hotkey (dictation + snippets) so the
+    /// flyout's capture box can receive those keystrokes itself. Restore with
+    /// ApplyDictationHotkey + ApplySnippetHotkeys.
+    /// </summary>
+    public void SuspendHotkeys()
+    {
+        if (!CheckAccess())
+        {
+            Dispatcher.InvokeAsync(SuspendHotkeys);
+            return;
+        }
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) return;
+        NativeMethods.UnregisterHotKey(hwnd, DictationHotkeyId);
+        for (var i = 0; i < _hotkeySnippets.Length; i++)
+        {
+            NativeMethods.UnregisterHotKey(hwnd, SnippetHotkeyBase + i);
+            _hotkeySnippets[i] = null;
+        }
+    }
+
     void RefreshHotkeyStrings()
     {
         _dictationText.Text = DictationHotkeyLive

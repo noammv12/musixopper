@@ -54,7 +54,9 @@ static class DeepSeekClient
     public static Task<string?> PolishAsync(string text, bool professional, string apiKey, CancellationToken ct)
     {
         if (text.Length > MaxDictationChars) return Task.FromResult<string?>(null); // too long to round-trip — keep raw
-        return ChatAsync(professional ? ProfessionalPrompt : PolishPrompt, text, 0.2, 2048, apiKey, ct);
+        // rejectTruncated: a polish cut off at the token cap must never
+        // replace the full raw transcript.
+        return ChatAsync(professional ? ProfessionalPrompt : PolishPrompt, text, 0.2, 4096, apiKey, ct, rejectTruncated: true);
     }
 
     /// <summary>A paste-ready follow-up message, or null when unavailable.</summary>
@@ -64,7 +66,7 @@ static class DeepSeekClient
         return ChatAsync(FollowUpPrompt, "Call notes:\n" + noteText, 0.5, 300, apiKey, ct);
     }
 
-    static async Task<string?> ChatAsync(string systemPrompt, string userContent, double temperature, int maxTokens, string apiKey, CancellationToken ct)
+    static async Task<string?> ChatAsync(string systemPrompt, string userContent, double temperature, int maxTokens, string apiKey, CancellationToken ct, bool rejectTruncated = false)
     {
         for (var attempt = 0; attempt < 2; attempt++)
         {
@@ -110,11 +112,15 @@ static class DeepSeekClient
                 }
 
                 using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
-                var content = doc.RootElement
-                    .GetProperty("choices")[0]
-                    .GetProperty("message")
-                    .GetProperty("content")
-                    .GetString();
+                var choice = doc.RootElement.GetProperty("choices")[0];
+                if (rejectTruncated
+                    && choice.TryGetProperty("finish_reason", out var finish)
+                    && finish.GetString() == "length")
+                {
+                    Log.Write("DeepSeek: response hit the token cap — discarded");
+                    return null;
+                }
+                var content = choice.GetProperty("message").GetProperty("content").GetString();
                 return string.IsNullOrWhiteSpace(content) ? null : content.Trim();
             }
             catch (Exception ex) when (attempt == 0 && ex is not OperationCanceledException)

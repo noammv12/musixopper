@@ -8,8 +8,11 @@ static class Program
     static int Main(string[] args)
     {
         // Trim stray quotes too — some dialer integrations pass them through.
+        // The payload rejoins argv: an unquoted "+972 50-1234567" from
+        // %NUMBER% arrives split across arguments.
         if (args.Length > 0)
-            return RunCli(args[0].Trim().Trim('"').ToLowerInvariant(), args.Length > 1 ? args[1] : null);
+            return RunCli(args[0].Trim().Trim('"').ToLowerInvariant(),
+                args.Length > 1 ? string.Join(' ', args[1..]) : null);
 
         using var mutex = new Mutex(initiallyOwned: true, "Saley.Tray.SingleInstance", out var isFirstInstance);
         if (!isFirstInstance)

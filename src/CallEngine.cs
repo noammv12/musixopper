@@ -86,6 +86,12 @@ sealed class CallEngine : IDisposable
             else if (endSignaled) _signaledOnCall = false;
             else if (startSignaled) _signaledOnCall = true;
 
+            // A start signal while already on a call (mic-mode answer,
+            // coalesced end+start) still carries a fresh number: consume it
+            // now so a stale side-channel file can't tag the NEXT call.
+            if (startSignaled && State == CallState.OnCall && CurrentCall.Take() is { } freshNumber)
+                CurrentNumber = freshNumber;
+
             if (!Enabled)
             {
                 // Disabled mid-call: forget what we paused but don't resume it,

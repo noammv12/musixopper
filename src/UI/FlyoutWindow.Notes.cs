@@ -33,6 +33,10 @@ partial class FlyoutWindow
     /// hotkey from Settings; false when Windows refused the combo.</summary>
     public Func<bool>? ApplyDictationHotkey { get; set; }
 
+    /// <summary>Set by Shell: releases all of the dock's global hotkeys so
+    /// the capture box can receive combos Saley itself owns.</summary>
+    public Action? SuspendGlobalHotkeys { get; set; }
+
     StackPanel BuildNotesPanel()
     {
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
@@ -207,10 +211,18 @@ partial class FlyoutWindow
         _hotkeyBox.MouseLeftButtonUp += (_, _) => Keyboard.Focus(_hotkeyBox);
         _hotkeyBox.GotKeyboardFocus += (_, _) =>
         {
+            // Release Saley's own hotkeys so pressing e.g. the current combo
+            // reaches the capture box instead of starting a dictation.
+            SuspendGlobalHotkeys?.Invoke();
             _hotkeyLabel.Text = "Press a key combo…";
             SetHotkeyStatus("Esc cancels. Include Ctrl, Alt or Win.", warn: false);
         };
-        _hotkeyBox.LostKeyboardFocus += (_, _) => RefreshHotkeyRow();
+        _hotkeyBox.LostKeyboardFocus += (_, _) =>
+        {
+            ApplyDictationHotkey?.Invoke();
+            ApplySnippetHotkeys?.Invoke();
+            RefreshHotkeyRow();
+        };
         _hotkeyBox.PreviewKeyDown += OnHotkeyCapture;
         hotkeyRow.Children.Add(_hotkeyBox);
 
@@ -477,8 +489,7 @@ partial class FlyoutWindow
                     if (busy || Settings.DeepSeekKey is not { } key) return;
                     busy = true;
                     follow.Text = "Writing…";
-                    var text = await Task.Run(() =>
-                        DeepSeekClient.FollowUpAsync(note.Summary ?? note.Transcript, key, CancellationToken.None));
+                    var text = await DeepSeekClient.FollowUpAsync(note.Summary ?? note.Transcript, key, CancellationToken.None);
                     busy = false;
                     if (string.IsNullOrWhiteSpace(text))
                     {

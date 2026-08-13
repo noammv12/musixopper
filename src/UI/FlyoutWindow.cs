@@ -709,6 +709,7 @@ sealed partial class FlyoutWindow : Window
             Dispatcher.InvokeAsync(() => ShowFlyoutCore(onboarding, force));
             return;
         }
+        UpdateStatsLine(); // recompute "Today:" — the day may have rolled over
         if (IsVisible)
         {
             if (_hiding)

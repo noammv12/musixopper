@@ -28,7 +28,11 @@ partial class FlyoutWindow
         done.MouseLeftButtonUp += (_, _) => ShowPanel(_mainPanel);
         panel.Children.Add(done);
 
-        CallStatsStore.Changed += () => Dispatcher.InvokeAsync(UpdateStatsLine);
+        CallStatsStore.Changed += () => Dispatcher.InvokeAsync(() =>
+        {
+            UpdateStatsLine();
+            if (panel.Visibility == Visibility.Visible) RebuildStats();
+        });
         UpdateStatsLine(); // the main panel (and its stats line) is built before this panel
         return panel;
     }

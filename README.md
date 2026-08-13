@@ -45,7 +45,7 @@ Flyout → **Detect calls by**:
 
 ## Snippets
 
-Your repeat texts as chips in the dock. **Click** pastes straight into the app you're working in (the dock never takes focus); **right-click** copies. Manage up to 15 via **…** → Snippets. Caveats: elevated (admin) apps silently ignore injected paste (the text is still on the clipboard), and some terminals bind paste to Ctrl+Shift+V.
+Your repeat texts as chips in the dock. **Click** pastes straight into the app you're working in (the dock never takes focus); **right-click** copies. Manage up to 15 via **…** → Snippets. Optional: turn on **Paste with Ctrl+Alt+1–9** there to paste your first nine snippets by global hotkey (off by default — skip it if you type with AltGr). Caveats: elevated (admin) apps silently ignore injected paste (the text is still on the clipboard), and some terminals bind paste to Ctrl+Shift+V.
 
 ## Reminders
 
@@ -58,7 +58,8 @@ Flyout → *Call notes…* → **Take notes on my calls**. From then on:
 1. During a call, Saley records your mic + the caller's audio.
 2. When you hang up, it transcribes the call. **With a Groq API key** (free at console.groq.com, paste it in the panel) transcription runs on Groq's whisper-large-v3-turbo — excellent Hebrew, done in seconds. **Without a key** it runs locally on your PC with the offline Whisper model (~466 MB one-time download, 1–2 min for a 10-min call). With both, Groq is used first and the local model is the automatic fallback when Groq is unreachable or rate-limited.
 3. If you've pasted a DeepSeek API key, it writes **3 bullets + the next step**; without one you get the transcript only.
-4. The note pops up in the dock ("Notes ready — click to view"), lands in the flyout with a Copy button, and is appended to a daily Markdown file (`%LOCALAPPDATA%\Saley\notes\`).
+4. The note pops up in the dock ("Notes ready — click to view"), lands in the flyout with a Copy button, and is appended to a daily Markdown file (`%LOCALAPPDATA%\Saley\notes\`). If your softphone handlers pass `%NUMBER%`, the note is tagged with the caller's number.
+5. Each note card has **✨ Follow-up** (with a DeepSeek key): one click drafts a short WhatsApp-style follow-up message from the note, in the call's language, ready to copy.
 
 **Privacy:** recording is OFF by default. Audio files are deleted immediately after processing — only text is kept, on your PC. Keys are stored encrypted (Windows DPAPI, bound to your Windows account). With a Groq key, call audio is uploaded to Groq for transcription; only transcript text goes to DeepSeek. **Recording calls may require consent where you are — check your local law and company policy before enabling.**
 
@@ -68,9 +69,16 @@ The log at `%LOCALAPPDATA%\Saley\log.txt` narrates every step of note processing
 
 Press **Ctrl+Alt+Space** (or the 🎙 chip in the dock), speak, press it again (or click Finish) — the text is typed straight into whatever app your cursor is in. Hebrew by default, powered by the same Groq/local engine as call notes (needs a Groq key or the offline model). ✕ on the dock cancels. Works mid-call.
 
+- **Your hotkey:** flyout → *Notes & dictation…* → **Dictation** — click the combo box, press the keys you want (any Ctrl/Alt/Win combo), or turn the hotkey off. If another app owns the combo, Saley says so and keeps the old one.
+- **Polish with AI** (optional, needs a DeepSeek key): cleans punctuation and filler words before the text is typed; **Professional tone** additionally smooths phrasing for business messages. If the API is unreachable, the raw transcript is typed — a dictation is never lost.
+
+## Call stats
+
+The flyout shows a quiet "Today: 14 calls · 1h 12m" line under the status, and **Stats…** opens today / last-7-days totals with average call length. Counted locally from answered calls into `%LOCALAPPDATA%\Saley\calls.json` (kept 90 days), never uploaded anywhere.
+
 ## Network use
 
-Saley talks to the network only when *you* opt in: the one-time voice-model download from `huggingface.co`, transcription requests to `api.groq.com` when you add a Groq key, and summary requests to `api.deepseek.com` when you add a DeepSeek key. Nothing else, ever.
+Saley talks to the network only when *you* opt in: the one-time voice-model download from `huggingface.co`, transcription requests to `api.groq.com` when you add a Groq key, and requests to `api.deepseek.com` when you add a DeepSeek key (call summaries and follow-up drafts; dictation text too, but only while "Polish with AI" is on). Nothing else, ever.
 
 ## Upgrading from Musixopper
 
