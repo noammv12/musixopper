@@ -99,6 +99,20 @@ static class Settings
         }
     }
 
+    /// <summary>Clean up dictated text with DeepSeek before typing it.</summary>
+    public static bool DictationPolish
+    {
+        get => Read("DictationPolish") == "1";
+        set => WriteValue("DictationPolish", value ? "1" : "0");
+    }
+
+    /// <summary>Polish variant: smooth phrasing into a professional tone.</summary>
+    public static bool DictationProfessional
+    {
+        get => Read("DictationProfessional") == "1";
+        set => WriteValue("DictationProfessional", value ? "1" : "0");
+    }
+
     /// <summary>
     /// DeepSeek API key, DPAPI-encrypted and bound to this Windows user —
     /// it never exists in plaintext outside this machine (the repo is public).

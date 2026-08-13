@@ -24,6 +24,9 @@ partial class FlyoutWindow
     Border _hotkeyBox = null!;
     TextBlock _hotkeyLabel = null!;
     TextBlock _hotkeyStatus = null!;
+    PillSwitch _polishSwitch = null!;
+    Grid _toneRow = null!;
+    TextBlock _polishHint = null!;
 
     /// <summary>Set by Shell: re-registers the dock's global dictation
     /// hotkey from Settings; false when Windows refused the combo.</summary>
@@ -181,7 +184,7 @@ partial class FlyoutWindow
 
         panel.Children.Add(Ui.Divider(12, 10));
 
-        panel.Children.Add(Ui.Text("DICTATION HOTKEY", 10, "TextSecondaryBrush", FontWeights.SemiBold));
+        panel.Children.Add(Ui.Text("DICTATION", 10, "TextSecondaryBrush", FontWeights.SemiBold));
 
         var hotkeyRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
         hotkeyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -230,6 +233,27 @@ partial class FlyoutWindow
         _hotkeyStatus.Margin = new Thickness(0, 6, 0, 0);
         panel.Children.Add(_hotkeyStatus);
 
+        _polishSwitch = new PillSwitch(Settings.DictationPolish);
+        _polishSwitch.Toggled += on =>
+        {
+            Settings.DictationPolish = on;
+            UpdatePolishRows();
+        };
+        var polishRow = Ui.ToggleRow("Polish dictation with AI", _polishSwitch);
+        polishRow.Margin = new Thickness(0, 12, 0, 0);
+        panel.Children.Add(polishRow);
+
+        var toneSwitch = new PillSwitch(Settings.DictationProfessional);
+        toneSwitch.Toggled += on => Settings.DictationProfessional = on;
+        _toneRow = Ui.ToggleRow("Professional tone", toneSwitch);
+        _toneRow.Margin = new Thickness(14, 8, 0, 0); // indented under the polish toggle
+        panel.Children.Add(_toneRow);
+
+        _polishHint = Ui.Text("", 10.5, "TextSecondaryBrush");
+        _polishHint.TextWrapping = TextWrapping.Wrap;
+        _polishHint.Margin = new Thickness(0, 6, 0, 0);
+        panel.Children.Add(_polishHint);
+
         panel.Children.Add(Ui.Divider(12, 10));
 
         panel.Children.Add(Ui.Text("RECENT NOTES", 10, "TextSecondaryBrush", FontWeights.SemiBold));
@@ -272,7 +296,21 @@ partial class FlyoutWindow
         UpdateKeyStatus();
         UpdateGroqStatus();
         RefreshHotkeyRow();
+        UpdatePolishRows();
         return panel;
+    }
+
+    void UpdatePolishRows()
+    {
+        var on = Settings.DictationPolish;
+        _toneRow.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        _polishHint.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        if (on)
+        {
+            _polishHint.Text = Settings.DeepSeekKey is null
+                ? "Add a DeepSeek key above — until then the raw text is typed."
+                : "Fillers and punctuation are cleaned up (via DeepSeek) before typing.";
+        }
     }
 
     void OnHotkeyCapture(object sender, KeyEventArgs e)
@@ -386,6 +424,7 @@ partial class FlyoutWindow
         _keyStatus.Text = Settings.DeepSeekKey is null
             ? "No key — notes will be transcript-only. Paste your DeepSeek key for AI summaries."
             : "Key saved ✓ — summaries on.";
+        if (_polishHint is not null) UpdatePolishRows(); // key row is built before the dictation section
     }
 
     void RebuildNotesList()

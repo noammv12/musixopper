@@ -102,6 +102,16 @@ sealed class Dictation : IDisposable
                 return;
             }
 
+            if (Settings.DictationPolish && Settings.DeepSeekKey is { } key)
+            {
+                StatusChanged?.Invoke("Polishing…");
+                var polished = await Task.Run(() =>
+                    DeepSeekClient.PolishAsync(text, Settings.DictationProfessional, key, CancellationToken.None));
+                // Null (API failure, text too long) keeps the raw transcript —
+                // the dictation itself is never lost to the polish step.
+                if (!string.IsNullOrWhiteSpace(polished)) text = polished;
+            }
+
             // Back on the UI thread here (clipboard needs STA).
             var result = await SnippetPaster.PasteTextAsync(text);
             if (result == PasteResult.CopiedOnly) ToastRequested?.Invoke("Dictation copied — press Ctrl+V");

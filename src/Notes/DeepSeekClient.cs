@@ -7,29 +7,51 @@ using System.Text.Json;
 namespace Saley.Notes;
 
 /// <summary>
-/// Turns a transcript into "3 bullets + next step" via DeepSeek's
-/// OpenAI-compatible chat API. Every failure degrades to a
-/// transcript-only note — a summary is never worth losing a note over.
+/// DeepSeek's OpenAI-compatible chat API: call summaries, dictation
+/// polish, and follow-up drafts. Every failure returns null — AI output
+/// is never worth losing the underlying text over.
 /// </summary>
 static class DeepSeekClient
 {
     const string Endpoint = "https://api.deepseek.com/chat/completions";
     const int MaxTranscriptChars = 100_000;
+    const int MaxDictationChars = 8_000;
 
-    const string SystemPrompt =
+    const string SummaryPrompt =
         "You write concise notes from a sales-call transcript. Reply in the language the " +
         "transcript is mostly written in (Hebrew transcript → Hebrew reply). Output exactly " +
         "4 lines: 3 lines starting with '• ' — the key facts, decisions or objections; then " +
         "1 line starting with 'Next step: ' (in Hebrew: 'הצעד הבא: ') with the single most " +
         "important follow-up. No headings, no extra text.";
 
+    const string PolishPrompt =
+        "You clean up dictated text. Fix punctuation and casing, remove filler words, false " +
+        "starts and immediate self-corrections (keep the corrected version), and fix obvious " +
+        "speech-to-text mistakes. Keep the original language, wording and meaning — do not " +
+        "add, drop, summarize or translate anything. Reply with the cleaned text only.";
+
+    const string ProfessionalPrompt = PolishPrompt +
+        " Then lightly smooth the phrasing so it reads as clear, professional business " +
+        "writing — still without adding or removing information.";
+
     static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(60) };
 
     /// <summary>Returns the summary, or null when unavailable (no retry beyond one).</summary>
-    public static async Task<string?> SummarizeAsync(string transcript, string apiKey, CancellationToken ct)
+    public static Task<string?> SummarizeAsync(string transcript, string apiKey, CancellationToken ct)
     {
         if (transcript.Length > MaxTranscriptChars) transcript = transcript[..MaxTranscriptChars];
+        return ChatAsync(SummaryPrompt, "Transcript:\n" + transcript, 0.3, 400, apiKey, ct);
+    }
 
+    /// <summary>Cleaned-up dictation, or null when unavailable (caller keeps the raw text).</summary>
+    public static Task<string?> PolishAsync(string text, bool professional, string apiKey, CancellationToken ct)
+    {
+        if (text.Length > MaxDictationChars) return Task.FromResult<string?>(null); // too long to round-trip — keep raw
+        return ChatAsync(professional ? ProfessionalPrompt : PolishPrompt, text, 0.2, 2048, apiKey, ct);
+    }
+
+    static async Task<string?> ChatAsync(string systemPrompt, string userContent, double temperature, int maxTokens, string apiKey, CancellationToken ct)
+    {
         for (var attempt = 0; attempt < 2; attempt++)
         {
             try
@@ -41,11 +63,11 @@ static class DeepSeekClient
                     model = "deepseek-chat",
                     messages = new object[]
                     {
-                        new { role = "system", content = SystemPrompt },
-                        new { role = "user", content = "Transcript:\n" + transcript },
+                        new { role = "system", content = systemPrompt },
+                        new { role = "user", content = userContent },
                     },
-                    temperature = 0.3,
-                    max_tokens = 400,
+                    temperature,
+                    max_tokens = maxTokens,
                     stream = false,
                 };
                 request.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
