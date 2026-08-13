@@ -208,7 +208,7 @@ sealed partial class FlyoutWindow : Window
         remindersLink.MouseLeftButtonUp += (_, _) => ShowReminders();
         panel.Children.Add(remindersLink);
 
-        var notesLink = Ui.Link("Call notes…", 11);
+        var notesLink = Ui.Link("Notes & dictation…", 11);
         notesLink.Margin = new Thickness(2, 8, 2, 0);
         notesLink.MouseLeftButtonUp += (_, _) => ShowNotes();
         panel.Children.Add(notesLink);

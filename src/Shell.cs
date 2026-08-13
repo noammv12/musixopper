@@ -61,6 +61,7 @@ sealed class Shell : IDisposable
         _dictation.ToastRequested += message => _dock.ShowToast(message, paused: false, showIcon: false, important: true);
         _dock.DictationToggleRequested += _dictation.Toggle;
         _dock.DictationCancelRequested += _dictation.Cancel;
+        _flyout.ApplyDictationHotkey = _dock.ApplyDictationHotkey;
 
         _engine.StateChanged += () =>
         {

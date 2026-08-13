@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using Saley.Notes;
 
 namespace Saley.UI;
@@ -20,12 +21,19 @@ partial class FlyoutWindow
     PasswordBox _groqKeyBox = null!;
     TextBlock _groqKeyStatus = null!;
     StackPanel _notesList = null!;
+    Border _hotkeyBox = null!;
+    TextBlock _hotkeyLabel = null!;
+    TextBlock _hotkeyStatus = null!;
+
+    /// <summary>Set by Shell: re-registers the dock's global dictation
+    /// hotkey from Settings; false when Windows refused the combo.</summary>
+    public Func<bool>? ApplyDictationHotkey { get; set; }
 
     StackPanel BuildNotesPanel()
     {
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
-        panel.Children.Add(Ui.Text("Call notes", 15, "TextPrimaryBrush", FontWeights.SemiBold));
+        panel.Children.Add(Ui.Text("Notes & dictation", 15, "TextPrimaryBrush", FontWeights.SemiBold));
         var subtitle = Ui.Text("Records your calls, types them up, and writes 3 bullets + a next step. Recording is off until you turn it on; audio is deleted right after transcription.", 11.5, "TextSecondaryBrush");
         subtitle.TextWrapping = TextWrapping.Wrap;
         subtitle.Margin = new Thickness(0, 6, 0, 0);
@@ -173,6 +181,57 @@ partial class FlyoutWindow
 
         panel.Children.Add(Ui.Divider(12, 10));
 
+        panel.Children.Add(Ui.Text("DICTATION HOTKEY", 10, "TextSecondaryBrush", FontWeights.SemiBold));
+
+        var hotkeyRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        hotkeyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        hotkeyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        hotkeyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        _hotkeyLabel = Ui.Text("", 11.5, "TextPrimaryBrush", FontWeights.SemiBold);
+        _hotkeyLabel.HorizontalAlignment = HorizontalAlignment.Center;
+        _hotkeyBox = new Border
+        {
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(10, 6, 10, 7),
+            Cursor = Cursors.Hand,
+            Focusable = true,
+            Child = _hotkeyLabel,
+        };
+        _hotkeyBox.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
+        Ui.HoverFill(_hotkeyBox);
+        _hotkeyBox.MouseLeftButtonUp += (_, _) => Keyboard.Focus(_hotkeyBox);
+        _hotkeyBox.GotKeyboardFocus += (_, _) =>
+        {
+            _hotkeyLabel.Text = "Press a key combo…";
+            SetHotkeyStatus("Esc cancels. Include Ctrl, Alt or Win.", warn: false);
+        };
+        _hotkeyBox.LostKeyboardFocus += (_, _) => RefreshHotkeyRow();
+        _hotkeyBox.PreviewKeyDown += OnHotkeyCapture;
+        hotkeyRow.Children.Add(_hotkeyBox);
+
+        var resetHotkey = Ui.Link("Reset", 10.5);
+        resetHotkey.Margin = new Thickness(10, 0, 0, 0);
+        resetHotkey.VerticalAlignment = VerticalAlignment.Center;
+        resetHotkey.MouseLeftButtonUp += (_, _) => SaveHotkey(Hotkey.Default);
+        Grid.SetColumn(resetHotkey, 1);
+        hotkeyRow.Children.Add(resetHotkey);
+
+        var offHotkey = Ui.Link("Turn off", 10.5);
+        offHotkey.Margin = new Thickness(10, 0, 0, 0);
+        offHotkey.VerticalAlignment = VerticalAlignment.Center;
+        offHotkey.MouseLeftButtonUp += (_, _) => SaveHotkey(Hotkey.Off);
+        Grid.SetColumn(offHotkey, 2);
+        hotkeyRow.Children.Add(offHotkey);
+        panel.Children.Add(hotkeyRow);
+
+        _hotkeyStatus = Ui.Text("Click the box, then press the combo you want for dictation.", 10.5, "TextSecondaryBrush");
+        _hotkeyStatus.TextWrapping = TextWrapping.Wrap;
+        _hotkeyStatus.Margin = new Thickness(0, 6, 0, 0);
+        panel.Children.Add(_hotkeyStatus);
+
+        panel.Children.Add(Ui.Divider(12, 10));
+
         panel.Children.Add(Ui.Text("RECENT NOTES", 10, "TextSecondaryBrush", FontWeights.SemiBold));
         _notesList = new StackPanel();
         var scroll = new ScrollViewer
@@ -212,7 +271,59 @@ partial class FlyoutWindow
         UpdateModelRow();
         UpdateKeyStatus();
         UpdateGroqStatus();
+        RefreshHotkeyRow();
         return panel;
+    }
+
+    void OnHotkeyCapture(object sender, KeyEventArgs e)
+    {
+        e.Handled = true;
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key == Key.Escape)
+        {
+            Keyboard.ClearFocus(); // LostKeyboardFocus restores the label
+            return;
+        }
+        if (Hotkey.IsModifierKey(key)) return; // mid-combo — keep waiting
+        if (Hotkey.FromKeyEvent(e) is not { } combo)
+        {
+            SetHotkeyStatus("Include Ctrl, Alt or Win in the combo.", warn: true);
+            return;
+        }
+        Keyboard.ClearFocus();
+        SaveHotkey(combo);
+    }
+
+    void SaveHotkey(Hotkey combo)
+    {
+        var previous = Settings.DictationHotkey;
+        Settings.DictationHotkey = combo.Serialize();
+        if (ApplyDictationHotkey?.Invoke() ?? true)
+        {
+            SetHotkeyStatus(combo.IsOff
+                ? "Hotkey off — dictate with the 🎙 chip in the dock."
+                : $"Saved ✓ — press {combo} anywhere to dictate.", warn: false);
+        }
+        else
+        {
+            // Windows refused the combo (another app owns it) — keep the old one.
+            Settings.DictationHotkey = previous;
+            ApplyDictationHotkey?.Invoke();
+            SetHotkeyStatus($"{combo} is taken by another app — kept {Hotkey.LoadDictation()}.", warn: true);
+        }
+        RefreshHotkeyRow();
+    }
+
+    void SetHotkeyStatus(string text, bool warn)
+    {
+        _hotkeyStatus.Text = text;
+        _hotkeyStatus.SetResourceReference(TextBlock.ForegroundProperty, warn ? "AmberBrush" : "TextSecondaryBrush");
+    }
+
+    void RefreshHotkeyRow()
+    {
+        var combo = Hotkey.LoadDictation();
+        _hotkeyLabel.Text = combo.IsOff ? "Off — click to set" : combo.ToString();
     }
 
     void OnModelProgress(long received, long total)
@@ -337,6 +448,7 @@ partial class FlyoutWindow
         UpdateModelRow();
         UpdateKeyStatus();
         UpdateGroqStatus();
+        RefreshHotkeyRow();
         ShowFlyoutCore(onboarding: false, force: true);
         ShowPanel(_notesPanel);
     }

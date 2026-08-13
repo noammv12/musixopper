@@ -86,6 +86,20 @@ static class Settings
     }
 
     /// <summary>
+    /// Dictation hotkey as "modifiers,vk" (RegisterHotKey values, decimal) or
+    /// "off"; null/unset means the default combo. Parsed by Hotkey.Parse.
+    /// </summary>
+    public static string? DictationHotkey
+    {
+        get => Read("DictationHotkey");
+        set
+        {
+            if (value is null) DeleteValue("DictationHotkey");
+            else WriteValue("DictationHotkey", value);
+        }
+    }
+
+    /// <summary>
     /// DeepSeek API key, DPAPI-encrypted and bound to this Windows user —
     /// it never exists in plaintext outside this machine (the repo is public).
     /// </summary>

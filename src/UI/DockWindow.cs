@@ -63,6 +63,7 @@ sealed class DockWindow : Window
     readonly TextBlock _reminderCount;
     readonly StackPanel _dictationContent;
     readonly Ellipse _dictationDot;
+    readonly TextBlock _dictationText;
 
     readonly DispatcherTimer _hoverIntent;
     readonly DispatcherTimer _collapseDelay;
@@ -86,6 +87,8 @@ sealed class DockWindow : Window
     double _dragScale = 1;
 
     const int DictationHotkeyId = 0xA11;
+    Hotkey _dictationHotkey = Hotkey.LoadDictation();
+    bool _dictationHotkeyFailed;
 
     public event Action? OpenFlyoutRequested;
     public event Action? OpenRemindersRequested;
@@ -200,15 +203,14 @@ sealed class DockWindow : Window
         // -- dictation content ----------------------------------------------
         _dictationDot = new Ellipse { Width = 8, Height = 8, VerticalAlignment = VerticalAlignment.Center };
         _dictationDot.SetResourceReference(Shape.FillProperty, "StatusGoodBrush");
-        var dictationText = new TextBlock
+        _dictationText = new TextBlock
         {
-            Text = "Listening — Ctrl+Alt+Space to finish",
             FontSize = 12.5,
             FontWeight = FontWeights.Medium,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(8, 0, 0, 0),
         };
-        dictationText.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
+        _dictationText.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
         var dictationFinish = ReminderButton("Finish", primary: true);
         dictationFinish.Margin = new Thickness(12, 0, 0, 0);
         dictationFinish.MouseLeftButtonUp += (_, _) => DictationToggleRequested?.Invoke();
@@ -216,7 +218,7 @@ sealed class DockWindow : Window
         dictationCancel.MouseLeftButtonUp += (_, _) => DictationCancelRequested?.Invoke();
         _dictationContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 12, 0) };
         _dictationContent.Children.Add(_dictationDot);
-        _dictationContent.Children.Add(dictationText);
+        _dictationContent.Children.Add(_dictationText);
         _dictationContent.Children.Add(dictationFinish);
         _dictationContent.Children.Add(dictationCancel);
 
@@ -298,7 +300,7 @@ sealed class DockWindow : Window
         _pill.MouseLeftButtonUp += OnPillMouseUp;
 
         SnippetStore.Changed += RefreshChips;
-        RefreshChips();
+        RefreshHotkeyStrings();
 
         SourceInitialized += (_, _) =>
         {
@@ -307,12 +309,48 @@ sealed class DockWindow : Window
             ex |= NativeMethods.WS_EX_NOACTIVATE | NativeMethods.WS_EX_TOOLWINDOW;
             NativeMethods.SetWindowLongPtr(hwnd, NativeMethods.GWL_EXSTYLE, new IntPtr(ex));
 
-            if (!NativeMethods.RegisterHotKey(hwnd, DictationHotkeyId,
-                    NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT | NativeMethods.MOD_NOREPEAT, 0x20 /* Space */))
-                Log.Write("Dictation hotkey Ctrl+Alt+Space unavailable (taken by another app)");
             if (HwndSource.FromHwnd(hwnd) is { } source) source.AddHook(WndProc);
+            ApplyDictationHotkey();
         };
     }
+
+    /// <summary>
+    /// (Re)binds the global dictation hotkey from Settings. Returns false
+    /// when Windows refused the combo (already taken by another app); the
+    /// dock's hint strings fall back to the on-screen buttons in that case.
+    /// </summary>
+    public bool ApplyDictationHotkey()
+    {
+        _dictationHotkey = Hotkey.LoadDictation();
+        _dictationHotkeyFailed = false;
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero)
+        {
+            RefreshHotkeyStrings();
+            return true; // not sourced yet; SourceInitialized re-applies
+        }
+        NativeMethods.UnregisterHotKey(hwnd, DictationHotkeyId);
+        var ok = true;
+        if (!_dictationHotkey.IsOff)
+        {
+            ok = NativeMethods.RegisterHotKey(hwnd, DictationHotkeyId,
+                _dictationHotkey.Modifiers | NativeMethods.MOD_NOREPEAT, _dictationHotkey.Vk);
+            _dictationHotkeyFailed = !ok;
+            if (!ok) Log.Write($"Dictation hotkey {_dictationHotkey} unavailable (taken by another app)");
+        }
+        RefreshHotkeyStrings();
+        return ok;
+    }
+
+    void RefreshHotkeyStrings()
+    {
+        _dictationText.Text = DictationHotkeyLive
+            ? $"Listening — {_dictationHotkey} to finish"
+            : "Listening — click Finish when done";
+        RefreshChips(); // the 🎙 chip tooltip renders the same binding
+    }
+
+    bool DictationHotkeyLive => !_dictationHotkey.IsOff && !_dictationHotkeyFailed;
 
     // ---- lifecycle -----------------------------------------------------------
 
@@ -604,7 +642,9 @@ sealed class DockWindow : Window
             _chipsPanel.Children.Add(MakeChip(snippet));
 
         var dictate = MakeChipShell("🎙");
-        dictate.ToolTip = "Dictate (Ctrl+Alt+Space) — speak, and the text is typed where your cursor is";
+        dictate.ToolTip = DictationHotkeyLive
+            ? $"Dictate ({_dictationHotkey}) — speak, and the text is typed where your cursor is"
+            : "Dictate — speak, and the text is typed where your cursor is";
         dictate.MouseLeftButtonUp += (_, _) => DictationToggleRequested?.Invoke();
         _chipsPanel.Children.Add(dictate);
 
