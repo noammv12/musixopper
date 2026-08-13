@@ -34,6 +34,13 @@ static class DeepSeekClient
         " Then lightly smooth the phrasing so it reads as clear, professional business " +
         "writing — still without adding or removing information.";
 
+    const string FollowUpPrompt =
+        "You draft the short follow-up message a salesperson sends right after a call, " +
+        "WhatsApp style. Write in the language of the notes (Hebrew notes → Hebrew " +
+        "message). Warm and brief — 2 to 4 sentences: reference what was discussed, " +
+        "then end with the agreed next step. No subject line, no signature, no " +
+        "placeholders like [name]. Reply with the message text only.";
+
     static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(60) };
 
     /// <summary>Returns the summary, or null when unavailable (no retry beyond one).</summary>
@@ -48,6 +55,13 @@ static class DeepSeekClient
     {
         if (text.Length > MaxDictationChars) return Task.FromResult<string?>(null); // too long to round-trip — keep raw
         return ChatAsync(professional ? ProfessionalPrompt : PolishPrompt, text, 0.2, 2048, apiKey, ct);
+    }
+
+    /// <summary>A paste-ready follow-up message, or null when unavailable.</summary>
+    public static Task<string?> FollowUpAsync(string noteText, string apiKey, CancellationToken ct)
+    {
+        if (noteText.Length > MaxTranscriptChars) noteText = noteText[..MaxTranscriptChars];
+        return ChatAsync(FollowUpPrompt, "Call notes:\n" + noteText, 0.5, 300, apiKey, ct);
     }
 
     static async Task<string?> ChatAsync(string systemPrompt, string userContent, double temperature, int maxTokens, string apiKey, CancellationToken ct)

@@ -27,6 +27,7 @@ partial class FlyoutWindow
     PillSwitch _polishSwitch = null!;
     Grid _toneRow = null!;
     TextBlock _polishHint = null!;
+    readonly Dictionary<string, string> _followUps = new(); // note id → drafted follow-up (session-only)
 
     /// <summary>Set by Shell: re-registers the dock's global dictation
     /// hotkey from Settings; false when Windows refused the combo.</summary>
@@ -457,13 +458,42 @@ partial class FlyoutWindow
             preview.Margin = new Thickness(0, 4, 0, 0);
             stack.Children.Add(preview);
 
+            var links = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
             var copy = Ui.Link("Copy", 10.5);
-            copy.Margin = new Thickness(0, 6, 0, 0);
             copy.MouseLeftButtonUp += (_, _) =>
             {
                 if (SnippetPaster.TrySetClipboard(note.Summary ?? note.Transcript)) copy.Text = "Copied ✓";
             };
-            stack.Children.Add(copy);
+            links.Children.Add(copy);
+
+            var followHost = new StackPanel();
+            if (Settings.DeepSeekKey is not null)
+            {
+                var follow = Ui.Link("✨ Follow-up", 10.5);
+                follow.Margin = new Thickness(14, 0, 0, 0);
+                var busy = false;
+                follow.MouseLeftButtonUp += async (_, _) =>
+                {
+                    if (busy || Settings.DeepSeekKey is not { } key) return;
+                    busy = true;
+                    follow.Text = "Writing…";
+                    var text = await Task.Run(() =>
+                        DeepSeekClient.FollowUpAsync(note.Summary ?? note.Transcript, key, CancellationToken.None));
+                    busy = false;
+                    if (string.IsNullOrWhiteSpace(text))
+                    {
+                        follow.Text = "✨ Follow-up (failed — see log)";
+                        return;
+                    }
+                    follow.Text = "✨ Follow-up";
+                    _followUps[note.Id] = text;
+                    RenderFollowUp(followHost, text);
+                };
+                links.Children.Add(follow);
+            }
+            stack.Children.Add(links);
+            stack.Children.Add(followHost);
+            if (_followUps.TryGetValue(note.Id, out var cached)) RenderFollowUp(followHost, cached);
 
             var card = new Border
             {
@@ -475,6 +505,33 @@ partial class FlyoutWindow
             card.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
             _notesList.Children.Add(card);
         }
+    }
+
+    static void RenderFollowUp(StackPanel host, string text)
+    {
+        host.Children.Clear();
+        var inner = new StackPanel();
+        var body = Ui.Text(text, 11, "TextPrimaryBrush");
+        body.TextWrapping = TextWrapping.Wrap;
+        inner.Children.Add(body);
+        var copy = Ui.Link("Copy", 10.5);
+        copy.Margin = new Thickness(0, 6, 0, 0);
+        copy.MouseLeftButtonUp += (_, _) =>
+        {
+            if (SnippetPaster.TrySetClipboard(text)) copy.Text = "Copied ✓";
+        };
+        inner.Children.Add(copy);
+        var box = new Border
+        {
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(8, 6, 8, 7),
+            Margin = new Thickness(0, 8, 0, 0),
+            BorderThickness = new Thickness(1),
+            Child = inner,
+        };
+        box.SetResourceReference(Border.BackgroundProperty, "SurfaceBrush");
+        box.SetResourceReference(Border.BorderBrushProperty, "SurfaceStrokeBrush");
+        host.Children.Add(box);
     }
 
     public void ShowNotes()
