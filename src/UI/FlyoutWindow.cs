@@ -95,6 +95,7 @@ sealed partial class FlyoutWindow : Window
         _snippetsPanel = BuildSnippetsPanel();
         _remindersPanel = BuildRemindersPanel();
         _notesPanel = BuildNotesPanel();
+        _statsPanel = BuildStatsPanel();
         var host = new Grid();
         host.Children.Add(_mainPanel);
         host.Children.Add(_welcomePanel);
@@ -102,6 +103,7 @@ sealed partial class FlyoutWindow : Window
         host.Children.Add(_snippetsPanel);
         host.Children.Add(_remindersPanel);
         host.Children.Add(_notesPanel);
+        host.Children.Add(_statsPanel);
 
         _root = new Border
         {
@@ -164,6 +166,11 @@ sealed partial class FlyoutWindow : Window
         statusRow.Children.Add(_statusText);
         panel.Children.Add(statusRow);
 
+        _statsLine = Ui.Text("", 10.5, "TextSecondaryBrush");
+        _statsLine.Margin = new Thickness(20, 4, 0, 0); // aligns under the status text
+        _statsLine.Visibility = Visibility.Collapsed;
+        panel.Children.Add(_statsLine);
+
         panel.Children.Add(Ui.Divider(12, 12));
 
         panel.Children.Add(Ui.Text("Detect calls by", 11, "TextSecondaryBrush"));
@@ -215,6 +222,11 @@ sealed partial class FlyoutWindow : Window
         notesLink.Margin = new Thickness(2, 8, 2, 0);
         notesLink.MouseLeftButtonUp += (_, _) => ShowNotes();
         panel.Children.Add(notesLink);
+
+        var statsLink = Ui.Link("Stats…", 11);
+        statsLink.Margin = new Thickness(2, 8, 2, 0);
+        statsLink.MouseLeftButtonUp += (_, _) => ShowStats();
+        panel.Children.Add(statsLink);
 
         panel.Children.Add(Ui.Divider(12, 10));
 

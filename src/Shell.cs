@@ -16,6 +16,7 @@ sealed class Shell : IDisposable
     readonly FlyoutWindow _flyout;
     readonly DockWindow _dock;
     readonly ReminderScheduler _reminders;
+    readonly CallStatsTracker _stats;
     readonly NotesPipeline _notes;
     readonly Dictation _dictation;
     readonly DispatcherTimer _ticker;
@@ -37,6 +38,7 @@ sealed class Shell : IDisposable
         _dock.OpenFlyoutRequested += () => _flyout.ShowSnippets();
         _dock.OpenRemindersRequested += () => _flyout.ShowReminders();
 
+        _stats = new CallStatsTracker(_engine);
         _reminders = new ReminderScheduler(_engine);
         _reminders.ReminderDue += (reminder, missed) => _dock.ShowReminder(reminder, missed);
         _dock.ReminderOpenRequested += _reminders.Open;
@@ -122,6 +124,7 @@ sealed class Shell : IDisposable
         _dictation.Dispose();
         _notes.Dispose();
         _reminders.Dispose();
+        _stats.Dispose();
         _showFlyoutWait.Unregister(null);
         _showFlyoutSignal.Dispose();
         _dock.Shutdown();
