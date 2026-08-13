@@ -99,6 +99,14 @@ static class Settings
         }
     }
 
+    /// <summary>Ctrl+Alt+1–9 pastes snippets 1–9. Opt-in: Ctrl+Alt+digit
+    /// doubles as AltGr+digit on some keyboard layouts.</summary>
+    public static bool SnippetHotkeys
+    {
+        get => Read("SnippetHotkeys") == "1";
+        set => WriteValue("SnippetHotkeys", value ? "1" : "0");
+    }
+
     /// <summary>Clean up dictated text with DeepSeek before typing it.</summary>
     public static bool DictationPolish
     {

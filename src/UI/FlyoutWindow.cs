@@ -61,6 +61,9 @@ sealed partial class FlyoutWindow : Window
 
     public event Action? QuitRequested;
 
+    /// <summary>Set by Shell: re-registers the dock's Ctrl+Alt+1–9 snippet hotkeys.</summary>
+    public Action? ApplySnippetHotkeys { get; set; }
+
     public FlyoutWindow(CallEngine engine)
     {
         _engine = engine;
@@ -339,6 +342,22 @@ sealed partial class FlyoutWindow : Window
         subtitle.Margin = new Thickness(0, 6, 0, 0);
         panel.Children.Add(subtitle);
 
+        var hotkeySwitch = new PillSwitch(Settings.SnippetHotkeys);
+        hotkeySwitch.Toggled += on =>
+        {
+            Settings.SnippetHotkeys = on;
+            ApplySnippetHotkeys?.Invoke();
+            RebuildSnippetList(); // show/hide the number badges
+        };
+        var hotkeyRow = Ui.ToggleRow("Paste with Ctrl+Alt+1–9", hotkeySwitch);
+        hotkeyRow.Margin = new Thickness(0, 10, 0, 0);
+        panel.Children.Add(hotkeyRow);
+
+        var hotkeyHint = Ui.Text("Global shortcuts — if you type with AltGr, leave this off.", 10.5, "TextSecondaryBrush");
+        hotkeyHint.TextWrapping = TextWrapping.Wrap;
+        hotkeyHint.Margin = new Thickness(0, 4, 0, 0);
+        panel.Children.Add(hotkeyHint);
+
         _snippetList = new StackPanel();
         var scroll = new ScrollViewer
         {
@@ -388,7 +407,9 @@ sealed partial class FlyoutWindow : Window
         for (var c = 0; c < 3; c++)
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var title = Ui.Text(snippet.Label.Length > 0 ? snippet.Label : "(untitled)", 12, "TextPrimaryBrush", FontWeights.SemiBold);
+        var titleText = snippet.Label.Length > 0 ? snippet.Label : "(untitled)";
+        if (Settings.SnippetHotkeys && index < 9) titleText = $"{index + 1} · {titleText}";
+        var title = Ui.Text(titleText, 12, "TextPrimaryBrush", FontWeights.SemiBold);
         title.TextTrimming = TextTrimming.CharacterEllipsis;
         title.VerticalAlignment = VerticalAlignment.Center;
         header.Children.Add(title);

@@ -90,6 +90,9 @@ sealed class DockWindow : Window
     Hotkey _dictationHotkey = Hotkey.LoadDictation();
     bool _dictationHotkeyFailed;
 
+    const int SnippetHotkeyBase = 0xA21; // ids 0xA21–0xA29 = Ctrl+Alt+1–9
+    readonly Snippet?[] _hotkeySnippets = new Snippet?[9];
+
     public event Action? OpenFlyoutRequested;
     public event Action? OpenRemindersRequested;
     public event Action? DictationToggleRequested;
@@ -300,6 +303,7 @@ sealed class DockWindow : Window
         _pill.MouseLeftButtonUp += OnPillMouseUp;
 
         SnippetStore.Changed += RefreshChips;
+        SnippetStore.Changed += ApplySnippetHotkeys;
         RefreshHotkeyStrings();
 
         SourceInitialized += (_, _) =>
@@ -311,7 +315,42 @@ sealed class DockWindow : Window
 
             if (HwndSource.FromHwnd(hwnd) is { } source) source.AddHook(WndProc);
             ApplyDictationHotkey();
+            ApplySnippetHotkeys();
         };
+    }
+
+    /// <summary>
+    /// (Re)binds Ctrl+Alt+1–9 to the first nine snippets when the opt-in
+    /// setting is on. Combos another app owns are skipped silently — a
+    /// snippet hotkey is a convenience, never worth an error state.
+    /// </summary>
+    public void ApplySnippetHotkeys()
+    {
+        if (!CheckAccess())
+        {
+            Dispatcher.InvokeAsync(ApplySnippetHotkeys);
+            return;
+        }
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) return; // not sourced yet; SourceInitialized applies
+
+        for (var i = 0; i < _hotkeySnippets.Length; i++)
+        {
+            NativeMethods.UnregisterHotKey(hwnd, SnippetHotkeyBase + i);
+            _hotkeySnippets[i] = null;
+        }
+        if (!Settings.SnippetHotkeys) return;
+
+        var snippets = SnippetStore.Load();
+        for (var i = 0; i < snippets.Count && i < _hotkeySnippets.Length; i++)
+        {
+            // vk 0x31 + i = '1'…'9'
+            if (NativeMethods.RegisterHotKey(hwnd, SnippetHotkeyBase + i,
+                    NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT | NativeMethods.MOD_NOREPEAT, (uint)(0x31 + i)))
+                _hotkeySnippets[i] = snippets[i];
+            else
+                Log.Write($"Snippet hotkey Ctrl+Alt+{i + 1} unavailable (taken by another app)");
+        }
     }
 
     /// <summary>
@@ -366,7 +405,10 @@ sealed class DockWindow : Window
     {
         try
         {
-            NativeMethods.UnregisterHotKey(new WindowInteropHelper(this).Handle, DictationHotkeyId);
+            var hwnd = new WindowInteropHelper(this).Handle;
+            NativeMethods.UnregisterHotKey(hwnd, DictationHotkeyId);
+            for (var i = 0; i < _hotkeySnippets.Length; i++)
+                NativeMethods.UnregisterHotKey(hwnd, SnippetHotkeyBase + i);
         }
         catch
         {
@@ -377,6 +419,7 @@ sealed class DockWindow : Window
         _fullscreenPoll.Stop();
         _callTicker.Stop();
         SnippetStore.Changed -= RefreshChips;
+        SnippetStore.Changed -= ApplySnippetHotkeys;
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplayChanged;
         Hide();
     }
@@ -491,10 +534,21 @@ sealed class DockWindow : Window
 
     IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == NativeMethods.WM_HOTKEY && wParam.ToInt32() == DictationHotkeyId)
+        if (msg == NativeMethods.WM_HOTKEY)
         {
-            DictationToggleRequested?.Invoke();
-            handled = true;
+            var id = wParam.ToInt32();
+            if (id == DictationHotkeyId)
+            {
+                DictationToggleRequested?.Invoke();
+                handled = true;
+            }
+            else if (id >= SnippetHotkeyBase && id < SnippetHotkeyBase + _hotkeySnippets.Length)
+            {
+                // The foreground app is the paste target — the dock never activates.
+                if (_hotkeySnippets[id - SnippetHotkeyBase] is { } snippet)
+                    _ = SnippetPaster.PasteAsync(snippet);
+                handled = true;
+            }
         }
         return IntPtr.Zero;
     }

@@ -63,6 +63,7 @@ sealed class Shell : IDisposable
         _dock.DictationToggleRequested += _dictation.Toggle;
         _dock.DictationCancelRequested += _dictation.Cancel;
         _flyout.ApplyDictationHotkey = _dock.ApplyDictationHotkey;
+        _flyout.ApplySnippetHotkeys = _dock.ApplySnippetHotkeys;
 
         _engine.StateChanged += () =>
         {
