@@ -446,6 +446,7 @@ partial class FlyoutWindow
             var local = note.StartedUtc.ToLocalTime();
             var header = Ui.Text(
                 $"{local:HH:mm} · {Math.Max(1, note.DurationSec / 60)} min" +
+                (note.Number is { } number ? $" · {number}" : "") +
                 (note.State == "transcript-only" ? " · no summary" : note.State == "recovered" ? " · recovered" : ""),
                 10.5, "TextSecondaryBrush", FontWeights.SemiBold);
             stack.Children.Add(header);

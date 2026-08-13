@@ -289,8 +289,10 @@ sealed partial class FlyoutWindow : Window
         if (hasSpaces) exe = $"\"{exe}\"";
         var rows = new (string Caption, string Command)[]
         {
-            ("Outgoing call answer", $"{exe} pause"),
-            ("Incoming call answer", $"{exe} pause"),
+            // %NUMBER% is substituted by Softphone.Pro with the caller's
+            // number, which tags notes and toasts with who the call was with.
+            ("Outgoing call answer", $"{exe} pause %NUMBER%"),
+            ("Incoming call answer", $"{exe} pause %NUMBER%"),
             ("Call end", $"{exe} resume"),
         };
         double top = 12;

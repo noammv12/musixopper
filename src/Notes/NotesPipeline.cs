@@ -20,6 +20,7 @@ sealed class NotesPipeline : IDisposable
     readonly SemaphoreSlim _processQueue = new(1, 1);
     readonly DispatcherTimer _capTimer;
     CallState _lastState = CallState.Idle;
+    string? _activeCallNumber; // captured at recording start; engine clears its copy at call end
 
     /// <summary>Replaced by the Whisper engine when it's available.</summary>
     public ITranscriber Transcriber { get; set; } = new UnavailableTranscriber();
@@ -44,7 +45,7 @@ sealed class NotesPipeline : IDisposable
             if (_recorder.Stop() is { } session)
             {
                 Log.Write("Recorder: 45 min cap reached");
-                _ = ProcessAsync(session, recovered: false);
+                _ = ProcessAsync(session, recovered: false, _activeCallNumber);
             }
         };
     }
@@ -112,6 +113,7 @@ sealed class NotesPipeline : IDisposable
 
         if (state == CallState.OnCall && was != CallState.OnCall)
         {
+            _activeCallNumber = _engine.CurrentNumber;
             if (!Settings.NotesEnabled || !TranscriberReady()) return;
             if (_recorder.Start(NotesStore.TmpDir) is null)
             {
@@ -140,11 +142,11 @@ sealed class NotesPipeline : IDisposable
                 return;
             }
             ToastRequested?.Invoke("Taking notes…");
-            _ = ProcessAsync(session, recovered: false);
+            _ = ProcessAsync(session, recovered: false, _activeCallNumber);
         }
     }
 
-    async Task ProcessAsync(RecordingSession session, bool recovered)
+    async Task ProcessAsync(RecordingSession session, bool recovered, string? number = null)
     {
         await _processQueue.WaitAsync();
         try
@@ -196,7 +198,8 @@ sealed class NotesPipeline : IDisposable
                         durationSec,
                         summary,
                         transcript,
-                        recovered ? "recovered" : summary is null ? "transcript-only" : "ok");
+                        recovered ? "recovered" : summary is null ? "transcript-only" : "ok",
+                        number);
                     NotesStore.Add(note);
                     NoteReady?.Invoke(note);
                 }

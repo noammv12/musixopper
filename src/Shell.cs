@@ -50,8 +50,9 @@ sealed class Shell : IDisposable
         };
         _notes.ToastRequested += message => _dock.ShowToast(message, paused: false, showIcon: false, important: true);
         _notes.StatusChanged += status => _dock.SetNotesStatus(status);
-        _notes.NoteReady += _ => _dock.ShowToast("Notes ready — click to view", paused: false,
-            onClick: () => _flyout.ShowNotes(), showIcon: false, important: true);
+        _notes.NoteReady += note => _dock.ShowToast(
+            note.Number is { } number ? $"Notes ready ({number}) — click to view" : "Notes ready — click to view",
+            paused: false, onClick: () => _flyout.ShowNotes(), showIcon: false, important: true);
         _notes.SweepRecoveredSessions();
 
         _dictation = new Dictation();

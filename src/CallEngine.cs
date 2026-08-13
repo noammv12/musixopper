@@ -36,6 +36,10 @@ sealed class CallEngine : IDisposable
     public bool Enabled { get; private set; } = Settings.Enabled;
     public CallState State { get; private set; } = CallState.Idle;
 
+    /// <summary>Caller's number for the ongoing call, when the softphone
+    /// handler passed one (%NUMBER%); null otherwise and between calls.</summary>
+    public string? CurrentNumber { get; private set; }
+
     public event Action? StateChanged;
     public event Action? MusicPaused;
     public event Action? MusicResumed;
@@ -112,6 +116,9 @@ sealed class CallEngine : IDisposable
 
             if (onCall)
             {
+                // Take the side-channel number before StateChanged fires, so
+                // subscribers (notes) see it on the call-start transition.
+                if (State != CallState.OnCall) CurrentNumber = CurrentCall.Take();
                 _resumePendingSince = null;
                 if (!_pausedForCall)
                 {
@@ -162,6 +169,8 @@ sealed class CallEngine : IDisposable
         if (State == state) return;
         State = state;
         StateChanged?.Invoke();
+        // Cleared after notifying: end-of-call subscribers may still want it.
+        if (state != CallState.OnCall) CurrentNumber = null;
     }
 
     public void Dispose()

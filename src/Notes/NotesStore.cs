@@ -10,7 +10,8 @@ sealed record CallNote(
     int DurationSec,
     string? Summary,
     string Transcript,
-    string State); // "ok" | "transcript-only" | "recovered"
+    string State,           // "ok" | "transcript-only" | "recovered"
+    string? Number = null); // caller's number when the softphone passed one
 
 /// <summary>
 /// Call notes persistence: a JSON index of the last 50 notes for the UI,
@@ -81,6 +82,7 @@ static class NotesStore
         var path = Path.Combine(NotesDir, $"{local:yyyy-MM-dd}.md");
         var sb = new StringBuilder();
         sb.AppendLine($"## {local:HH:mm} · {Math.Max(1, note.DurationSec / 60)} min" +
+                      (note.Number is { } number ? $" · {number}" : "") +
                       (note.State == "recovered" ? " · recovered" : ""));
         if (note.Summary is { } summary)
         {

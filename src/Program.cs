@@ -8,7 +8,8 @@ static class Program
     static int Main(string[] args)
     {
         // Trim stray quotes too — some dialer integrations pass them through.
-        if (args.Length > 0) return RunCli(args[0].Trim().Trim('"').ToLowerInvariant());
+        if (args.Length > 0)
+            return RunCli(args[0].Trim().Trim('"').ToLowerInvariant(), args.Length > 1 ? args[1] : null);
 
         using var mutex = new Mutex(initiallyOwned: true, "Saley.Tray.SingleInstance", out var isFirstInstance);
         if (!isFirstInstance)
@@ -49,16 +50,21 @@ static class Program
 
     // ---- CLI mode (softphone event handlers, terminal) --------------------
 
-    static int RunCli(string verb) => verb switch
+    static int RunCli(string verb, string? payload) => verb switch
     {
-        "pause" => SignalOrRun(verb, TraySignals.CallStartName, MediaController.CliPauseAsync),
+        "pause" => SignalOrRun(verb, TraySignals.CallStartName, MediaController.CliPauseAsync, payload),
         "resume" or "play" => SignalOrRun(verb, TraySignals.CallEndName, MediaController.CliResumeAsync),
         "test" => RunTest(),
         _ => Usage(verb),
     };
 
-    static int SignalOrRun(string verb, string signalName, Func<Task> standalone)
+    static int SignalOrRun(string verb, string signalName, Func<Task> standalone, string? callerNumber = null)
     {
+        // The caller's number (softphone %NUMBER% handler arg) rides a file
+        // side channel — named events carry no payload. Written before the
+        // signal so the engine finds it when the state flips.
+        if (callerNumber is not null) CurrentCall.Set(callerNumber);
+
         // If the tray app is running, hand it the event so it keeps the
         // paused-session state (and the UI) in one place.
         if (EventWaitHandle.TryOpenExisting(signalName, out var signal))
@@ -119,7 +125,7 @@ static class Program
     {
         Log.Write($"CLI: unknown verb '{verb}'");
         NativeMethods.AttachConsole(NativeMethods.ATTACH_PARENT_PROCESS);
-        TryWriteLine("Usage: Saley.exe [pause | resume | test]   (no arguments starts the app)");
+        TryWriteLine("Usage: Saley.exe [pause [number] | resume | test]   (no arguments starts the app)");
         return 2;
     }
 

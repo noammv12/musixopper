@@ -33,11 +33,13 @@ Flyout → **Detect calls by**:
 - **Microphone** *(zero config)* — pauses when any app opens your mic, resumes ~2 s after it's released. Only ever resumes what it paused. Caveat: outbound dialing opens the mic, so ringing pauses music too.
 - **Call events** *(recommended for outbound)* — pauses **only when your softphone reports the call was answered**. In Softphone.Pro add three handlers under *Settings → Integration → Third-party systems* (SIP account: *All*, Action: *Launch a program*):
 
-  | Event                  | URL/Program                    |
-  |------------------------|--------------------------------|
-  | `Outgoing call answer` | `C:\path\to\Saley.exe pause`   |
-  | `Incoming call answer` | `C:\path\to\Saley.exe pause`   |
-  | `Call end`             | `C:\path\to\Saley.exe resume`  |
+  | Event                  | URL/Program                             |
+  |------------------------|-----------------------------------------|
+  | `Outgoing call answer` | `C:\path\to\Saley.exe pause %NUMBER%`   |
+  | `Incoming call answer` | `C:\path\to\Saley.exe pause %NUMBER%`   |
+  | `Call end`             | `C:\path\to\Saley.exe resume`           |
+
+  The `%NUMBER%` part is optional — Softphone.Pro replaces it with the caller's number, which tags your call notes with who the call was with.
 
   **Don't quote the path** (move the exe to a space-free folder like `C:\Tools` if needed). Pick the "answer" events, not "ring". The app shows these commands with copy buttons. Test with the handler dialog's **Test** button or `Saley.exe test`; received commands are logged to `%LOCALAPPDATA%\Saley\log.txt`.
 
