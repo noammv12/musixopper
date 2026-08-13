@@ -1,13 +1,13 @@
 # Bridget ⚫
 
-**Your sales sidekick.** Bridget pauses your music when a call starts and brings it back after, keeps your go-to texts one click away, reminds you who to call back, writes your call notes for you (opt-in) — and types what you dictate straight into any app.
+**Your personal sales assistant.** Bridget pauses your music when a call starts and brings it back after, writes your call notes, reminds you who to call back, types what you dictate into any app — and when you ask her something out loud, she answers back or opens whatever you asked for.
 
 Built for people who live between calls: sales, support, recruiting. One black-and-silver dock pill above the taskbar; everything happens there.
 
 ## Install
 
-1. Download `Bridget.exe` from the [latest release](../../releases) (or from the artifacts of the latest [build](../../actions)).
-2. Run it. An **S** appears in the tray, the dock pill appears above the taskbar, and a 30-second welcome walks you through setup.
+1. Download `Bridget.exe` from the artifacts of the latest [build](../../actions) (or the [latest release](../../releases)).
+2. Run it. A **B** appears in the tray, the dock pill appears above the taskbar, and a 30-second welcome walks you through setup.
 3. In the flyout (left-click the tray icon), turn on **Start with Windows**.
 
 One self-contained exe — nothing to install. First launch takes a couple of seconds while Windows unpacks it.
@@ -21,10 +21,26 @@ Requires Windows 10 version 1903 or later (Windows 11 works).
 A small capsule floats just above the taskbar (drag it left/right — the spot is remembered):
 
 - **Resting**: a quiet sliver with a status dot — green (listening), amber (on a call).
-- **Hover**: expands into a pill with your status, snippet chips, the ⏰ reminder chip, and **…** for settings.
+- **Hover**: expands into a pill with your status, snippet chips, and the 🎙 💬 ⏰ 📝 chips — dictate, ask Bridget, reminders, notes. **…** opens settings.
 - **Call events**: briefly shows "Paused for your call" / "Music resumed", then tucks away.
-- **Reminders**: when one is due, the pill expands and stays until you act on it.
 - Auto-hides during presentations and fullscreen apps; never steals focus from what you're typing.
+
+The settings card (flyout) is draggable too — grab any empty spot on it. It never grows taller than your screen; long panels scroll.
+
+## Ask Bridget 💬
+
+Press **Ctrl+Alt+B** (or the 💬 chip), ask out loud, press again — Bridget either **answers back, out loud**, or **runs one of your commands**:
+
+- "מה שעון בניו יורק?" → she answers, in your language, briefly.
+- "תפתחי סיילספורס" → your Salesforce opens (see Commands below).
+
+Answers also land as a clickable toast and in the *Ask Bridget* panel with a Copy button. The hotkey is configurable there, and **Speak answers out loud** can be turned off. Needs your DeepSeek key (same one as notes) and a Groq key or the offline voice model for hearing you.
+
+**Voice:** Windows' built-in voice, offline and free. For Hebrew answers, add the Hebrew voice once: *Windows Settings → Time & Language → Speech → Add voices*. Bridget deliberately stays silent while a call is being recorded — her voice would end up in your transcript.
+
+## Commands
+
+Flyout → *Commands…*: name + target rows — a URL, an app path, a folder, anything Windows can open. Run them in one click, or just ask Bridget in your own words ("open WhatsApp", "תפתח את הסי-אר-אם"). Up to 20, stored locally in `commands.json`.
 
 ## Music pausing — two trigger modes
 
@@ -33,56 +49,56 @@ Flyout → **Detect calls by**:
 - **Microphone** *(zero config)* — pauses when any app opens your mic, resumes ~2 s after it's released. Only ever resumes what it paused. Caveat: outbound dialing opens the mic, so ringing pauses music too.
 - **Call events** *(recommended for outbound)* — pauses **only when your softphone reports the call was answered**. In Softphone.Pro add three handlers under *Settings → Integration → Third-party systems* (SIP account: *All*, Action: *Launch a program*):
 
-  | Event                  | URL/Program                             |
-  |------------------------|-----------------------------------------|
-  | `Outgoing call answer` | `C:\path\to\Bridget.exe pause %NUMBER%`   |
-  | `Incoming call answer` | `C:\path\to\Bridget.exe pause %NUMBER%`   |
-  | `Call end`             | `C:\path\to\Bridget.exe resume`           |
+  | Event                  | URL/Program                              |
+  |------------------------|------------------------------------------|
+  | `Outgoing call answer` | `C:\path\to\Bridget.exe pause %NUMBER%`  |
+  | `Incoming call answer` | `C:\path\to\Bridget.exe pause %NUMBER%`  |
+  | `Call end`             | `C:\path\to\Bridget.exe resume`          |
 
   The `%NUMBER%` part is optional — Softphone.Pro replaces it with the caller's number, which tags your call notes with who the call was with.
 
   **Don't quote the path** (move the exe to a space-free folder like `C:\Tools` if needed). Pick the "answer" events, not "ring". The app shows these commands with copy buttons. Test with the handler dialog's **Test** button or `Bridget.exe test`; received commands are logged to `%LOCALAPPDATA%\Bridget\log.txt`.
 
-## Snippets
-
-Your repeat texts as chips in the dock. **Click** pastes straight into the app you're working in (the dock never takes focus); **right-click** copies. Manage up to 15 via **…** → Snippets. Optional: turn on **Paste with Ctrl+Alt+1–9** there to paste your first nine snippets by global hotkey (off by default — skip it if you type with AltGr). Caveats: elevated (admin) apps silently ignore injected paste (the text is still on the clipboard), and some terminals bind paste to Ctrl+Shift+V.
-
-## Reminders
-
-⏰ chip (or flyout → *Reminders…*): paste the lead's link, pick a time — `30m / 1h / 3h / Tomorrow 9:00 / Custom` — done. When it's due, the dock expands with **Open / 10m / ✕**. Open launches the link in your browser. Due reminders queue up, wait politely while you're on a call or presenting, and anything missed while the PC was off fires on the next launch marked "Missed". Stored in `%LOCALAPPDATA%\Bridget\reminders.json`.
-
 ## Call notes (opt-in)
 
-Flyout → *Call notes…* → **Take notes on my calls**. From then on:
+📝 chip (or flyout → *Notes & dictation…*) → **Take notes on my calls**. From then on:
 
 1. During a call, Bridget records your mic + the caller's audio.
-2. When you hang up, it transcribes the call. **With a Groq API key** (free at console.groq.com, paste it in the panel) transcription runs on Groq's whisper-large-v3-turbo — excellent Hebrew, done in seconds. **Without a key** it runs locally on your PC with the offline Whisper model (~466 MB one-time download, 1–2 min for a 10-min call). With both, Groq is used first and the local model is the automatic fallback when Groq is unreachable or rate-limited.
-3. If you've pasted a DeepSeek API key, it writes **3 bullets + the next step**; without one you get the transcript only.
-4. The note pops up in the dock ("Notes ready — click to view"), lands in the flyout with a Copy button, and is appended to a daily Markdown file (`%LOCALAPPDATA%\Bridget\notes\`). If your softphone handlers pass `%NUMBER%`, the note is tagged with the caller's number.
-5. Each note card has **✨ Follow-up** (with a DeepSeek key): one click drafts a short WhatsApp-style follow-up message from the note, in the call's language, ready to copy.
+2. When you hang up, she transcribes the call. **With a Groq API key** (free at console.groq.com) transcription runs on Groq's whisper-large-v3-turbo — excellent Hebrew, done in seconds. **Without a key** it runs locally with the offline Whisper model (~466 MB one-time download). With both, Groq is first and local is the automatic fallback.
+3. With a DeepSeek key she writes **3 bullets + the next step**; without one you get the transcript only.
+4. The note pops up in the dock, lands at the top of the notes panel with a Copy button, and is appended to a daily Markdown file (`%LOCALAPPDATA%\Bridget\notes\`). With `%NUMBER%` handlers, notes are tagged with the caller's number.
+5. **✨ Follow-up** on each note card drafts a short WhatsApp-style follow-up message from the call, ready to copy.
 
-**Privacy:** recording is OFF by default. Audio files are deleted immediately after processing — only text is kept, on your PC. Keys are stored encrypted (Windows DPAPI, bound to your Windows account). With a Groq key, call audio is uploaded to Groq for transcription; only transcript text goes to DeepSeek. **Recording calls may require consent where you are — check your local law and company policy before enabling.**
+**Privacy:** recording is OFF by default. Audio is deleted right after processing — only text is kept, on your PC. Keys are stored encrypted (Windows DPAPI, bound to your Windows account). With a Groq key, call audio is uploaded to Groq for transcription; only text goes to DeepSeek. **Recording calls may require consent where you are — check your local law and company policy before enabling.**
 
-The log at `%LOCALAPPDATA%\Bridget\log.txt` narrates every step of note processing — if a note doesn't appear, the reason is in there.
+The log at `%LOCALAPPDATA%\Bridget\log.txt` narrates every step — if a note doesn't appear, the reason is in there.
 
 ## Dictation
 
-Press **Ctrl+Alt+Space** (or the 🎙 chip in the dock), speak, press it again (or click Finish) — the text is typed straight into whatever app your cursor is in. Hebrew by default, powered by the same Groq/local engine as call notes (needs a Groq key or the offline model). ✕ on the dock cancels. Works mid-call.
+Press **Ctrl+Alt+Space** (or the 🎙 chip), speak, press again — the text is typed straight into whatever app your cursor is in. Hebrew by default; works mid-call.
 
-- **Your hotkey:** flyout → *Notes & dictation…* → **Dictation** — click the combo box, press the keys you want (any Ctrl/Alt/Win combo), or turn the hotkey off. If another app owns the combo, Bridget says so and keeps the old one.
-- **Polish with AI** (optional, needs a DeepSeek key): cleans punctuation and filler words before the text is typed; **Professional tone** additionally smooths phrasing for business messages. If the API is unreachable, the raw transcript is typed — a dictation is never lost.
+- **Your hotkey:** *Notes & dictation…* → **Dictation** — click the combo box and press the keys you want, or turn it off.
+- **Polish with AI** (optional, DeepSeek): cleans punctuation and fillers before typing; **Professional tone** smooths phrasing. If the API is unreachable the raw transcript is typed — a dictation is never lost.
+
+## Snippets
+
+Your repeat texts as chips in the dock. **Click** pastes into the app you're working in (the dock never takes focus); **right-click** copies. Manage up to 15 via **…** → Snippets; optionally **Paste with Ctrl+Alt+1–9** (off by default — skip it if you type with AltGr). Caveats: elevated (admin) apps ignore injected paste (text stays on the clipboard); some terminals bind paste to Ctrl+Shift+V.
+
+## Reminders
+
+⏰ chip: paste the lead's link, pick a time — `30m / 1h / 3h / Tomorrow 9:00 / Custom`. When due, the dock expands with **Open / 10m / ✕**. Missed reminders fire on next launch, marked "Missed".
 
 ## Call stats
 
-The flyout shows a quiet "Today: 14 calls · 1h 12m" line under the status, and **Stats…** opens today / last-7-days totals with average call length. Counted locally from answered calls into `%LOCALAPPDATA%\Bridget\calls.json` (kept 90 days), never uploaded anywhere.
+The flyout shows "Today: 14 calls · 1h 12m" under the status; **Stats…** opens today / last-7-days totals with average call length. Local only (`calls.json`, 90 days), never uploaded.
 
 ## Network use
 
-Bridget talks to the network only when *you* opt in: the one-time voice-model download from `huggingface.co`, transcription requests to `api.groq.com` when you add a Groq key, and requests to `api.deepseek.com` when you add a DeepSeek key (call summaries and follow-up drafts; dictation text too, but only while "Polish with AI" is on). Nothing else, ever.
+Bridget talks to the network only when *you* opt in: the one-time voice-model download from `huggingface.co`, transcription requests to `api.groq.com` (Groq key), and requests to `api.deepseek.com` (DeepSeek key: call summaries, follow-up drafts, dictation polish when enabled, and Ask-Bridget questions). Her speaking voice is Windows' own — nothing leaves your PC for it. Nothing else, ever.
 
 ## Upgrading from Saley
 
-**Quit the old Saley first** (tray icon → Quit) — Bridget warns you if it's still running. On first launch everything migrates automatically: settings, API keys, autostart, and your whole data folder (notes, snippets, reminders, stats, and the offline voice model). Then delete the old `Saley.exe` and re-point the three Softphone.Pro handlers to `Bridget.exe` — the app reminds you and shows the new commands.
+**Quit the old Saley first** (tray icon → Quit) — Bridget warns you if it's still running. On first launch everything migrates automatically: settings, API keys, autostart, and your whole data folder (notes, snippets, reminders, stats, and the offline voice model). Then delete `Saley.exe` and re-point the three Softphone.Pro handlers to `Bridget.exe` — the app reminds you and shows the new commands.
 
 ## Good to know
 

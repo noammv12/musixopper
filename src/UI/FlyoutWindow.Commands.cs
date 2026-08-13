@@ -102,17 +102,9 @@ partial class FlyoutWindow
         }
 
         TextBlock? run = null;
-        run = Link("Run", 1, () =>
-        {
-            run!.Text = CommandStore.Execute(command) ? "✓" : "failed";
-            var revert = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
-            revert.Tick += (_, _) =>
-            {
-                revert.Stop();
-                run.Text = "Run";
-            };
-            revert.Start();
-        }, enabled: command.Target.Length > 0);
+        run = Link("Run", 1,
+            () => Ui.Flash(run!, CommandStore.Execute(command) ? "✓" : "failed", "Run"),
+            enabled: command.Target.Length > 0);
         Link("▲", 2, () => MoveCommand(index, -1), enabled: index > 0);
         Link("▼", 3, () => MoveCommand(index, +1), enabled: index < _commands.Count - 1);
         if (_editingCommand != index)

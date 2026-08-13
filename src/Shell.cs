@@ -64,7 +64,12 @@ sealed class Shell : IDisposable
         _dictation.Stopped += () => _dock.SetDictation(false);
         _dictation.StatusChanged += status => _dock.SetDictationStatus(status);
         _dictation.ToastRequested += message => _dock.ShowToast(message, paused: false, showIcon: false, important: true);
-        _dock.DictationToggleRequested += _dictation.Toggle;
+        // One microphone mode at a time: the other hotkey is inert while a
+        // session runs, so the shared pill's buttons always match the mode.
+        _dock.DictationToggleRequested += () =>
+        {
+            if (!_assistant.IsListening) _dictation.Toggle();
+        };
         _dock.DictationCancelRequested += _dictation.Cancel;
         _flyout.ApplyDictationHotkey = _dock.ApplyDictationHotkey;
         _flyout.ApplySnippetHotkeys = _dock.ApplySnippetHotkeys;
@@ -81,7 +86,10 @@ sealed class Shell : IDisposable
             _dock.ShowToast("Bridget answered — click to read", paused: false,
                 onClick: () => _flyout.ShowBridget(), showIcon: false, important: true);
         };
-        _dock.AssistantToggleRequested += _assistant.Toggle;
+        _dock.AssistantToggleRequested += () =>
+        {
+            if (!_dictation.IsActive) _assistant.Toggle();
+        };
         _dock.AssistantCancelRequested += _assistant.Cancel;
         _flyout.ApplyAssistantHotkey = _dock.ApplyAssistantHotkey;
 

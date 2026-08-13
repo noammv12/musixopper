@@ -96,7 +96,9 @@ static class DeepSeekClient
             prompt.Append("\nThe user has no saved commands — always answer.");
         }
 
-        var raw = await ChatAsync(prompt.ToString(), question, 0.2, 500, apiKey, ct);
+        // rejectTruncated: half a JSON object must not reach the fallback
+        // below, where it would be displayed — and spoken — verbatim.
+        var raw = await ChatAsync(prompt.ToString(), question, 0.2, 500, apiKey, ct, rejectTruncated: true);
         if (raw is null) return null;
 
         try
@@ -115,13 +117,16 @@ static class DeepSeekClient
                     && doc.RootElement.TryGetProperty("text", out var t)
                     && t.GetString() is { Length: > 0 } text)
                     return new AssistResult("answer", null, text);
+                return null; // valid JSON but no usable action/content
             }
         }
         catch (JsonException)
         {
-            // fall through — the raw text is still a usable answer
+            // fall through
         }
-        return new AssistResult("answer", null, raw);
+        // The model ignored the JSON contract. Plain prose is still a usable
+        // answer; a JSON-looking fragment is not.
+        return raw.StartsWith('{') ? null : new AssistResult("answer", null, raw);
     }
 
     static async Task<string?> ChatAsync(string systemPrompt, string userContent, double temperature, int maxTokens, string apiKey, CancellationToken ct, bool rejectTruncated = false)

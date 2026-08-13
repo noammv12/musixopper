@@ -207,13 +207,16 @@ static class Settings
             {
                 if (existing is null)
                 {
-                    using var old = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Saley");
+                    // Two identities back: a straight Musixopper→Bridget jump
+                    // (never installed Saley) still deserves its settings.
+                    using var old = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Saley")
+                        ?? Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Musixopper");
                     if (old is null) return; // fresh install — nothing else to migrate either
                     using var dest = Registry.CurrentUser.CreateSubKey(KeyPath);
                     foreach (var name in old.GetValueNames())
                         dest.SetValue(name, old.GetValue(name)!, old.GetValueKind(name));
                     JustMigrated = true; // old settings key deliberately left in place
-                    Log.Write("Migrated settings from Saley");
+                    Log.Write("Migrated settings from the previous install");
                 }
             }
         }
@@ -224,14 +227,18 @@ static class Settings
 
         try
         {
-            // Drop the retired exe's Run entry so it doesn't keep launching
+            // Drop the retired exes' Run entries so they don't keep launching
             // at boot and fighting this app; re-point autostart at us.
             using var run = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true);
-            if (run?.GetValue("Saley") is not null)
+            var hadOld = false;
+            foreach (var retired in new[] { "Saley", "Musixopper" })
             {
-                run.DeleteValue("Saley", throwOnMissingValue: false);
-                if (Environment.ProcessPath is { } path) run.SetValue(RunValueName, $"\"{path}\"");
+                if (run?.GetValue(retired) is null) continue;
+                run.DeleteValue(retired, throwOnMissingValue: false);
+                hadOld = true;
             }
+            if (hadOld && Environment.ProcessPath is { } path)
+                run!.SetValue(RunValueName, $"\"{path}\"");
         }
         catch (Exception ex)
         {
@@ -240,19 +247,32 @@ static class Settings
 
         try
         {
+            // Log.Init() has already created (and written into) the Bridget
+            // folder by the time this runs, so a whole-folder Directory.Move
+            // would never fire — move the old tree's contents item by item
+            // instead. Idempotent: existing entries win, leftovers retry on
+            // the next launch until the old folder is deleted.
             var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             var oldDir = System.IO.Path.Combine(local, "Saley");
             var newDir = System.IO.Path.Combine(local, "Bridget");
-            if (System.IO.Directory.Exists(oldDir) && !System.IO.Directory.Exists(newDir))
+            if (System.IO.Directory.Exists(oldDir))
             {
-                System.IO.Directory.Move(oldDir, newDir);
-                Log.Write("Moved data folder from Saley to Bridget");
+                System.IO.Directory.CreateDirectory(newDir);
+                var moved = 0;
+                foreach (var entry in System.IO.Directory.EnumerateFileSystemEntries(oldDir))
+                {
+                    var dest = System.IO.Path.Combine(newDir, System.IO.Path.GetFileName(entry));
+                    if (System.IO.File.Exists(dest) || System.IO.Directory.Exists(dest)) continue;
+                    System.IO.Directory.Move(entry, dest); // moves files too
+                    moved++;
+                }
+                if (moved > 0) Log.Write($"Moved {moved} data item(s) from Saley to Bridget");
             }
         }
         catch (Exception ex)
         {
-            // Locked (old app still running?) or partial — start fresh; the
-            // old folder stays intact for a manual copy.
+            // Locked (old app still running?) or partial — whatever moved is
+            // in place; the rest stays in the old folder for the next launch.
             Log.Write($"Data folder migration failed: {ex.Message}");
         }
     }

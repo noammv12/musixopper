@@ -122,7 +122,7 @@ sealed class Assistant : IDisposable
             var result = await DeepSeekClient.AssistAsync(question, commands, key, CancellationToken.None);
             if (result is null)
             {
-                ToastRequested?.Invoke("Bridget couldn't reach DeepSeek — see log");
+                ToastRequested?.Invoke("Bridget couldn't work that one out — try again");
                 return;
             }
 
@@ -144,6 +144,9 @@ sealed class Assistant : IDisposable
             Answered?.Invoke(question, answer);
             if (Settings.VoiceEnabled && _callState() != CallState.OnCall)
             {
+                // Speaking isn't "busy" — clearing the flag here is what lets
+                // the hotkey barge in (Toggle: stop speech, start listening).
+                _busy = false;
                 // Speaking during a recorded call would leak into the
                 // transcript via loopback capture — screen-only then.
                 await _speaker.SpeakAsync(answer);

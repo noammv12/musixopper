@@ -663,17 +663,7 @@ sealed class DockWindow : Window
             return;
         }
         _dictationActive = active;
-        UpdateListeningText();
-        if (active)
-        {
-            if (_state != DockState.Reminder) SetState(DockState.Dictation);
-        }
-        else if (_state == DockState.Dictation)
-        {
-            SetState(RestState() == DockState.Dictation
-                ? DockState.Dictation
-                : _pill.IsMouseOver ? DockState.Expanded : DockState.Collapsed);
-        }
+        SyncListeningState(active);
     }
 
     /// <summary>Ask-Bridget listening shares the dictation pill (dot + Finish
@@ -686,16 +676,19 @@ sealed class DockWindow : Window
             return;
         }
         _assistantActive = active;
+        SyncListeningState(active);
+    }
+
+    void SyncListeningState(bool activated)
+    {
         UpdateListeningText();
-        if (active)
+        if (activated)
         {
             if (_state != DockState.Reminder) SetState(DockState.Dictation);
         }
         else if (_state == DockState.Dictation)
         {
-            SetState(RestState() == DockState.Dictation
-                ? DockState.Dictation
-                : _pill.IsMouseOver ? DockState.Expanded : DockState.Collapsed);
+            SetState(RestState()); // still Dictation if the other mode runs
         }
     }
 
