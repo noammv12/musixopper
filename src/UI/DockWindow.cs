@@ -7,11 +7,11 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using System.Windows.Threading;
-using Saley.Interop;
+using Bridget.Interop;
 using ShapePath = System.Windows.Shapes.Path;
 using WinF = System.Windows.Forms;
 
-namespace Saley.UI;
+namespace Bridget.UI;
 
 enum DockState
 {
@@ -23,7 +23,7 @@ enum DockState
 }
 
 /// <summary>
-/// The Saley dock: a small always-on-top capsule that lives just above the
+/// The Bridget dock: a small always-on-top capsule that lives just above the
 /// taskbar. Collapsed it's a quiet sliver with a status dot; on hover it
 /// expands to show status and snippet chips (click = paste into the focused
 /// app); on call events it self-expands as a toast for two seconds.
@@ -46,8 +46,8 @@ sealed class DockWindow : Window
 
     static readonly Geometry PauseGlyph = Geometry.Parse("M0,0 H3.6 V11 H0 Z M6.4,0 H10 V11 H6.4 Z");
     static readonly Geometry PlayGlyph = Geometry.Parse("M0,0 L10,5.5 L0,11 Z");
-    // The Saley S at 14 px — same two tangent arcs as the app icon.
-    static readonly Geometry SMark = Geometry.Parse("M8.45,3.49 A2.06,2.06 0 1 0 7,7 A2.06,2.06 0 1 1 5.55,10.51");
+    // The Bridget B at 14 px — stem + two right bowls, same geometry as the app icon.
+    static readonly Geometry BMark = Geometry.Parse("M5.78,2.89 L5.78,11.11 M5.78,2.89 A2.06,2.06 0 0 1 5.78,7 A2.06,2.06 0 0 1 5.78,11.11");
 
     readonly Border _pill;
     readonly Ellipse _collapsedDot;
@@ -126,17 +126,17 @@ sealed class DockWindow : Window
         _collapsedDot.SetResourceReference(Shape.FillProperty, "StatusGoodBrush");
 
         // -- expanded content ------------------------------------------------
-        var sMark = new ShapePath
+        var bMark = new ShapePath
         {
-            Data = SMark,
-            StrokeThickness = 2,
+            Data = BMark,
+            StrokeThickness = 1.75,
             StrokeStartLineCap = PenLineCap.Round,
             StrokeEndLineCap = PenLineCap.Round,
             Width = 14,
             Height = 14,
             VerticalAlignment = VerticalAlignment.Center,
         };
-        sMark.SetResourceReference(Shape.StrokeProperty, "AccentBrush");
+        bMark.SetResourceReference(Shape.StrokeProperty, "AccentBrush");
 
         _statusDot = new Ellipse { Width = 8, Height = 8, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
         _statusDot.SetResourceReference(Shape.FillProperty, "StatusGoodBrush");
@@ -149,7 +149,7 @@ sealed class DockWindow : Window
         _chipsPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
 
         _expandedContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 12, 0) };
-        _expandedContent.Children.Add(sMark);
+        _expandedContent.Children.Add(bMark);
         _expandedContent.Children.Add(_statusDot);
         _expandedContent.Children.Add(_statusText);
         _expandedContent.Children.Add(divider);

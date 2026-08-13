@@ -1,7 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 
-namespace Saley.UI;
+namespace Bridget.UI;
 
 /// <summary>The flyout's call-stats panel plus the ambient "Today:" line.</summary>
 partial class FlyoutWindow

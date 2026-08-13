@@ -4,7 +4,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
-namespace Saley.Notes;
+namespace Bridget.Notes;
 
 /// <summary>
 /// DeepSeek's OpenAI-compatible chat API: call summaries, dictation

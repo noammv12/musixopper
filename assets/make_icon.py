@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Generates src/Assets/Saley.ico — the app icon (exe, Explorer, alt-tab).
+"""Generates src/Assets/Bridget.ico — the app icon (exe, Explorer, alt-tab).
 
-Rounded green square with a bold round-capped white "S" built from two
-tangent-circle arcs, drawn at 1024px and downsampled. The tray icon is
-rendered at runtime instead (it must adapt to the taskbar theme) with the
-same arc geometry — keep the two in sync.
+Rounded graphite square (the app's black→silver brand) with a bold
+round-capped silver-white "B" built from a stem and two equal right-side
+bowls, drawn at 1024px and downsampled. The tray icon is rendered at
+runtime instead (it must adapt to the taskbar theme) with the same
+geometry — keep the two in sync.
 
 Usage: python make_icon.py [output.ico]
 Requires: Pillow
@@ -20,7 +21,7 @@ def draw_base():
     img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
 
     # Vertical gradient, masked to a rounded square.
-    top, bottom = (52, 199, 89), (31, 138, 59)  # #34C759 -> #1F8A3B
+    top, bottom = (44, 44, 48), (18, 18, 21)  # #2C2C30 -> #121215
     grad = Image.new("RGBA", (S, S))
     gd = ImageDraw.Draw(grad)
     for y in range(S):
@@ -31,32 +32,42 @@ def draw_base():
     ImageDraw.Draw(mask).rounded_rectangle([0, 0, S - 1, S - 1], radius=int(S * 0.22), fill=255)
     img.paste(grad, (0, 0), mask)
 
-    # "S" mark on a 16-unit design grid: two tangent circles r=2.35 centered
-    # (8, 5.65) and (8, 10.35); stroke 2.3u, round caps. Angles are GDI+
-    # convention (0deg = +x, positive = clockwise with y-down), so the C#
-    # tray renderer uses the exact same numbers.
+    # "B" mark on a 16-unit design grid: stem at x=6.6 from y=3.3 to 12.7,
+    # two equal bowls r=2.35 centered (6.6, 5.65) and (6.6, 10.35); stroke
+    # 2.0u, round caps. Angles are GDI+ convention (0deg = +x, positive =
+    # clockwise with y-down) — the C# tray renderer uses the same numbers.
     d = ImageDraw.Draw(img)
     u = S * 0.055
     ox = S * 0.5 - 8 * u
     oy = S * 0.5 - 8 * u
-    white = (255, 255, 255, 245)
-    stamp_r = 1.15 * u  # half the 2.3u stroke
+    silver = (227, 227, 234, 248)  # the theme's AccentBrush #E3E3EA
+    stamp_r = 1.0 * u  # half the 2.0u stroke
+
+    def stamp(x16, y16):
+        x = ox + x16 * u
+        y = oy + y16 * u
+        d.ellipse([x - stamp_r, y - stamp_r, x + stamp_r, y + stamp_r], fill=silver)
 
     def arc(cx, cy, r, start_deg, sweep_deg):
         steps = 96
         for i in range(steps + 1):
             theta = math.radians(start_deg + sweep_deg * i / steps)
-            x = ox + (cx + r * math.cos(theta)) * u
-            y = oy + (cy + r * math.sin(theta)) * u
-            d.ellipse([x - stamp_r, y - stamp_r, x + stamp_r, y + stamp_r], fill=white)
+            stamp(cx + r * math.cos(theta), cy + r * math.sin(theta))
 
-    arc(8, 5.65, 2.35, -45, -225)   # top bowl: upper-right terminal -> center
-    arc(8, 10.35, 2.35, 270, 225)   # bottom bowl: center -> lower-left terminal
+    def line(x0, y0, x1, y1):
+        steps = 96
+        for i in range(steps + 1):
+            f = i / steps
+            stamp(x0 + (x1 - x0) * f, y0 + (y1 - y0) * f)
+
+    line(6.6, 3.3, 6.6, 12.7)          # stem
+    arc(6.6, 5.65, 2.35, -90, 180)     # top bowl (right half)
+    arc(6.6, 10.35, 2.35, -90, 180)    # bottom bowl (right half)
     return img
 
 
 def main():
-    out = sys.argv[1] if len(sys.argv) > 1 else "src/Assets/Saley.ico"
+    out = sys.argv[1] if len(sys.argv) > 1 else "src/Assets/Bridget.ico"
     base = draw_base()
     sizes = [16, 24, 32, 48, 64, 128, 256]
     frames = [base.resize((s, s), Image.LANCZOS) for s in sizes]

@@ -1,6 +1,6 @@
 using System.Windows.Media.Animation;
 
-namespace Saley.UI;
+namespace Bridget.UI;
 
 /// <summary>
 /// The app's motion vocabulary: three durations, three curves. Everything

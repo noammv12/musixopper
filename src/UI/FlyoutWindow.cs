@@ -7,10 +7,10 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using System.Windows.Threading;
-using Saley.Interop;
+using Bridget.Interop;
 using WinF = System.Windows.Forms;
 
-namespace Saley.UI;
+namespace Bridget.UI;
 
 /// <summary>
 /// The single window of the app: status, trigger mode, toggles — plus the
@@ -231,7 +231,7 @@ sealed partial class FlyoutWindow : Window
         panel.Children.Add(Ui.Divider(12, 10));
 
         var footer = new Grid();
-        var appName = Ui.Text($"Saley {Program.Version}", 10.5, "TextSecondaryBrush");
+        var appName = Ui.Text($"Bridget {Program.Version}", 10.5, "TextSecondaryBrush");
         appName.VerticalAlignment = VerticalAlignment.Center;
         var quit = Ui.Text("Quit", 11, "TextSecondaryBrush");
         quit.Cursor = Cursors.Hand;
@@ -251,7 +251,7 @@ sealed partial class FlyoutWindow : Window
     {
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
-        panel.Children.Add(Ui.Text("Welcome to Saley", 15, "TextPrimaryBrush", FontWeights.SemiBold));
+        panel.Children.Add(Ui.Text("Welcome to Bridget", 15, "TextPrimaryBrush", FontWeights.SemiBold));
         var subtitle = Ui.Text("Your music pauses when a call starts, and comes back when it ends.", 11.5, "TextSecondaryBrush");
         subtitle.TextWrapping = TextWrapping.Wrap;
         subtitle.Margin = new Thickness(0, 6, 0, 0);
@@ -299,7 +299,7 @@ sealed partial class FlyoutWindow : Window
 
         // Softphone.Pro launches the string as "path + arguments" without
         // shell-style quote stripping, so quote only when unavoidable.
-        var exe = Environment.ProcessPath ?? "Saley.exe";
+        var exe = Environment.ProcessPath ?? "Bridget.exe";
         var hasSpaces = exe.Contains(' ');
         if (hasSpaces) exe = $"\"{exe}\"";
         var rows = new (string Caption, string Command)[]
@@ -320,13 +320,13 @@ sealed partial class FlyoutWindow : Window
         }
         if (hasSpaces)
         {
-            var spaceHint = Ui.Text("If a handler doesn't fire, move Saley.exe to a folder without spaces (e.g. C:\\Tools) — some softphones don't handle quoted paths.", 10.5, "TextSecondaryBrush");
+            var spaceHint = Ui.Text("If a handler doesn't fire, move Bridget.exe to a folder without spaces (e.g. C:\\Tools) — some softphones don't handle quoted paths.", 10.5, "TextSecondaryBrush");
             spaceHint.TextWrapping = TextWrapping.Wrap;
             spaceHint.Margin = new Thickness(0, 8, 0, 0);
             panel.Children.Add(spaceHint);
         }
 
-        var hint = Ui.Text("Tip: run “Saley test” in a terminal — your music pauses for 8 seconds, then resumes.", 11, "TextSecondaryBrush");
+        var hint = Ui.Text("Tip: run “Bridget test” in a terminal — your music pauses for 8 seconds, then resumes.", 11, "TextSecondaryBrush");
         hint.TextWrapping = TextWrapping.Wrap;
         hint.Margin = new Thickness(0, 12, 0, 0);
         panel.Children.Add(hint);

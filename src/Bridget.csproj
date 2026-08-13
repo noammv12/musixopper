@@ -6,20 +6,20 @@
     <TargetPlatformMinVersion>10.0.18362.0</TargetPlatformMinVersion>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
-    <RootNamespace>Saley</RootNamespace>
-    <AssemblyName>Saley</AssemblyName>
-    <ApplicationIcon>Assets\Saley.ico</ApplicationIcon>
+    <RootNamespace>Bridget</RootNamespace>
+    <AssemblyName>Bridget</AssemblyName>
+    <ApplicationIcon>Assets\Bridget.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <Product>Saley</Product>
-    <Description>Your sales sidekick: pauses music on calls, pastes your go-to texts in one click.</Description>
-    <Company>Saley</Company>
-    <Copyright>© 2026 Saley</Copyright>
-    <Version>5.0.0</Version>
-    <FileVersion>5.0.0.0</FileVersion>
-    <AssemblyVersion>5.0.0.0</AssemblyVersion>
+    <Product>Bridget</Product>
+    <Description>Your personal sales assistant: pauses music on calls, takes your notes, pastes your texts, answers when you ask.</Description>
+    <Company>Bridget</Company>
+    <Copyright>© 2026 Bridget</Copyright>
+    <Version>6.0.0</Version>
+    <FileVersion>6.0.0.0</FileVersion>
+    <AssemblyVersion>6.0.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -42,7 +42,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="$(PkgWhisper_net_Runtime)\build\win-x64\*.dll"
-                      LogicalName="Saley.WhisperNative.%(Filename)%(Extension)" />
+                      LogicalName="Bridget.WhisperNative.%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

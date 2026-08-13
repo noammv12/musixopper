@@ -2,7 +2,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 
-namespace Saley.Notes;
+namespace Bridget.Notes;
 
 sealed record CallNote(
     string Id,
@@ -28,7 +28,7 @@ static class NotesStore
     };
 
     public static string NotesDir => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Saley", "notes");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Bridget", "notes");
     public static string TmpDir => Path.Combine(NotesDir, "tmp");
     static string IndexPath => Path.Combine(NotesDir, "notes.json");
 

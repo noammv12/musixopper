@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace Saley;
+namespace Bridget;
 
 /// <summary>
 /// One-shot side channel for the caller's number. The CLI writes it just
@@ -13,7 +13,7 @@ static class CurrentCall
     static readonly TimeSpan MaxAge = TimeSpan.FromSeconds(15);
 
     static string FilePath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Saley", "current-call.txt");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Bridget", "current-call.txt");
 
     /// <summary>Sanitizes and stores the number; no-op when it isn't one.</summary>
     public static void Set(string? raw)

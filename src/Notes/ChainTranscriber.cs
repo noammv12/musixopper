@@ -1,4 +1,4 @@
-namespace Saley.Notes;
+namespace Bridget.Notes;
 
 /// <summary>
 /// The engine strategy the user picked: Groq first whenever a key is set

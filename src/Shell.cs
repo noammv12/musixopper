@@ -1,9 +1,9 @@
 using System.Windows;
 using System.Windows.Threading;
-using Saley.Notes;
-using Saley.UI;
+using Bridget.Notes;
+using Bridget.UI;
 
-namespace Saley;
+namespace Bridget;
 
 /// <summary>
 /// Wires everything together for tray mode: engine ticks, tray icon,
@@ -91,6 +91,15 @@ sealed class Shell : IDisposable
         _dock.ShowDock();
         _dock.SyncState(_engine.State); // StateChanged won't fire until the state moves
 
+        // A still-running Saley build won't collide on the renamed mutex or
+        // events — it would fight over the mic and media sessions. Warn once.
+        if (EventWaitHandle.TryOpenExisting(@"Local\Saley.ShowFlyout", out var oldApp))
+        {
+            oldApp.Dispose();
+            _dock.ShowToast("The old Saley is still running — quit it from its tray icon",
+                paused: false, showIcon: false, important: true);
+        }
+
         if (!Settings.OnboardingDone)
         {
             OpenFlyoutSoon(() => _flyout.ShowFlyout(onboarding: true));
@@ -101,7 +110,7 @@ sealed class Shell : IDisposable
             OpenFlyoutSoon(() =>
             {
                 _flyout.ShowFlyout();
-                _flyout.ShowSoftphoneSetup("Saley replaces Musixopper — update your softphone handlers.");
+                _flyout.ShowSoftphoneSetup("Bridget replaces Saley — update your softphone handlers.");
             });
         }
     }

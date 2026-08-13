@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Windows.Threading;
 
-namespace Saley;
+namespace Bridget;
 
 /// <summary>
 /// Watches the reminder store and delivers due reminders to the dock.

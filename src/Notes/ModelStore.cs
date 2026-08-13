@@ -3,11 +3,11 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 
-namespace Saley.Notes;
+namespace Bridget.Notes;
 
 /// <summary>
 /// The Whisper voice model: downloaded once from Hugging Face into
-/// %LOCALAPPDATA%\Saley\models with resume support (.part + Range).
+/// %LOCALAPPDATA%\Bridget\models with resume support (.part + Range).
 /// </summary>
 static class ModelStore
 {
@@ -16,7 +16,7 @@ static class ModelStore
     public const string DisplaySize = "466 MB";
 
     static string Dir => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Saley", "models");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Bridget", "models");
     public static string ModelPath => Path.Combine(Dir, "ggml-small.bin");
 
     static readonly HttpClient Http = new() { Timeout = Timeout.InfiniteTimeSpan };

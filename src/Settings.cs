@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Win32;
 
-namespace Saley;
+namespace Bridget;
 
 enum TriggerMode
 {
@@ -11,15 +11,15 @@ enum TriggerMode
     Microphone = 0,
 
     /// <summary>Pause only on explicit call-answered signals from the
-    /// softphone's event handlers (via "Saley.exe pause/resume").</summary>
+    /// softphone's event handlers (via "Bridget.exe pause/resume").</summary>
     SoftphoneEvents = 1,
 }
 
 static class Settings
 {
-    const string KeyPath = @"SOFTWARE\Saley";
+    const string KeyPath = @"SOFTWARE\Bridget";
     const string RunKeyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
-    const string RunValueName = "Saley";
+    const string RunValueName = "Bridget";
 
     public static TriggerMode Trigger
     {
@@ -166,42 +166,72 @@ static class Settings
         WriteValue(name, Convert.ToBase64String(protectedBytes));
     }
 
-    /// <summary>Set when this run inherited settings from a Musixopper install.</summary>
+    /// <summary>Set when this run inherited settings from a Saley install.</summary>
     public static bool JustMigrated { get; private set; }
 
-    /// <summary>One-time copy of settings from the app's previous identity.</summary>
-    public static void MigrateFromMusixopper()
+    /// <summary>
+    /// One-time takeover of the app's previous identity: every registry
+    /// value copies raw (DPAPI blobs are bound to the Windows user, not the
+    /// app, so they still decrypt), the autostart entry is re-pointed, and
+    /// the whole %LOCALAPPDATA% tree — notes, snippets, reminders, stats,
+    /// and the 466 MB voice model — moves across. Each step is independent:
+    /// one failing must not take the others down.
+    /// </summary>
+    public static void MigrateFromSaley()
     {
         try
         {
             using (var existing = Registry.CurrentUser.OpenSubKey(KeyPath))
-                if (existing is not null) return; // Saley settings already exist
-
-            using var old = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Musixopper");
-            if (old is null) return; // fresh install
-
-            using var dest = Registry.CurrentUser.CreateSubKey(KeyPath);
-            foreach (var name in new[] { "TriggerMode", "Enabled", "OnboardingDone" })
-                if (old.GetValue(name)?.ToString() is { } value)
-                    dest.SetValue(name, value);
-
-            // Carry over autostart, and drop the retired exe's Run entry so
-            // it doesn't keep launching at boot and fighting this app.
-            using (var run = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true))
             {
-                if (run?.GetValue("Musixopper") is not null)
+                if (existing is null)
                 {
-                    run.DeleteValue("Musixopper", throwOnMissingValue: false);
-                    if (Environment.ProcessPath is { } path) run.SetValue(RunValueName, $"\"{path}\"");
+                    using var old = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Saley");
+                    if (old is null) return; // fresh install — nothing else to migrate either
+                    using var dest = Registry.CurrentUser.CreateSubKey(KeyPath);
+                    foreach (var name in old.GetValueNames())
+                        dest.SetValue(name, old.GetValue(name)!, old.GetValueKind(name));
+                    JustMigrated = true; // old settings key deliberately left in place
+                    Log.Write("Migrated settings from Saley");
                 }
             }
-
-            JustMigrated = true; // old settings key deliberately left in place
-            Log.Write("Migrated settings from Musixopper");
         }
         catch (Exception ex)
         {
             Log.Write($"Settings migration failed: {ex.Message}");
+        }
+
+        try
+        {
+            // Drop the retired exe's Run entry so it doesn't keep launching
+            // at boot and fighting this app; re-point autostart at us.
+            using var run = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true);
+            if (run?.GetValue("Saley") is not null)
+            {
+                run.DeleteValue("Saley", throwOnMissingValue: false);
+                if (Environment.ProcessPath is { } path) run.SetValue(RunValueName, $"\"{path}\"");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Autostart migration failed: {ex.Message}");
+        }
+
+        try
+        {
+            var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var oldDir = System.IO.Path.Combine(local, "Saley");
+            var newDir = System.IO.Path.Combine(local, "Bridget");
+            if (System.IO.Directory.Exists(oldDir) && !System.IO.Directory.Exists(newDir))
+            {
+                System.IO.Directory.Move(oldDir, newDir);
+                Log.Write("Moved data folder from Saley to Bridget");
+            }
+        }
+        catch (Exception ex)
+        {
+            // Locked (old app still running?) or partial — start fresh; the
+            // old folder stays intact for a manual copy.
+            Log.Write($"Data folder migration failed: {ex.Message}");
         }
     }
 

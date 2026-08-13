@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace Saley.Interop;
+namespace Bridget.Interop;
 
 static class NativeMethods
 {

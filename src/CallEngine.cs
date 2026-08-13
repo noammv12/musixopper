@@ -1,6 +1,6 @@
 using Windows.Media.Control;
 
-namespace Saley;
+namespace Bridget;
 
 enum CallState
 {

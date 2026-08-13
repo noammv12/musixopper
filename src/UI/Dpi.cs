@@ -1,8 +1,8 @@
 using System.Windows;
 using System.Windows.Interop;
-using Saley.Interop;
+using Bridget.Interop;
 
-namespace Saley.UI;
+namespace Bridget.UI;
 
 static class Dpi
 {

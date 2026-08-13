@@ -3,7 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 
-namespace Saley.UI;
+namespace Bridget.UI;
 
 /// <summary>The flyout's Reminders panel: quick-add + pending list.</summary>
 partial class FlyoutWindow
@@ -31,7 +31,7 @@ partial class FlyoutWindow
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
         panel.Children.Add(Ui.Text("Reminders", 15, "TextPrimaryBrush", FontWeights.SemiBold));
-        var subtitle = Ui.Text("Paste the lead's link, pick a time — Saley pops it above the taskbar when it's time to call.", 11.5, "TextSecondaryBrush");
+        var subtitle = Ui.Text("Paste the lead's link, pick a time — Bridget pops it above the taskbar when it's time to call.", 11.5, "TextSecondaryBrush");
         subtitle.TextWrapping = TextWrapping.Wrap;
         subtitle.Margin = new Thickness(0, 6, 0, 0);
         panel.Children.Add(subtitle);

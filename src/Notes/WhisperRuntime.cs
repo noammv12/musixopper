@@ -4,13 +4,13 @@ using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics.X86;
 using Whisper.net.LibraryLoader;
 
-namespace Saley.Notes;
+namespace Bridget.Notes;
 
 /// <summary>
 /// Loads the whisper.cpp natives. They ship as embedded resources (the
 /// NuGet runtime package delivers them as loose content files, which a
 /// single-file publish would silently drop), get extracted once to
-/// %LOCALAPPDATA%\Saley\whisper-runtime\, and are loaded manually in
+/// %LOCALAPPDATA%\Bridget\whisper-runtime\, and are loaded manually in
 /// dependency order; RuntimeOptions.LoadedLibrary then bypasses
 /// Whisper.net's own path probing entirely.
 /// </summary>
@@ -50,12 +50,12 @@ static class WhisperRuntime
             {
                 var dir = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "Saley", "whisper-runtime", Version);
+                    "Bridget", "whisper-runtime", Version);
                 Directory.CreateDirectory(dir);
 
                 var assembly = typeof(WhisperRuntime).Assembly;
                 foreach (var name in LoadOrder)
-                    ExtractIfNeeded(assembly, "Saley.WhisperNative." + name, Path.Combine(dir, name));
+                    ExtractIfNeeded(assembly, "Bridget.WhisperNative." + name, Path.Combine(dir, name));
                 foreach (var name in LoadOrder)
                     NativeLibrary.Load(Path.Combine(dir, name));
 

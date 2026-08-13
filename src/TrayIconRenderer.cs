@@ -1,15 +1,15 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
-using Saley.Interop;
+using Bridget.Interop;
 
-namespace Saley;
+namespace Bridget;
 
 /// <summary>
-/// Renders the tray glyph at runtime — the Saley "S" drawn as two
-/// tangent-circle arcs (crisp at 16 px, no font fallback; same geometry
-/// as assets/make_icon.py), white on a dark taskbar and near-black on a
-/// light one, with an amber dot while on a call.
+/// Renders the tray glyph at runtime — the Bridget "B" drawn as a rounded
+/// stem plus two equal right-side bowls (crisp at 16 px, no font fallback;
+/// same geometry as assets/make_icon.py), white on a dark taskbar and
+/// near-black on a light one, with an amber dot while on a call.
 /// </summary>
 static class TrayIconRenderer
 {
@@ -43,10 +43,12 @@ static class TrayIconRenderer
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
             float u = size / 16f;
 
-            using var pen = new Pen(color, 2.3f * u) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            // Two tangent circles r=2.35 centered (8,5.65)/(8,10.35) on the 16-grid.
-            g.DrawArc(pen, (8 - 2.35f) * u, (5.65f - 2.35f) * u, 4.7f * u, 4.7f * u, -45f, -225f);  // top bowl
-            g.DrawArc(pen, (8 - 2.35f) * u, (10.35f - 2.35f) * u, 4.7f * u, 4.7f * u, 270f, 225f);  // bottom bowl
+            using var pen = new Pen(color, 2.0f * u) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            // B-mark: stem at x=6.6 (y 3.3–12.7) + two equal right bowls
+            // r=2.35 centered (6.6,5.65)/(6.6,10.35) on the 16-grid.
+            g.DrawLine(pen, 6.6f * u, 3.3f * u, 6.6f * u, 12.7f * u);
+            g.DrawArc(pen, (6.6f - 2.35f) * u, (5.65f - 2.35f) * u, 4.7f * u, 4.7f * u, -90f, 180f);   // top bowl
+            g.DrawArc(pen, (6.6f - 2.35f) * u, (10.35f - 2.35f) * u, 4.7f * u, 4.7f * u, -90f, 180f);  // bottom bowl
 
             if (state == CallState.OnCall)
             {

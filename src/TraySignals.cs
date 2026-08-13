@@ -1,4 +1,4 @@
-namespace Saley;
+namespace Bridget;
 
 /// <summary>
 /// Named events that let short-lived CLI invocations (wired to softphone
@@ -7,7 +7,7 @@ namespace Saley;
 /// </summary>
 static class TraySignals
 {
-    public const string CallStartName = @"Local\Saley.CallStart";
-    public const string CallEndName = @"Local\Saley.CallEnd";
-    public const string ShowFlyoutName = @"Local\Saley.ShowFlyout";
+    public const string CallStartName = @"Local\Bridget.CallStart";
+    public const string CallEndName = @"Local\Bridget.CallEnd";
+    public const string ShowFlyoutName = @"Local\Bridget.ShowFlyout";
 }

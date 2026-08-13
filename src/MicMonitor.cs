@@ -1,6 +1,6 @@
 using Microsoft.Win32;
 
-namespace Saley;
+namespace Bridget;
 
 /// <summary>
 /// Detects whether any app currently has the microphone open, using the
@@ -13,8 +13,8 @@ static class MicMonitor
     const string ConsentStore =
         @"SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone";
 
-    // Saley's own call recording opens the mic too; without excluding
-    // ourselves, Microphone mode would see Saley as a caller and the call
+    // Bridget's own call recording opens the mic too; without excluding
+    // ourselves, Microphone mode would see Bridget as a caller and the call
     // would never end while notes are recording. NonPackaged subkey names
     // encode the exe path with '#' in place of '\'.
     static readonly string? SelfEntryName = Environment.ProcessPath?.Replace('\\', '#');

@@ -3,9 +3,9 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using Saley.Notes;
+using Bridget.Notes;
 
-namespace Saley.UI;
+namespace Bridget.UI;
 
 /// <summary>The flyout's Call notes panel: opt-in, model download, key, list.</summary>
 partial class FlyoutWindow
@@ -34,7 +34,7 @@ partial class FlyoutWindow
     public Func<bool>? ApplyDictationHotkey { get; set; }
 
     /// <summary>Set by Shell: releases all of the dock's global hotkeys so
-    /// the capture box can receive combos Saley itself owns.</summary>
+    /// the capture box can receive combos Bridget itself owns.</summary>
     public Action? SuspendGlobalHotkeys { get; set; }
 
     StackPanel BuildNotesPanel()
@@ -211,7 +211,7 @@ partial class FlyoutWindow
         _hotkeyBox.MouseLeftButtonUp += (_, _) => Keyboard.Focus(_hotkeyBox);
         _hotkeyBox.GotKeyboardFocus += (_, _) =>
         {
-            // Release Saley's own hotkeys so pressing e.g. the current combo
+            // Release Bridget's own hotkeys so pressing e.g. the current combo
             // reaches the capture box instead of starting a dictation.
             SuspendGlobalHotkeys?.Invoke();
             _hotkeyLabel.Text = "Press a key combo…";

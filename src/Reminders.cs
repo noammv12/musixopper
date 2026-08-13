@@ -1,7 +1,7 @@
 using System.IO;
 using System.Text.Json;
 
-namespace Saley;
+namespace Bridget;
 
 enum ReminderState
 {
@@ -19,7 +19,7 @@ sealed record Reminder(string Id, string Url, string Label, DateTime DueAtUtc, R
 }
 
 /// <summary>
-/// Call-back reminders: %LOCALAPPDATA%\Saley\reminders.json, same atomic
+/// Call-back reminders: %LOCALAPPDATA%\Bridget\reminders.json, same atomic
 /// store pattern as snippets. Saves are user/scheduler initiated; a corrupt
 /// file is never overwritten with defaults.
 /// </summary>
@@ -35,7 +35,7 @@ static class ReminderStore
     };
 
     static string Dir => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Saley");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Bridget");
     static string FilePath => Path.Combine(Dir, "reminders.json");
 
     public static event Action? Changed;

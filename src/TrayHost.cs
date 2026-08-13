@@ -1,6 +1,6 @@
 using System.Windows.Forms;
 
-namespace Saley;
+namespace Bridget;
 
 /// <summary>
 /// The tray icon: left-click opens the flyout, right-click gives a
@@ -17,7 +17,7 @@ sealed class TrayHost : IDisposable
     public TrayHost()
     {
         var menu = new ContextMenuStrip();
-        var open = new ToolStripMenuItem("Open Saley");
+        var open = new ToolStripMenuItem("Open Bridget");
         open.Click += (_, _) => OpenRequested?.Invoke();
         var quit = new ToolStripMenuItem("Quit");
         quit.Click += (_, _) => QuitRequested?.Invoke();
@@ -47,9 +47,9 @@ sealed class TrayHost : IDisposable
         _icon.Icon = TrayIconRenderer.Get(_state, Theme.SystemLight);
         _icon.Text = _state switch
         {
-            CallState.OnCall => "Saley — on a call, music paused",
-            CallState.Disabled => "Saley — off",
-            _ => "Saley — listening for calls",
+            CallState.OnCall => "Bridget — on a call, music paused",
+            CallState.Disabled => "Bridget — off",
+            _ => "Bridget — listening for calls",
         };
     }
 

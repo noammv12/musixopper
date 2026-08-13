@@ -2,10 +2,10 @@ using Microsoft.Win32;
 using System.Windows;
 using System.Windows.Media;
 
-namespace Saley;
+namespace Bridget;
 
 /// <summary>
-/// Saley's signature look: one black/silver palette, always — near-black
+/// Bridget's signature look: one black/silver palette, always — near-black
 /// graphite surfaces with a machined silver hairline, silver chrome for
 /// interactive elements, and semantic status colors. All colors are
 /// consumed via SetResourceReference so a future palette swap stays a

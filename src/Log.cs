@@ -1,8 +1,8 @@
 using System.IO;
 
-namespace Saley;
+namespace Bridget;
 
-/// <summary>Minimal size-capped file log: %LOCALAPPDATA%\Saley\log.txt.</summary>
+/// <summary>Minimal size-capped file log: %LOCALAPPDATA%\Bridget\log.txt.</summary>
 static class Log
 {
     const long MaxBytes = 256 * 1024;
@@ -11,7 +11,7 @@ static class Log
     static int _writesSinceCheck;
 
     static string Dir => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Saley");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Bridget");
     static string FilePath => Path.Combine(Dir, "log.txt");
 
     public static void Init()

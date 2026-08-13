@@ -1,7 +1,7 @@
 using System.Windows.Input;
-using Saley.Interop;
+using Bridget.Interop;
 
-namespace Saley.UI;
+namespace Bridget.UI;
 
 /// <summary>
 /// A global hotkey combo (RegisterHotKey modifiers + virtual key) with its
