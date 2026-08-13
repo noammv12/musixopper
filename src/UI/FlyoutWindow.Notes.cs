@@ -250,8 +250,7 @@ partial class FlyoutWindow
         };
         _hotkeyBox.LostKeyboardFocus += (_, _) =>
         {
-            ApplyDictationHotkey?.Invoke();
-            ApplySnippetHotkeys?.Invoke();
+            RestoreGlobalHotkeys();
             RefreshHotkeyRow();
         };
         _hotkeyBox.PreviewKeyDown += OnHotkeyCapture;

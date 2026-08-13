@@ -90,6 +90,10 @@ sealed class DockWindow : Window
     Hotkey _dictationHotkey = Hotkey.LoadDictation();
     bool _dictationHotkeyFailed;
 
+    const int AssistantHotkeyId = 0xA12;
+    Hotkey _assistantHotkey = Hotkey.LoadAssistant();
+    bool _assistantHotkeyFailed;
+
     const int SnippetHotkeyBase = 0xA21; // ids 0xA21–0xA29 = Ctrl+Alt+1–9
     readonly Snippet?[] _hotkeySnippets = new Snippet?[9];
 
@@ -98,7 +102,11 @@ sealed class DockWindow : Window
     public event Action? OpenNotesRequested;
     public event Action? DictationToggleRequested;
     public event Action? DictationCancelRequested;
+    public event Action? AssistantToggleRequested;
+    public event Action? AssistantCancelRequested;
     bool _dictationActive;
+    bool _assistantActive;
+    string _assistantStatus = "";
     public event Action<Reminder>? ReminderOpenRequested;
     public event Action<Reminder>? ReminderSnoozeRequested;
     public event Action<Reminder>? ReminderDismissRequested;
@@ -217,9 +225,11 @@ sealed class DockWindow : Window
         _dictationText.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
         var dictationFinish = ReminderButton("Finish", primary: true);
         dictationFinish.Margin = new Thickness(12, 0, 0, 0);
-        dictationFinish.MouseLeftButtonUp += (_, _) => DictationToggleRequested?.Invoke();
+        dictationFinish.MouseLeftButtonUp += (_, _) =>
+            (_assistantActive ? AssistantToggleRequested : DictationToggleRequested)?.Invoke();
         var dictationCancel = ReminderButton("✕", primary: false);
-        dictationCancel.MouseLeftButtonUp += (_, _) => DictationCancelRequested?.Invoke();
+        dictationCancel.MouseLeftButtonUp += (_, _) =>
+            (_assistantActive ? AssistantCancelRequested : DictationCancelRequested)?.Invoke();
         _dictationContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 12, 0) };
         _dictationContent.Children.Add(_dictationDot);
         _dictationContent.Children.Add(_dictationText);
@@ -316,9 +326,39 @@ sealed class DockWindow : Window
 
             if (HwndSource.FromHwnd(hwnd) is { } source) source.AddHook(WndProc);
             ApplyDictationHotkey();
+            ApplyAssistantHotkey();
             ApplySnippetHotkeys();
         };
     }
+
+    /// <summary>
+    /// (Re)binds the global Ask-Bridget hotkey from Settings. Returns false
+    /// when Windows refused the combo (already taken by another app).
+    /// </summary>
+    public bool ApplyAssistantHotkey()
+    {
+        _assistantHotkey = Hotkey.LoadAssistant();
+        _assistantHotkeyFailed = false;
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero)
+        {
+            RefreshHotkeyStrings();
+            return true; // not sourced yet; SourceInitialized re-applies
+        }
+        NativeMethods.UnregisterHotKey(hwnd, AssistantHotkeyId);
+        var ok = true;
+        if (!_assistantHotkey.IsOff)
+        {
+            ok = NativeMethods.RegisterHotKey(hwnd, AssistantHotkeyId,
+                _assistantHotkey.Modifiers | NativeMethods.MOD_NOREPEAT, _assistantHotkey.Vk);
+            _assistantHotkeyFailed = !ok;
+            if (!ok) Log.Write($"Assistant hotkey {_assistantHotkey} unavailable (taken by another app)");
+        }
+        RefreshHotkeyStrings();
+        return ok;
+    }
+
+    bool AssistantHotkeyLive => !_assistantHotkey.IsOff && !_assistantHotkeyFailed;
 
     /// <summary>
     /// (Re)binds Ctrl+Alt+1–9 to the first nine snippets when the opt-in
@@ -397,6 +437,7 @@ sealed class DockWindow : Window
         var hwnd = new WindowInteropHelper(this).Handle;
         if (hwnd == IntPtr.Zero) return;
         NativeMethods.UnregisterHotKey(hwnd, DictationHotkeyId);
+        NativeMethods.UnregisterHotKey(hwnd, AssistantHotkeyId);
         for (var i = 0; i < _hotkeySnippets.Length; i++)
         {
             NativeMethods.UnregisterHotKey(hwnd, SnippetHotkeyBase + i);
@@ -406,11 +447,14 @@ sealed class DockWindow : Window
 
     void RefreshHotkeyStrings()
     {
-        _dictationText.Text = DictationHotkeyLive
-            ? $"Listening — {_dictationHotkey} to finish"
-            : "Listening — click Finish when done";
-        RefreshChips(); // the 🎙 chip tooltip renders the same binding
+        UpdateListeningText();
+        RefreshChips(); // the 🎙/💬 chip tooltips render the same bindings
     }
+
+    void UpdateListeningText() => _dictationText.Text =
+        _assistantActive ? "Bridget is listening — ask away"
+        : DictationHotkeyLive ? $"Listening — {_dictationHotkey} to finish"
+        : "Listening — click Finish when done";
 
     bool DictationHotkeyLive => !_dictationHotkey.IsOff && !_dictationHotkeyFailed;
 
@@ -430,6 +474,7 @@ sealed class DockWindow : Window
         {
             var hwnd = new WindowInteropHelper(this).Handle;
             NativeMethods.UnregisterHotKey(hwnd, DictationHotkeyId);
+            NativeMethods.UnregisterHotKey(hwnd, AssistantHotkeyId);
             for (var i = 0; i < _hotkeySnippets.Length; i++)
                 NativeMethods.UnregisterHotKey(hwnd, SnippetHotkeyBase + i);
         }
@@ -505,6 +550,17 @@ sealed class DockWindow : Window
         UpdateStatusText();
     }
 
+    public void SetAssistantStatus(string status)
+    {
+        if (!CheckAccess())
+        {
+            Dispatcher.InvokeAsync(() => SetAssistantStatus(status));
+            return;
+        }
+        _assistantStatus = status;
+        UpdateStatusText();
+    }
+
     void UpdateStatusText()
     {
         _statusText.Text = _callState switch
@@ -513,7 +569,8 @@ sealed class DockWindow : Window
                 ? $"On a call — {elapsed:hh\\:mm\\:ss}"
                 : $"On a call — {DateTime.UtcNow - _callStartedUtc:mm\\:ss}",
             CallState.Disabled => "Paused",
-            _ => _dictationStatus.Length > 0 ? _dictationStatus
+            _ => _assistantStatus.Length > 0 ? _assistantStatus
+                : _dictationStatus.Length > 0 ? _dictationStatus
                 : _notesStatus.Length > 0 ? _notesStatus
                 : "Listening for calls",
         };
@@ -565,6 +622,11 @@ sealed class DockWindow : Window
                 DictationToggleRequested?.Invoke();
                 handled = true;
             }
+            else if (id == AssistantHotkeyId)
+            {
+                AssistantToggleRequested?.Invoke();
+                handled = true;
+            }
             else if (id >= SnippetHotkeyBase && id < SnippetHotkeyBase + _hotkeySnippets.Length)
             {
                 // The foreground app is the paste target — the dock never activates.
@@ -586,13 +648,39 @@ sealed class DockWindow : Window
             return;
         }
         _dictationActive = active;
+        UpdateListeningText();
         if (active)
         {
             if (_state != DockState.Reminder) SetState(DockState.Dictation);
         }
         else if (_state == DockState.Dictation)
         {
-            SetState(_pill.IsMouseOver ? DockState.Expanded : DockState.Collapsed);
+            SetState(RestState() == DockState.Dictation
+                ? DockState.Dictation
+                : _pill.IsMouseOver ? DockState.Expanded : DockState.Collapsed);
+        }
+    }
+
+    /// <summary>Ask-Bridget listening shares the dictation pill (dot + Finish
+    /// + ✕) with its own text; the buttons route by which mode is active.</summary>
+    public void SetAssistant(bool active)
+    {
+        if (!CheckAccess())
+        {
+            Dispatcher.InvokeAsync(() => SetAssistant(active));
+            return;
+        }
+        _assistantActive = active;
+        UpdateListeningText();
+        if (active)
+        {
+            if (_state != DockState.Reminder) SetState(DockState.Dictation);
+        }
+        else if (_state == DockState.Dictation)
+        {
+            SetState(RestState() == DockState.Dictation
+                ? DockState.Dictation
+                : _pill.IsMouseOver ? DockState.Expanded : DockState.Collapsed);
         }
     }
 
@@ -611,7 +699,7 @@ sealed class DockWindow : Window
 
     /// <summary>Where the dock settles when a transient state ends.</summary>
     DockState RestState() =>
-        _dictationActive ? DockState.Dictation
+        _dictationActive || _assistantActive ? DockState.Dictation
         : _pill.IsMouseOver ? DockState.Expanded
         : DockState.Collapsed;
 
@@ -725,6 +813,13 @@ sealed class DockWindow : Window
             : "Dictate — speak, and the text is typed where your cursor is";
         dictate.MouseLeftButtonUp += (_, _) => DictationToggleRequested?.Invoke();
         _chipsPanel.Children.Add(dictate);
+
+        var ask = MakeChipShell("💬");
+        ask.ToolTip = AssistantHotkeyLive
+            ? $"Ask Bridget ({_assistantHotkey}) — she answers back, or opens one of your commands"
+            : "Ask Bridget — she answers back, or opens one of your commands";
+        ask.MouseLeftButtonUp += (_, _) => AssistantToggleRequested?.Invoke();
+        _chipsPanel.Children.Add(ask);
 
         var remind = MakeChipShell("⏰");
         remind.ToolTip = "Remind me to call someone back";

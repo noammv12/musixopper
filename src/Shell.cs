@@ -19,6 +19,7 @@ sealed class Shell : IDisposable
     readonly CallStatsTracker _stats;
     readonly NotesPipeline _notes;
     readonly Dictation _dictation;
+    readonly Assistant _assistant;
     readonly DispatcherTimer _ticker;
     readonly EventWaitHandle _showFlyoutSignal;
     readonly RegisteredWaitHandle _showFlyoutWait;
@@ -68,6 +69,21 @@ sealed class Shell : IDisposable
         _flyout.ApplyDictationHotkey = _dock.ApplyDictationHotkey;
         _flyout.ApplySnippetHotkeys = _dock.ApplySnippetHotkeys;
         _flyout.SuspendGlobalHotkeys = _dock.SuspendHotkeys;
+
+        _assistant = new Assistant(() => _engine.State);
+        _assistant.Started += () => _dock.SetAssistant(true);
+        _assistant.Stopped += () => _dock.SetAssistant(false);
+        _assistant.StatusChanged += status => _dock.SetAssistantStatus(status);
+        _assistant.ToastRequested += message => _dock.ShowToast(message, paused: false, showIcon: false, important: true);
+        _assistant.Answered += (question, answer) =>
+        {
+            _flyout.SetLastExchange(question, answer);
+            _dock.ShowToast("Bridget answered — click to read", paused: false,
+                onClick: () => _flyout.ShowBridget(), showIcon: false, important: true);
+        };
+        _dock.AssistantToggleRequested += _assistant.Toggle;
+        _dock.AssistantCancelRequested += _assistant.Cancel;
+        _flyout.ApplyAssistantHotkey = _dock.ApplyAssistantHotkey;
 
         _engine.StateChanged += () =>
         {
@@ -132,6 +148,7 @@ sealed class Shell : IDisposable
     public void Dispose()
     {
         _ticker.Stop();
+        _assistant.Dispose();
         _dictation.Dispose();
         _notes.Dispose();
         _reminders.Dispose();
