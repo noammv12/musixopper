@@ -59,6 +59,16 @@ sealed partial class FlyoutWindow : Window
     bool _hiding;
     bool _pulsing;
 
+    // positioning + drag
+    System.Drawing.Point _anchor;   // cursor at open time; repositions stay anchored to it
+    bool _userMoved;
+    bool _dragArmed;
+    bool _dragging;
+    NativeMethods.POINT _dragStartPt;
+    double _dragStartLeft;
+    double _dragStartTop;
+    double _dragScale = 1;
+
     public event Action? QuitRequested;
 
     /// <summary>Set by Shell: re-registers the dock's Ctrl+Alt+1–9 snippet hotkeys.</summary>
@@ -96,6 +106,8 @@ sealed partial class FlyoutWindow : Window
         _remindersPanel = BuildRemindersPanel();
         _notesPanel = BuildNotesPanel();
         _statsPanel = BuildStatsPanel();
+        // The outer scroll host is what keeps a clamped-height flyout usable:
+        // when a panel is taller than the screen the content scrolls.
         var host = new Grid();
         host.Children.Add(_mainPanel);
         host.Children.Add(_welcomePanel);
@@ -104,6 +116,12 @@ sealed partial class FlyoutWindow : Window
         host.Children.Add(_remindersPanel);
         host.Children.Add(_notesPanel);
         host.Children.Add(_statsPanel);
+        var scrollHost = new ScrollViewer
+        {
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Content = host,
+        };
 
         _root = new Border
         {
@@ -120,7 +138,7 @@ sealed partial class FlyoutWindow : Window
                 Opacity = 0.45,
                 Color = Colors.Black,
             },
-            Child = host,
+            Child = scrollHost,
         };
         _root.SetResourceReference(Border.BackgroundProperty, "SurfaceBrush");
         _root.SetResourceReference(Border.BorderBrushProperty, "SurfaceStrokeBrush");
@@ -131,6 +149,17 @@ sealed partial class FlyoutWindow : Window
         {
             if (e.Key == Key.Escape) HideFlyout();
         };
+
+        // A panel switch can double the height — keep the card anchored and
+        // fully on-screen (unless the user has dragged it somewhere).
+        SizeChanged += (_, _) =>
+        {
+            if (IsVisible && !_userMoved && !_hiding)
+                Dispatcher.InvokeAsync(() => PositionNearTray(initial: false), DispatcherPriority.Loaded);
+        };
+        _root.PreviewMouseLeftButtonDown += OnRootDragStart;
+        _root.PreviewMouseMove += OnRootDragMove;
+        _root.PreviewMouseLeftButtonUp += OnRootDragEnd;
     }
 
     // ---- panels ----------------------------------------------------------
@@ -734,6 +763,8 @@ sealed partial class FlyoutWindow : Window
         ShowPanel(onboarding ? _welcomePanel : _mainPanel);
         SyncFromEngine();
 
+        _anchor = WinF.Cursor.Position;
+        _userMoved = false;
         Opacity = 0;
         Show();
         Dispatcher.InvokeAsync(() =>
@@ -769,20 +800,25 @@ sealed partial class FlyoutWindow : Window
             _rootSlide.BeginAnimation(TranslateTransform.YProperty, null);
             _rootSlide.Y = 0;
             _hiding = false;
+            _userMoved = false; // next open re-anchors near the tray
             _lastHiddenAt = DateTime.UtcNow;
             UpdatePulse();
         };
         BeginAnimation(OpacityProperty, fade);
     }
 
-    void PositionNearTray()
+    void PositionNearTray(bool initial = true)
     {
-        var cursor = WinF.Cursor.Position;
-        var screen = WinF.Screen.FromPoint(cursor);
+        var screen = WinF.Screen.FromPoint(_anchor);
         var wa = screen.WorkingArea;
         var bounds = screen.Bounds;
 
-        var scale = Dpi.MoveToAndGetScale(this, wa);
+        // Repositions while visible must not park the window at the monitor
+        // center first (Dpi.MoveToAndGetScale does) — that would flash.
+        var scale = initial ? Dpi.MoveToAndGetScale(this, wa) : CurrentScale();
+
+        // Never taller than the work area — the panel host scrolls instead.
+        MaxHeight = wa.Height / scale + (ShadowMargin - EdgeGap) * 2;
 
         UpdateLayout();
         double w = ActualWidth * scale;
@@ -793,17 +829,86 @@ sealed partial class FlyoutWindow : Window
         bool leftBar = wa.Left > bounds.Left;
         bool rightBar = wa.Right < bounds.Right;
 
-        double left = cursor.X - w / 2;
+        double left = _anchor.X - w / 2;
         double top;
         if (topBar) top = wa.Top - overlap;
-        else if (leftBar) { left = wa.Left - overlap; top = cursor.Y - h / 2; }
-        else if (rightBar) { left = wa.Right - w + overlap; top = cursor.Y - h / 2; }
+        else if (leftBar) { left = wa.Left - overlap; top = _anchor.Y - h / 2; }
+        else if (rightBar) { left = wa.Right - w + overlap; top = _anchor.Y - h / 2; }
         else top = wa.Bottom - h + overlap; // bottom taskbar (default)
 
-        left = Math.Min(Math.Max(left, wa.Left - overlap), wa.Right - w + overlap);
-        top = Math.Min(Math.Max(top, wa.Top - overlap), wa.Bottom - h + overlap);
+        // Clamp with the top/left bound LAST: if the window ever ends up
+        // taller than the work area, the top edge must stay reachable.
+        left = Math.Max(Math.Min(left, wa.Right - w + overlap), wa.Left - overlap);
+        top = Math.Max(Math.Min(top, wa.Bottom - h + overlap), wa.Top - overlap);
 
         Left = left / scale;
         Top = top / scale;
+    }
+
+    double CurrentScale()
+    {
+        var scale = NativeMethods.GetDpiForWindow(new WindowInteropHelper(this).EnsureHandle()) / 96.0;
+        return scale <= 0 ? 1 : scale;
+    }
+
+    // ---- drag ------------------------------------------------------------
+    // The whole card is a drag surface (threshold keeps plain clicks
+    // working; text boxes and scrollbars are exempt). Once moved, the
+    // flyout stays where the user put it until it's hidden.
+
+    void OnRootDragStart(object sender, MouseButtonEventArgs e)
+    {
+        if (InsideTextInput(e.OriginalSource as DependencyObject)) return;
+        NativeMethods.GetCursorPos(out _dragStartPt);
+        _dragStartLeft = Left;
+        _dragStartTop = Top;
+        _dragScale = CurrentScale();
+        _dragArmed = true;
+        _dragging = false;
+    }
+
+    void OnRootDragMove(object sender, MouseEventArgs e)
+    {
+        if (!_dragArmed) return;
+        if (e.LeftButton != MouseButtonState.Pressed)
+        {
+            _dragArmed = false;
+            return;
+        }
+        NativeMethods.GetCursorPos(out var pt);
+        var dx = pt.X - _dragStartPt.X;
+        var dy = pt.Y - _dragStartPt.Y;
+        if (!_dragging)
+        {
+            if (Math.Abs(dx) <= SystemParameters.MinimumHorizontalDragDistance &&
+                Math.Abs(dy) <= SystemParameters.MinimumVerticalDragDistance) return;
+            _dragging = true;
+            _userMoved = true; // auto-reposition stands down until hidden
+            _root.CaptureMouse();
+        }
+        Left = _dragStartLeft + dx / _dragScale;
+        Top = _dragStartTop + dy / _dragScale;
+    }
+
+    void OnRootDragEnd(object sender, MouseButtonEventArgs e)
+    {
+        _dragArmed = false;
+        if (!_dragging) return;
+        _dragging = false;
+        _root.ReleaseMouseCapture();
+        e.Handled = true; // the release must not click whatever is underneath
+    }
+
+    static bool InsideTextInput(DependencyObject? d)
+    {
+        while (d is not null)
+        {
+            if (d is System.Windows.Controls.Primitives.TextBoxBase or PasswordBox
+                or System.Windows.Controls.Primitives.ScrollBar) return true;
+            d = d is Visual or System.Windows.Media.Media3D.Visual3D
+                ? VisualTreeHelper.GetParent(d)
+                : LogicalTreeHelper.GetParent(d);
+        }
+        return false;
     }
 }

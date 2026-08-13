@@ -95,6 +95,7 @@ sealed class DockWindow : Window
 
     public event Action? OpenFlyoutRequested;
     public event Action? OpenRemindersRequested;
+    public event Action? OpenNotesRequested;
     public event Action? DictationToggleRequested;
     public event Action? DictationCancelRequested;
     bool _dictationActive;
@@ -714,7 +715,8 @@ sealed class DockWindow : Window
             return;
         }
         _chipsPanel.Children.Clear();
-        foreach (var snippet in SnippetStore.Load().Take(5))
+        // Four snippets, not five: the notes chip needs the width budget.
+        foreach (var snippet in SnippetStore.Load().Take(4))
             _chipsPanel.Children.Add(MakeChip(snippet));
 
         var dictate = MakeChipShell("🎙");
@@ -728,6 +730,11 @@ sealed class DockWindow : Window
         remind.ToolTip = "Remind me to call someone back";
         remind.MouseLeftButtonUp += (_, _) => OpenRemindersRequested?.Invoke();
         _chipsPanel.Children.Add(remind);
+
+        var notes = MakeChipShell("📝");
+        notes.ToolTip = "Your call notes";
+        notes.MouseLeftButtonUp += (_, _) => OpenNotesRequested?.Invoke();
+        _chipsPanel.Children.Add(notes);
 
         var more = MakeChipShell("…");
         more.MouseLeftButtonUp += (_, _) => OpenFlyoutRequested?.Invoke();

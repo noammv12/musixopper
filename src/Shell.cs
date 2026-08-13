@@ -37,6 +37,7 @@ sealed class Shell : IDisposable
         _flyout.QuitRequested += Quit;
         _dock.OpenFlyoutRequested += () => _flyout.ShowSnippets();
         _dock.OpenRemindersRequested += () => _flyout.ShowReminders();
+        _dock.OpenNotesRequested += () => _flyout.ShowNotes();
 
         _stats = new CallStatsTracker(_engine);
         _reminders = new ReminderScheduler(_engine);

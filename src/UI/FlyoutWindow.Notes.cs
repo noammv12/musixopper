@@ -65,6 +65,37 @@ partial class FlyoutWindow
 
         panel.Children.Add(Ui.Divider(12, 10));
 
+        // The notes themselves come first — they're what this panel is for;
+        // transcription/key plumbing lives below.
+        panel.Children.Add(Ui.Text("RECENT NOTES", 10, "TextSecondaryBrush", FontWeights.SemiBold));
+        _notesList = new StackPanel();
+        var scroll = new ScrollViewer
+        {
+            MaxHeight = 220,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Content = _notesList,
+        };
+        panel.Children.Add(scroll);
+
+        var openFolder = Ui.Link("Open notes folder", 11);
+        openFolder.Margin = new Thickness(2, 10, 2, 0);
+        openFolder.MouseLeftButtonUp += (_, _) =>
+        {
+            try
+            {
+                Directory.CreateDirectory(NotesStore.NotesDir);
+                Process.Start(new ProcessStartInfo(NotesStore.NotesDir) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                Log.Write($"Open notes folder failed: {ex.Message}");
+            }
+        };
+        panel.Children.Add(openFolder);
+
+        panel.Children.Add(Ui.Divider(12, 10));
+
         panel.Children.Add(Ui.Text("FAST TRANSCRIPTION (GROQ)", 10, "TextSecondaryBrush", FontWeights.SemiBold));
         var groqRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
         groqRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -266,35 +297,6 @@ partial class FlyoutWindow
         _polishHint.TextWrapping = TextWrapping.Wrap;
         _polishHint.Margin = new Thickness(0, 6, 0, 0);
         panel.Children.Add(_polishHint);
-
-        panel.Children.Add(Ui.Divider(12, 10));
-
-        panel.Children.Add(Ui.Text("RECENT NOTES", 10, "TextSecondaryBrush", FontWeights.SemiBold));
-        _notesList = new StackPanel();
-        var scroll = new ScrollViewer
-        {
-            MaxHeight = 220,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            Content = _notesList,
-        };
-        panel.Children.Add(scroll);
-
-        var openFolder = Ui.Link("Open notes folder", 11);
-        openFolder.Margin = new Thickness(2, 10, 2, 0);
-        openFolder.MouseLeftButtonUp += (_, _) =>
-        {
-            try
-            {
-                Directory.CreateDirectory(NotesStore.NotesDir);
-                Process.Start(new ProcessStartInfo(NotesStore.NotesDir) { UseShellExecute = true });
-            }
-            catch (Exception ex)
-            {
-                Log.Write($"Open notes folder failed: {ex.Message}");
-            }
-        };
-        panel.Children.Add(openFolder);
 
         var done = Ui.PrimaryButton("Done");
         done.Margin = new Thickness(0, 12, 0, 0);
