@@ -161,7 +161,7 @@ sealed partial class FlyoutWindow : Window
                 Opacity = 0.45,
                 Color = Colors.Black,
             },
-            Child = scrollHost,
+            Child = glassHost,
         };
         _root.SetResourceReference(Border.BackgroundProperty, "SurfaceBrush");
         _root.SetResourceReference(Border.BorderBrushProperty, "SurfaceStrokeBrush");

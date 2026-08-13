@@ -261,7 +261,6 @@ sealed class DockWindow : Window
         {
             Width = CollapsedWidth,
             Height = CollapsedHeight,
-            CornerRadius = new CornerRadius(5),
             Opacity = RestingOpacity,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Bottom,

@@ -253,35 +253,32 @@ static class Ui
     /// <summary>A gentle scale spring on hover — the "alive" half of the glass feel.</summary>
     public static void HoverSpring(FrameworkElement element, double to = 1.07)
     {
-        var scale = new ScaleTransform(1, 1);
-        element.RenderTransform = scale;
-        element.RenderTransformOrigin = new Point(0.5, 0.5);
-        element.MouseEnter += (_, _) =>
-        {
-            scale.BeginAnimation(ScaleTransform.ScaleXProperty, Motion.FromTo(scale.ScaleX, to, 150, Motion.Overshoot));
-            scale.BeginAnimation(ScaleTransform.ScaleYProperty, Motion.FromTo(scale.ScaleY, to, 150, Motion.Overshoot));
-        };
-        element.MouseLeave += (_, _) =>
-        {
-            scale.BeginAnimation(ScaleTransform.ScaleXProperty, Motion.FromTo(scale.ScaleX, 1, Motion.Fast, Motion.Out));
-            scale.BeginAnimation(ScaleTransform.ScaleYProperty, Motion.FromTo(scale.ScaleY, 1, Motion.Fast, Motion.Out));
-        };
+        var scale = AttachScale(element);
+        element.MouseEnter += (_, _) => AnimateScale(scale, to, 150, Motion.Overshoot);
+        element.MouseLeave += (_, _) => AnimateScale(scale, 1, Motion.Fast, Motion.Out);
     }
 
     /// <summary>Press feedback: a quick dip on mouse-down, spring back on release.</summary>
     public static void PressSpring(FrameworkElement element)
     {
+        var scale = AttachScale(element);
+        element.MouseLeftButtonDown += (_, _) => AnimateScale(scale, 0.97, 80, Motion.Out);
+        element.MouseLeftButtonUp += (_, _) => AnimateScale(scale, 1, 150, Motion.Overshoot);
+        element.MouseLeave += (_, _) => AnimateScale(scale, 1, Motion.Fast, Motion.Out);
+    }
+
+    static ScaleTransform AttachScale(FrameworkElement element)
+    {
         var scale = new ScaleTransform(1, 1);
         element.RenderTransform = scale;
         element.RenderTransformOrigin = new Point(0.5, 0.5);
-        void To(double target, int ms, IEasingFunction ease)
-        {
-            scale.BeginAnimation(ScaleTransform.ScaleXProperty, Motion.FromTo(scale.ScaleX, target, ms, ease));
-            scale.BeginAnimation(ScaleTransform.ScaleYProperty, Motion.FromTo(scale.ScaleY, target, ms, ease));
-        }
-        element.MouseLeftButtonDown += (_, _) => To(0.97, 80, Motion.Out);
-        element.MouseLeftButtonUp += (_, _) => To(1, 150, Motion.Overshoot);
-        element.MouseLeave += (_, _) => To(1, Motion.Fast, Motion.Out);
+        return scale;
+    }
+
+    static void AnimateScale(ScaleTransform scale, double to, int ms, IEasingFunction ease)
+    {
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty, Motion.FromTo(scale.ScaleX, to, ms, ease));
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty, Motion.FromTo(scale.ScaleY, to, ms, ease));
     }
 
     public static Border Divider(double top, double bottom)
