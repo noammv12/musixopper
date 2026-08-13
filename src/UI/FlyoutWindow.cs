@@ -106,6 +106,7 @@ sealed partial class FlyoutWindow : Window
         _remindersPanel = BuildRemindersPanel();
         _notesPanel = BuildNotesPanel();
         _statsPanel = BuildStatsPanel();
+        _commandsPanel = BuildCommandsPanel();
         // The outer scroll host is what keeps a clamped-height flyout usable:
         // when a panel is taller than the screen the content scrolls.
         var host = new Grid();
@@ -116,6 +117,7 @@ sealed partial class FlyoutWindow : Window
         host.Children.Add(_remindersPanel);
         host.Children.Add(_notesPanel);
         host.Children.Add(_statsPanel);
+        host.Children.Add(_commandsPanel);
         var scrollHost = new ScrollViewer
         {
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -251,6 +253,11 @@ sealed partial class FlyoutWindow : Window
         notesLink.Margin = new Thickness(2, 8, 2, 0);
         notesLink.MouseLeftButtonUp += (_, _) => ShowNotes();
         panel.Children.Add(notesLink);
+
+        var commandsLink = Ui.Link("Commands…", 11);
+        commandsLink.Margin = new Thickness(2, 8, 2, 0);
+        commandsLink.MouseLeftButtonUp += (_, _) => ShowCommands();
+        panel.Children.Add(commandsLink);
 
         var statsLink = Ui.Link("Stats…", 11);
         statsLink.Margin = new Thickness(2, 8, 2, 0);
