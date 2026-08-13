@@ -50,6 +50,8 @@ sealed class DockWindow : Window
     static readonly Geometry BMark = Geometry.Parse("M5.78,2.89 L5.78,11.11 M5.78,2.89 A2.06,2.06 0 0 1 5.78,7 A2.06,2.06 0 0 1 5.78,11.11");
 
     readonly Border _pill;
+    readonly Border _glassSheen;
+    readonly ScaleTransform _pillScale = new(1, 1);
     readonly Ellipse _collapsedDot;
     readonly StackPanel _expandedContent;
     readonly StackPanel _toastContent;
@@ -251,6 +253,9 @@ sealed class DockWindow : Window
         host.Children.Add(_toastContent);
         host.Children.Add(_reminderContent);
         host.Children.Add(_dictationContent);
+        _glassSheen = new Border { IsHitTestVisible = false, Margin = new Thickness(1) };
+        _glassSheen.SetResourceReference(Border.BackgroundProperty, "GlassSheenBrush");
+        host.Children.Add(_glassSheen); // light on the glass, over everything, never clickable
 
         _pill = new Border
         {
@@ -275,6 +280,9 @@ sealed class DockWindow : Window
         };
         _pill.SetResourceReference(Border.BackgroundProperty, "SurfaceBrush");
         _pill.SetResourceReference(Border.BorderBrushProperty, "SurfaceStrokeBrush");
+        _pill.RenderTransform = _pillScale;
+        _pill.RenderTransformOrigin = new Point(0.5, 1); // pops up from the taskbar edge
+        SetPillRadius(5);
         Content = _pill;
 
         ApplyContentVisibility();
@@ -893,6 +901,7 @@ sealed class DockWindow : Window
         };
         chip.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
         Ui.HoverFill(chip);
+        Ui.HoverSpring(chip);
         // Chips never start a pill drag.
         chip.MouseLeftButtonDown += (_, e) => e.Handled = true;
         return chip;
@@ -929,36 +938,40 @@ sealed class DockWindow : Window
         switch (state)
         {
             case DockState.Collapsed:
-                _pill.CornerRadius = new CornerRadius(5);
+                SetPillRadius(5);
                 AnimatePillTo(CollapsedWidth, CollapsedHeight, Motion.Base, Motion.InOut);
                 _pill.BeginAnimation(OpacityProperty, Motion.Fade(RestingOpacityFor(), Motion.Base, Motion.InOut));
                 break;
             case DockState.Expanded:
                 Reposition();
-                _pill.CornerRadius = new CornerRadius(20);
+                SetPillRadius(20);
                 AnimatePillTo(MeasureExpandedWidth(), ExpandedHeight, Motion.Slow, Motion.Overshoot);
                 _pill.BeginAnimation(OpacityProperty, Motion.Fade(1.0, Motion.Fast));
                 FadeInContent(_expandedContent);
+                PopPill();
                 break;
             case DockState.Toast:
-                _pill.CornerRadius = new CornerRadius(18);
+                SetPillRadius(18);
                 AnimatePillTo(MeasureWidth(_toastContent), ToastHeight, Motion.Base, Motion.Out);
                 _pill.BeginAnimation(OpacityProperty, Motion.Fade(1.0, Motion.Fast));
                 FadeInContent(_toastContent);
+                PopPill();
                 break;
             case DockState.Reminder:
                 Reposition();
-                _pill.CornerRadius = new CornerRadius(20);
+                SetPillRadius(20);
                 AnimatePillTo(MeasureWidth(_reminderContent), ExpandedHeight, Motion.Slow, Motion.Overshoot);
                 _pill.BeginAnimation(OpacityProperty, Motion.Fade(1.0, Motion.Fast));
                 FadeInContent(_reminderContent);
+                PopPill();
                 break;
             case DockState.Dictation:
                 Reposition();
-                _pill.CornerRadius = new CornerRadius(20);
+                SetPillRadius(20);
                 AnimatePillTo(MeasureWidth(_dictationContent), ExpandedHeight, Motion.Slow, Motion.Overshoot);
                 _pill.BeginAnimation(OpacityProperty, Motion.Fade(1.0, Motion.Fast));
                 FadeInContent(_dictationContent);
+                PopPill();
                 StartDictationPulse();
                 break;
         }
@@ -987,6 +1000,19 @@ sealed class DockWindow : Window
     {
         _pill.BeginAnimation(WidthProperty, Motion.FromTo(_pill.ActualWidth, width, ms, ease));
         _pill.BeginAnimation(HeightProperty, Motion.FromTo(_pill.ActualHeight, height, ms, ease));
+    }
+
+    void SetPillRadius(double radius)
+    {
+        _pill.CornerRadius = new CornerRadius(radius);
+        _glassSheen.CornerRadius = new CornerRadius(Math.Max(0, radius - 1));
+    }
+
+    /// <summary>A tiny spring up from the taskbar edge whenever the pill grows.</summary>
+    void PopPill()
+    {
+        _pillScale.BeginAnimation(ScaleTransform.ScaleXProperty, Motion.FromTo(0.96, 1, Motion.Slow, Motion.Overshoot));
+        _pillScale.BeginAnimation(ScaleTransform.ScaleYProperty, Motion.FromTo(0.96, 1, Motion.Slow, Motion.Overshoot));
     }
 
     static void PrepareFade(UIElement element)

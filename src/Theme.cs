@@ -53,8 +53,9 @@ static class Theme
     {
         var r = Application.Current.Resources;
 
-        SetGradient(r, "SurfaceBrush", "#FA1C1C21", "#FA0F0F12");       // graphite, lit from above
-        SetGradient(r, "SurfaceStrokeBrush", "#2EFFFFFF", "#10FFFFFF"); // machined hairline
+        SetGradient(r, "SurfaceBrush", "#EE23232B", "#F6101015");       // graphite glass, lit from above
+        SetGradient(r, "SurfaceStrokeBrush", "#3CFFFFFF", "#12FFFFFF"); // machined hairline, brighter top edge
+        SetSheen(r);                                                    // "light hitting the glass" overlay
         Set(r, "TextPrimaryBrush", "#FFF2F2F5");
         Set(r, "TextSecondaryBrush", "#FF9B9BA4");
         Set(r, "DividerBrush", "#16FFFFFF");
@@ -73,6 +74,18 @@ static class Theme
         var brush = new SolidColorBrush(Hex(hex));
         brush.Freeze();
         resources[key] = brush;
+    }
+
+    static void SetSheen(ResourceDictionary resources)
+    {
+        var sheen = new LinearGradientBrush(new GradientStopCollection
+        {
+            new GradientStop(Hex("#26FFFFFF"), 0.0),
+            new GradientStop(Hex("#08FFFFFF"), 0.25),
+            new GradientStop(Colors.Transparent, 0.45),
+        }, new Point(0, 0), new Point(0, 1));
+        sheen.Freeze();
+        resources["GlassSheenBrush"] = sheen;
     }
 
     static void SetGradient(ResourceDictionary resources, string key, string topHex, string bottomHex)

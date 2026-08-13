@@ -26,6 +26,7 @@ sealed partial class FlyoutWindow : Window
     readonly Border _root;
     readonly Grid _panelHost; // the panels grid — _root.Child is the scroll host, not this
     readonly TranslateTransform _rootSlide = new();
+    readonly ScaleTransform _rootScale = new(1, 1);
 
     // main panel
     readonly StackPanel _mainPanel;
@@ -129,12 +130,28 @@ sealed partial class FlyoutWindow : Window
             Content = host,
         };
 
+        // Light hitting the top of the glass; over the content, never clickable,
+        // capped so it doesn't wash the title text on tall panels.
+        var sheen = new Border
+        {
+            IsHitTestVisible = false,
+            Height = 90,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(-15), // reach under _root's padding to its edge
+            CornerRadius = new CornerRadius(11, 11, 0, 0),
+        };
+        sheen.SetResourceReference(Border.BackgroundProperty, "GlassSheenBrush");
+        var glassHost = new Grid();
+        glassHost.Children.Add(scrollHost);
+        glassHost.Children.Add(sheen);
+
         _root = new Border
         {
             CornerRadius = new CornerRadius(12),
             Padding = new Thickness(16),
             Margin = new Thickness(ShadowMargin),
-            RenderTransform = _rootSlide,
+            RenderTransform = new TransformGroup { Children = { _rootScale, _rootSlide } },
+            RenderTransformOrigin = new Point(0.5, 1),
             BorderThickness = new Thickness(1),
             Effect = new DropShadowEffect
             {
@@ -806,6 +823,9 @@ sealed partial class FlyoutWindow : Window
                 {
                     EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
                 });
+            // The glass springs up as it fades in.
+            _rootScale.BeginAnimation(ScaleTransform.ScaleXProperty, Motion.FromTo(0.97, 1, 220, Motion.Overshoot));
+            _rootScale.BeginAnimation(ScaleTransform.ScaleYProperty, Motion.FromTo(0.97, 1, 220, Motion.Overshoot));
             Activate();
             UpdatePulse();
         }, DispatcherPriority.Loaded);

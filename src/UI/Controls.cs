@@ -250,6 +250,40 @@ static class Ui
         element.MouseLeave += (_, _) => element.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
     }
 
+    /// <summary>A gentle scale spring on hover — the "alive" half of the glass feel.</summary>
+    public static void HoverSpring(FrameworkElement element, double to = 1.07)
+    {
+        var scale = new ScaleTransform(1, 1);
+        element.RenderTransform = scale;
+        element.RenderTransformOrigin = new Point(0.5, 0.5);
+        element.MouseEnter += (_, _) =>
+        {
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty, Motion.FromTo(scale.ScaleX, to, 150, Motion.Overshoot));
+            scale.BeginAnimation(ScaleTransform.ScaleYProperty, Motion.FromTo(scale.ScaleY, to, 150, Motion.Overshoot));
+        };
+        element.MouseLeave += (_, _) =>
+        {
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty, Motion.FromTo(scale.ScaleX, 1, Motion.Fast, Motion.Out));
+            scale.BeginAnimation(ScaleTransform.ScaleYProperty, Motion.FromTo(scale.ScaleY, 1, Motion.Fast, Motion.Out));
+        };
+    }
+
+    /// <summary>Press feedback: a quick dip on mouse-down, spring back on release.</summary>
+    public static void PressSpring(FrameworkElement element)
+    {
+        var scale = new ScaleTransform(1, 1);
+        element.RenderTransform = scale;
+        element.RenderTransformOrigin = new Point(0.5, 0.5);
+        void To(double target, int ms, IEasingFunction ease)
+        {
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty, Motion.FromTo(scale.ScaleX, target, ms, ease));
+            scale.BeginAnimation(ScaleTransform.ScaleYProperty, Motion.FromTo(scale.ScaleY, target, ms, ease));
+        }
+        element.MouseLeftButtonDown += (_, _) => To(0.97, 80, Motion.Out);
+        element.MouseLeftButtonUp += (_, _) => To(1, 150, Motion.Overshoot);
+        element.MouseLeave += (_, _) => To(1, Motion.Fast, Motion.Out);
+    }
+
     public static Border Divider(double top, double bottom)
     {
         var line = new Border { Height = 1, Margin = new Thickness(0, top, 0, bottom) };
@@ -285,6 +319,7 @@ static class Ui
         button.SetResourceReference(Border.BackgroundProperty, "AccentBrush");
         button.MouseEnter += (_, _) => button.Opacity = 0.92;
         button.MouseLeave += (_, _) => button.Opacity = 1.0;
+        PressSpring(button);
         return button;
     }
 
