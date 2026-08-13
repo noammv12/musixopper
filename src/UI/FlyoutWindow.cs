@@ -24,6 +24,7 @@ sealed partial class FlyoutWindow : Window
 
     readonly CallEngine _engine;
     readonly Border _root;
+    readonly Grid _panelHost; // the panels grid — _root.Child is the scroll host, not this
     readonly TranslateTransform _rootSlide = new();
 
     // main panel
@@ -111,6 +112,7 @@ sealed partial class FlyoutWindow : Window
         // The outer scroll host is what keeps a clamped-height flyout usable:
         // when a panel is taller than the screen the content scrolls.
         var host = new Grid();
+        _panelHost = host;
         host.Children.Add(_mainPanel);
         host.Children.Add(_welcomePanel);
         host.Children.Add(_softphonePanel);
@@ -647,7 +649,9 @@ sealed partial class FlyoutWindow : Window
 
     void ShowPanel(UIElement panel)
     {
-        var host = (Grid)_root.Child;
+        // _root.Child is the ScrollViewer since v6 — casting it to Grid threw
+        // on every open and silently killed the whole flyout.
+        var host = _panelHost;
         UIElement? current = null;
         foreach (UIElement child in host.Children)
             if (child.Visibility == Visibility.Visible && child != panel) current = child;
