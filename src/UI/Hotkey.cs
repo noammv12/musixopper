@@ -12,15 +12,19 @@ namespace Bridget.UI;
 readonly record struct Hotkey(uint Modifiers, uint Vk)
 {
     public static readonly Hotkey Default = new(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, 0x20 /* Space */);
+    public static readonly Hotkey AssistantDefault = new(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, 0x42 /* B */);
     public static readonly Hotkey Off = new(0, 0);
 
     public bool IsOff => Vk == 0;
 
     public static Hotkey LoadDictation() => Parse(Settings.DictationHotkey);
+    public static Hotkey LoadAssistant() => Parse(Settings.AssistantHotkey, AssistantDefault);
 
-    public static Hotkey Parse(string? stored)
+    public static Hotkey Parse(string? stored) => Parse(stored, Default);
+
+    public static Hotkey Parse(string? stored, Hotkey fallback)
     {
-        if (stored is null) return Default;
+        if (stored is null) return fallback;
         if (stored == "off") return Off;
         var parts = stored.Split(',');
         if (parts.Length == 2
@@ -30,7 +34,7 @@ readonly record struct Hotkey(uint Modifiers, uint Vk)
         {
             return new Hotkey(mods & 0xF, vk);
         }
-        return Default;
+        return fallback;
     }
 
     public string Serialize() => IsOff ? "off" : $"{Modifiers & 0xF},{Vk}";

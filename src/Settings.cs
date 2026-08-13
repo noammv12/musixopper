@@ -107,6 +107,28 @@ static class Settings
         set => WriteValue("SnippetHotkeys", value ? "1" : "0");
     }
 
+    /// <summary>
+    /// Ask-Bridget hotkey, same format as DictationHotkey; null/unset means
+    /// the default combo (Ctrl+Alt+B).
+    /// </summary>
+    public static string? AssistantHotkey
+    {
+        get => Read("AssistantHotkey");
+        set
+        {
+            if (value is null) DeleteValue("AssistantHotkey");
+            else WriteValue("AssistantHotkey", value);
+        }
+    }
+
+    /// <summary>Bridget speaks her answers out loud (never during a
+    /// recorded call — the TTS would end up in the transcript).</summary>
+    public static bool VoiceEnabled
+    {
+        get => Read("VoiceEnabled") != "0";
+        set => WriteValue("VoiceEnabled", value ? "1" : "0");
+    }
+
     /// <summary>Clean up dictated text with DeepSeek before typing it.</summary>
     public static bool DictationPolish
     {
