@@ -6,8 +6,9 @@ using System.Text.Json;
 
 namespace Bridget.Notes;
 
-/// <summary>Ask-Bridget outcome: Action is "open" (CommandId set) or "answer" (Text set).</summary>
-sealed record AssistResult(string Action, string? CommandId, string? Text);
+/// <summary>Ask-Bridget outcome: Action is "open" (CommandId set), "open_url"
+/// (Url set), or "answer" (Text set).</summary>
+sealed record AssistResult(string Action, string? CommandId, string? Text, string? Url = null);
 
 /// <summary>
 /// DeepSeek's OpenAI-compatible chat API: call summaries, dictation
@@ -78,13 +79,22 @@ static class DeepSeekClient
         string question, IReadOnlyList<BridgetCommand> commands, string apiKey, CancellationToken ct)
     {
         var prompt = new StringBuilder(
-            "You are Bridget, a concise personal assistant for a busy salesperson. Decide whether " +
-            "the user's spoken request runs one of their saved commands or needs an answer. Reply " +
-            "with PURE JSON only, no markdown fences: {\"action\":\"open\",\"id\":\"<command id>\"} " +
-            "to run a command, or {\"action\":\"answer\",\"text\":\"...\"} to answer. Match commands " +
-            "generously across languages and phrasings (Hebrew 'תפתח סיילספורס' matches a command " +
-            "labeled 'Salesforce'). Answers: reply in the user's language, at most 2 short sentences " +
-            "unless they clearly asked for more, plain text, no emoji.");
+            "You are Bridget, a decisive personal assistant for a busy salesperson. The input is a " +
+            "voice transcript. Decide ONE action and reply with PURE JSON only, no markdown fences:\n" +
+            "1. {\"action\":\"open\",\"id\":\"<command id>\"} — the request matches one of the user's " +
+            "saved commands (match generously across languages and phrasings: Hebrew " +
+            "'תפתחי סיילספורס' matches a command labeled 'Salesforce').\n" +
+            "2. {\"action\":\"open_url\",\"url\":\"https://…\"} — the request is to open a well-known " +
+            "website that is NOT a saved command (YouTube → https://www.youtube.com, Gmail, " +
+            "WhatsApp Web…), or to search ('חפש X' / 'search for X' → " +
+            "https://www.google.com/search?q=X, URL-encoded).\n" +
+            "3. {\"action\":\"answer\",\"text\":\"...\"} — anything else: answer in the user's " +
+            "language, at most 2 short sentences unless they clearly asked for more, plain text, " +
+            "no emoji.\n" +
+            "HARD RULES: never ask a clarifying question, never reply with a generic 'how can I " +
+            "help'. If asked to open something you can't resolve to a command or a URL, the answer " +
+            "is one short sentence telling the user to add it under Commands. If the transcript is " +
+            "garbled, say you didn't catch it. Prefer a saved command over open_url when both fit.");
         if (commands.Count > 0)
         {
             prompt.Append("\nSaved commands:");
@@ -93,7 +103,7 @@ static class DeepSeekClient
         }
         else
         {
-            prompt.Append("\nThe user has no saved commands — always answer.");
+            prompt.Append("\nThe user has no saved commands.");
         }
 
         // rejectTruncated: half a JSON object must not reach the fallback
@@ -113,6 +123,11 @@ static class DeepSeekClient
                     && doc.RootElement.TryGetProperty("id", out var id)
                     && id.GetString() is { Length: > 0 } commandId)
                     return new AssistResult("open", commandId, null);
+                if (action == "open_url"
+                    && doc.RootElement.TryGetProperty("url", out var u)
+                    && Uri.TryCreate(u.GetString(), UriKind.Absolute, out var uri)
+                    && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp))
+                    return new AssistResult("open_url", null, null, uri.AbsoluteUri);
                 if (action == "answer"
                     && doc.RootElement.TryGetProperty("text", out var t)
                     && t.GetString() is { Length: > 0 } text)

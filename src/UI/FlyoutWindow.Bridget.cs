@@ -223,7 +223,26 @@ partial class FlyoutWindow
         panel.Children.Add(done);
 
         RefreshAssistantHotkeyRow();
+        UpdateVoiceStatus();
         return panel;
+    }
+
+    void UpdateVoiceStatus()
+    {
+        if (Settings.VoicePreference == "windows")
+        {
+            _voiceStatus.Text = "Offline Windows voice only — nothing leaves your PC for speech (no female Hebrew voice exists offline).";
+            _elevenKeyStatus.Text = Settings.ElevenLabsKey is null
+                ? "No key."
+                : "Key saved ✓ — unused while Windows-only is selected.";
+            return;
+        }
+        _voiceStatus.Text = Settings.ElevenLabsKey is null
+            ? "Free neural voice — Hila (female) for Hebrew, Aria for English. Falls back to the Windows voice when offline."
+            : "Premium ElevenLabs voice first, then the free neural voice, then offline.";
+        _elevenKeyStatus.Text = Settings.ElevenLabsKey is null
+            ? "No key — the free neural voice is used. elevenlabs.io for the premium tier."
+            : "Key saved ✓ — premium voice on.";
     }
 
     void RestoreGlobalHotkeys()
@@ -307,6 +326,7 @@ partial class FlyoutWindow
         }
         _bridgetKeyHint.Visibility = Settings.DeepSeekKey is null ? Visibility.Visible : Visibility.Collapsed;
         RefreshAssistantHotkeyRow();
+        UpdateVoiceStatus();
         ShowFlyoutCore(onboarding: false, force: true);
         ShowPanel(_bridgetPanel);
     }

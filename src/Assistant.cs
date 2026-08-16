@@ -52,6 +52,17 @@ sealed class Assistant : IDisposable
         else Start();
     }
 
+    /// <summary>Speaks a short sample line with the current voice settings.</summary>
+    public Task PreviewVoiceAsync()
+    {
+        if (_callState() == CallState.OnCall)
+        {
+            ToastRequested?.Invoke("Preview after the call — Bridget stays quiet while recording");
+            return Task.CompletedTask;
+        }
+        return _speaker.SpeakAsync("שלום, אני ברידג'ט — העוזרת האישית שלך.");
+    }
+
     public void Cancel()
     {
         _speaker.Stop();
@@ -113,18 +124,24 @@ sealed class Assistant : IDisposable
             }
             if (question.Length == 0)
             {
+                Log.Write("Bridget heard nothing usable");
                 ToastRequested?.Invoke("Didn't catch that");
                 return;
             }
+            Log.Write($"Bridget heard: \"{question}\"");
 
             if (Settings.DeepSeekKey is not { } key) return; // removed mid-flight
             var commands = CommandStore.Load();
             var result = await DeepSeekClient.AssistAsync(question, commands, key, CancellationToken.None);
             if (result is null)
             {
+                Log.Write("Bridget intent: unusable model reply");
                 ToastRequested?.Invoke("Bridget couldn't work that one out — try again");
                 return;
             }
+            Log.Write($"Bridget intent: {result.Action}"
+                + (result.CommandId is { } cid ? $" id={cid}" : "")
+                + (result.Url is { } u ? $" url={u}" : ""));
 
             if (result.Action == "open" && commands.FirstOrDefault(c => c.Id == result.CommandId) is { } command)
             {
@@ -132,6 +149,12 @@ sealed class Assistant : IDisposable
                 ToastRequested?.Invoke(CommandStore.Execute(command)
                     ? $"Opening {command.Label}"
                     : $"Couldn't open {command.Label} — see log");
+                return;
+            }
+
+            if (result.Action == "open_url" && result.Url is { } url)
+            {
+                ToastRequested?.Invoke(OpenUrl(url) ? "Opening it" : "Couldn't open that — see log");
                 return;
             }
 
@@ -163,6 +186,21 @@ sealed class Assistant : IDisposable
             TryDelete(mixed);
             StatusChanged?.Invoke("");
             _busy = false;
+        }
+    }
+
+    static bool OpenUrl(string url)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Open URL failed: {ex.Message}");
+            return false;
         }
     }
 

@@ -344,6 +344,15 @@ sealed class DockWindow : Window
             ApplyDictationHotkey();
             ApplyAssistantHotkey();
             ApplySnippetHotkeys();
+
+            // A silently-dead hotkey reads as "hotkeys don't exist" — say it
+            // out loud once. Held as an important toast until the dock shows.
+            var taken = new List<string>(2);
+            if (_dictationHotkeyFailed) taken.Add(_dictationHotkey.ToString());
+            if (_assistantHotkeyFailed) taken.Add(_assistantHotkey.ToString());
+            if (taken.Count > 0)
+                ShowToast($"{string.Join(" and ", taken)} taken by another app — pick a different combo in settings",
+                    paused: false, showIcon: false, important: true);
         };
     }
 

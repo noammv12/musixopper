@@ -39,6 +39,7 @@ sealed partial class FlyoutWindow : Window
     TextBlock _setupLink = null!;
     PillSwitch _switchEnabled = null!;
     PillSwitch _switchStartup = null!;
+    TextBlock _hotkeyCaption = null!;
 
     // onboarding
     readonly StackPanel _welcomePanel;
@@ -187,6 +188,18 @@ sealed partial class FlyoutWindow : Window
 
     // ---- panels ----------------------------------------------------------
 
+    /// <summary>The quiet what-are-my-hotkeys line under the main panel's links.</summary>
+    void UpdateHotkeyCaption()
+    {
+        var ask = Hotkey.LoadAssistant();
+        var dictate = Hotkey.LoadDictation();
+        var parts = new List<string>(2);
+        if (!ask.IsOff) parts.Add($"{ask} — ask Bridget");
+        if (!dictate.IsOff) parts.Add($"{dictate} — dictate");
+        _hotkeyCaption.Text = string.Join("   ·   ", parts);
+        _hotkeyCaption.Visibility = parts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     /// <summary>Top-of-panel return affordance — panels can be taller than the
     /// screen now, and the Done button lives at the (scrolled) bottom.</summary>
     TextBlock BackLink()
@@ -296,6 +309,11 @@ sealed partial class FlyoutWindow : Window
         AddLink("Notes & dictation…", 2, 0, ShowNotes);
         AddLink("Stats…", 2, 1, ShowStats);
         panel.Children.Add(linkGrid);
+
+        _hotkeyCaption = Ui.Text("", 10, "TextSecondaryBrush");
+        _hotkeyCaption.TextWrapping = TextWrapping.Wrap;
+        _hotkeyCaption.Margin = new Thickness(2, 10, 2, 0);
+        panel.Children.Add(_hotkeyCaption);
 
         panel.Children.Add(Ui.Divider(12, 10));
 
@@ -782,6 +800,7 @@ sealed partial class FlyoutWindow : Window
             return;
         }
         UpdateStatsLine(); // recompute "Today:" — the day may have rolled over
+        UpdateHotkeyCaption();
         if (IsVisible)
         {
             if (_hiding)

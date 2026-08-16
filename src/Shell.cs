@@ -92,6 +92,7 @@ sealed class Shell : IDisposable
         };
         _dock.AssistantCancelRequested += _assistant.Cancel;
         _flyout.ApplyAssistantHotkey = _dock.ApplyAssistantHotkey;
+        _flyout.PreviewVoice = _assistant.PreviewVoiceAsync;
 
         _engine.StateChanged += () =>
         {
