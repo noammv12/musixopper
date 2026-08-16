@@ -594,7 +594,7 @@ sealed class DockWindow : Window
 
     void UpdateStatusText()
     {
-        _statusText.Text = _callState switch
+        var text = _callState switch
         {
             CallState.OnCall => (DateTime.UtcNow - _callStartedUtc) is { TotalHours: >= 1 } elapsed
                 ? $"On a call — {elapsed:hh\\:mm\\:ss}"
@@ -605,6 +605,11 @@ sealed class DockWindow : Window
                 : _notesStatus.Length > 0 ? _notesStatus
                 : "Listening for calls",
         };
+        if (_statusText.Text == text) return;
+        _statusText.Text = text;
+        // The call timer re-renders every second — pulsing then would flicker.
+        if (_callState != CallState.OnCall)
+            _statusText.BeginAnimation(OpacityProperty, Motion.FromTo(0.35, 1, Motion.Base));
     }
 
     public void ShowToast(string text, bool paused, Action? onClick = null, bool showIcon = true, bool important = false)
@@ -813,6 +818,7 @@ sealed class DockWindow : Window
             button.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
             Ui.HoverFill(button);
         }
+        Ui.HoverSpring(button, 1.05);
         button.MouseLeftButtonDown += (_, e) => e.Handled = true;
         return button;
     }
@@ -956,6 +962,7 @@ sealed class DockWindow : Window
                 AnimatePillTo(MeasureExpandedWidth(), ExpandedHeight, Motion.Slow, Motion.Overshoot);
                 _pill.BeginAnimation(OpacityProperty, Motion.Fade(1.0, Motion.Fast));
                 FadeInContent(_expandedContent);
+                Ui.StaggerIn(_chipsPanel, 18); // chips land one beat apart
                 PopPill();
                 break;
             case DockState.Toast:
@@ -963,6 +970,7 @@ sealed class DockWindow : Window
                 AnimatePillTo(MeasureWidth(_toastContent), ToastHeight, Motion.Base, Motion.Out);
                 _pill.BeginAnimation(OpacityProperty, Motion.Fade(1.0, Motion.Fast));
                 FadeInContent(_toastContent);
+                RiseIn(_toastContent);
                 PopPill();
                 break;
             case DockState.Reminder:
@@ -1035,6 +1043,15 @@ sealed class DockWindow : Window
         var fadeIn = Motion.FromTo(0, 1, Motion.Fast);
         fadeIn.BeginTime = TimeSpan.FromMilliseconds(60);
         content.BeginAnimation(OpacityProperty, fadeIn);
+    }
+
+    static void RiseIn(UIElement content)
+    {
+        var rise = new TranslateTransform(0, 4);
+        content.RenderTransform = rise;
+        var up = Motion.FromTo(4, 0, Motion.Base, Motion.Out);
+        up.BeginTime = TimeSpan.FromMilliseconds(60);
+        rise.BeginAnimation(TranslateTransform.YProperty, up);
     }
 
     // ---- drag --------------------------------------------------------------------

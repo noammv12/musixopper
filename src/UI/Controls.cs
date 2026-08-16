@@ -267,6 +267,27 @@ static class Ui
         element.MouseLeave += (_, _) => AnimateScale(scale, 1, Motion.Fast, Motion.Out);
     }
 
+    /// <summary>Fades a panel's children in one beat apart — list entrances
+    /// feel placed, not dumped. Opacity-only so it can't clobber transforms
+    /// (chips carry hover-spring scales). Capped so long lists stay quick.</summary>
+    public static void StaggerIn(Panel panel, int stepMs = 25)
+    {
+        var i = 0;
+        foreach (UIElement child in panel.Children)
+        {
+            child.BeginAnimation(UIElement.OpacityProperty, null);
+            if (i >= 10)
+            {
+                child.Opacity = 1;
+                continue;
+            }
+            child.Opacity = 0;
+            var fade = Motion.FromTo(0, 1, Motion.Base);
+            fade.BeginTime = TimeSpan.FromMilliseconds(30 + stepMs * i++);
+            child.BeginAnimation(UIElement.OpacityProperty, fade);
+        }
+    }
+
     static ScaleTransform AttachScale(FrameworkElement element)
     {
         var scale = new ScaleTransform(1, 1);

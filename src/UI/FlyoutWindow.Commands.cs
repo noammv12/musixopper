@@ -214,6 +214,7 @@ partial class FlyoutWindow
         _commands = CommandStore.Load();
         _editingCommand = -1;
         RebuildCommandList();
+        Ui.StaggerIn(_commandList);
         ShowFlyoutCore(onboarding: false, force: true);
         ShowPanel(_commandsPanel);
     }

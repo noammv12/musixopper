@@ -555,6 +555,7 @@ partial class FlyoutWindow
             return;
         }
         RebuildNotesList();
+        Ui.StaggerIn(_notesList);
         UpdateModelRow();
         UpdateKeyStatus();
         UpdateGroqStatus();

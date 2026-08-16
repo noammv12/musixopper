@@ -65,6 +65,7 @@ sealed partial class FlyoutWindow : Window
     // positioning + drag
     System.Drawing.Point _anchor;   // cursor at open time; repositions stay anchored to it
     bool _userMoved;
+    bool _morphing;                 // height-morph animation owns Height/Top right now
     bool _dragArmed;
     bool _dragging;
     NativeMethods.POINT _dragStartPt;
@@ -178,7 +179,7 @@ sealed partial class FlyoutWindow : Window
         // fully on-screen (unless the user has dragged it somewhere).
         SizeChanged += (_, _) =>
         {
-            if (IsVisible && !_userMoved && !_hiding)
+            if (IsVisible && !_userMoved && !_hiding && !_morphing)
                 Dispatcher.InvokeAsync(() => PositionNearTray(initial: false), DispatcherPriority.Loaded);
         };
         _root.PreviewMouseLeftButtonDown += OnRootDragStart;
@@ -631,6 +632,7 @@ sealed partial class FlyoutWindow : Window
         _snippets = SnippetStore.Load();
         _editingIndex = -1;
         RebuildSnippetList();
+        Ui.StaggerIn(_snippetList);
         ShowFlyoutCore(onboarding: false, force: true);
         ShowPanel(_snippetsPanel);
     }
@@ -703,7 +705,9 @@ sealed partial class FlyoutWindow : Window
             return;
         }
 
-        // Cross-fade: outgoing dips out, incoming rises in.
+        // Cross-fade: outgoing dips out, incoming rises in, and the window
+        // glides to the incoming panel's height instead of snapping.
+        var targetPanelHeight = MeasurePanelHeight(panel);
         var outgoing = current;
         var fadeOut = Motion.Fade(0, 90);
         fadeOut.Completed += (_, _) =>
@@ -718,8 +722,51 @@ sealed partial class FlyoutWindow : Window
             panel.RenderTransform = rise;
             panel.BeginAnimation(OpacityProperty, Motion.FromTo(0, 1, Motion.Base));
             rise.BeginAnimation(TranslateTransform.YProperty, Motion.Fade(0, Motion.Base));
+            MorphHeightTo(targetPanelHeight);
         };
         outgoing.BeginAnimation(OpacityProperty, fadeOut);
+    }
+
+    /// <summary>Measures what a (collapsed) panel would want at content width.
+    /// The visibility flip is synchronous — no layout pass sees it.</summary>
+    double MeasurePanelHeight(UIElement panel)
+    {
+        var width = _panelHost.ActualWidth > 0 ? _panelHost.ActualWidth : Width - ShadowMargin * 2 - 32;
+        var was = panel.Visibility;
+        panel.Visibility = Visibility.Hidden; // collapsed elements measure to zero
+        panel.Measure(new Size(width, double.PositiveInfinity));
+        var height = panel.DesiredSize.Height;
+        panel.Visibility = was;
+        return height;
+    }
+
+    /// <summary>Animates the window between panel heights, keeping the bottom
+    /// edge planted, then hands sizing back to SizeToContent.</summary>
+    void MorphHeightTo(double panelHeight)
+    {
+        var chrome = ActualHeight - _panelHost.ActualHeight;
+        if (double.IsNaN(chrome) || chrome <= 0) return;
+        var target = Math.Min(chrome + panelHeight, MaxHeight);
+        if (Math.Abs(target - ActualHeight) < 2) return;
+
+        _morphing = true;
+        SizeToContent = SizeToContent.Manual;
+        var oldTop = Top;
+        var newTop = oldTop + (ActualHeight - target); // bottom edge stays put
+
+        var heightAnim = Motion.FromTo(ActualHeight, target, Motion.Slow, Motion.Out);
+        heightAnim.Completed += (_, _) =>
+        {
+            BeginAnimation(HeightProperty, null);
+            BeginAnimation(TopProperty, null);
+            Height = target;
+            Top = newTop;
+            SizeToContent = SizeToContent.Height;
+            _morphing = false;
+            if (!_userMoved) Dispatcher.InvokeAsync(() => PositionNearTray(initial: false), DispatcherPriority.Loaded);
+        };
+        BeginAnimation(TopProperty, Motion.FromTo(oldTop, newTop, Motion.Slow, Motion.Out));
+        BeginAnimation(HeightProperty, heightAnim);
     }
 
     void ShowTransientStatus(string text)

@@ -258,6 +258,7 @@ partial class FlyoutWindow
             return;
         }
         RebuildReminderList();
+        Ui.StaggerIn(_reminderList);
         ShowFlyoutCore(onboarding: false, force: true);
         ShowPanel(_remindersPanel);
     }
