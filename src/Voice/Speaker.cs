@@ -40,19 +40,35 @@ sealed class Speaker : IDisposable
 
             if (Settings.VoicePreference != "windows")
             {
-                var voice = IsHebrew(text) ? EdgeTts.HebrewVoice : EdgeTts.DefaultVoice;
-                var mp3 = await EdgeTts.SynthesizeAsync(text, voice, CancellationToken.None);
-                if (gen != _generation) return; // superseded while synthesizing
+                var hebrew = IsHebrew(text);
+                byte[]? mp3 = null;
+
+                // Premium tier first when a key is present, then the free
+                // Edge neural voice.
+                if (Settings.ElevenLabsKey is { } elevenKey)
+                {
+                    var voiceId = Settings.ElevenLabsVoiceId is { Length: > 0 } id ? id : ElevenLabs.DefaultVoiceId;
+                    mp3 = await ElevenLabs.SynthesizeAsync(text, voiceId, elevenKey, hebrew, CancellationToken.None);
+                    if (gen != _generation) return;
+                }
+                if (mp3 is null)
+                {
+                    mp3 = await EdgeTts.SynthesizeAsync(text, hebrew ? EdgeTts.HebrewVoice : EdgeTts.DefaultVoice, CancellationToken.None);
+                    if (gen != _generation) return;
+                }
+
                 if (mp3 is not null)
                 {
                     try
                     {
                         buffer = new MemoryStream(mp3);
-                        reader = new Mp3FileReader(buffer);
+                        // Mp3FileReader lives in the NAudio metapackage; the
+                        // split packages expose the same thing as base+ACM.
+                        reader = new Mp3FileReaderBase(buffer, wf => new AcmMp3FrameDecompressor(wf));
                     }
                     catch (Exception ex)
                     {
-                        Log.Write($"Edge TTS audio unreadable: {ex.Message}");
+                        Log.Write($"Cloud TTS audio unreadable: {ex.Message}");
                         buffer?.Dispose();
                         reader = null;
                         buffer = null;

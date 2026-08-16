@@ -12,6 +12,9 @@ partial class FlyoutWindow
     Border _asstHotkeyBox = null!;
     TextBlock _asstHotkeyLabel = null!;
     TextBlock _asstHotkeyStatus = null!;
+    TextBlock _voiceStatus = null!;
+    PasswordBox _elevenKeyBox = null!;
+    TextBlock _elevenKeyStatus = null!;
     TextBlock _lastQuestion = null!;
     TextBlock _lastAnswer = null!;
     TextBlock _copyAnswerLink = null!;
@@ -20,6 +23,9 @@ partial class FlyoutWindow
 
     /// <summary>Set by Shell: re-registers the dock's Ask-Bridget hotkey.</summary>
     public Func<bool>? ApplyAssistantHotkey { get; set; }
+
+    /// <summary>Set by Shell: speaks a short sample line with the current voice.</summary>
+    public Func<Task>? PreviewVoice { get; set; }
 
     StackPanel BuildBridgetPanel()
     {
@@ -95,14 +101,82 @@ partial class FlyoutWindow
 
         panel.Children.Add(Ui.Divider(12, 10));
 
+        panel.Children.Add(Ui.Text("VOICE", 10, "TextSecondaryBrush", FontWeights.SemiBold));
+
         var voiceSwitch = new PillSwitch(Settings.VoiceEnabled);
         voiceSwitch.Toggled += on => Settings.VoiceEnabled = on;
-        panel.Children.Add(Ui.ToggleRow("Speak answers out loud", voiceSwitch));
+        var voiceToggleRow = Ui.ToggleRow("Speak answers out loud", voiceSwitch);
+        voiceToggleRow.Margin = new Thickness(0, 8, 0, 0);
+        panel.Children.Add(voiceToggleRow);
 
-        var voiceHint = Ui.Text("Windows voice — for Hebrew answers, add the Hebrew voice under Windows Settings → Time & Language → Speech. Bridget stays quiet while a call is being recorded.", 10.5, "TextSecondaryBrush");
-        voiceHint.TextWrapping = TextWrapping.Wrap;
-        voiceHint.Margin = new Thickness(0, 6, 0, 0);
-        panel.Children.Add(voiceHint);
+        var voiceMode = new Segmented("Neural (online)", "Windows only", Settings.VoicePreference == "windows" ? 1 : 0)
+        {
+            Margin = new Thickness(0, 10, 0, 0),
+        };
+        voiceMode.SelectionChanged += index =>
+        {
+            Settings.VoicePreference = index == 1 ? "windows" : "auto";
+            UpdateVoiceStatus();
+        };
+        panel.Children.Add(voiceMode);
+
+        var preview = Ui.Link("▶ Preview voice", 11);
+        preview.Margin = new Thickness(2, 8, 2, 0);
+        preview.MouseLeftButtonUp += (_, _) => _ = PreviewVoice?.Invoke();
+        panel.Children.Add(preview);
+
+        _voiceStatus = Ui.Text("", 10.5, "TextSecondaryBrush");
+        _voiceStatus.TextWrapping = TextWrapping.Wrap;
+        _voiceStatus.Margin = new Thickness(0, 6, 0, 0);
+        panel.Children.Add(_voiceStatus);
+
+        var elevenCaption = Ui.Text("ELEVENLABS (OPTIONAL PREMIUM VOICE)", 10, "TextSecondaryBrush", FontWeights.SemiBold);
+        elevenCaption.Margin = new Thickness(0, 12, 0, 0);
+        panel.Children.Add(elevenCaption);
+
+        var elevenRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        elevenRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        elevenRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _elevenKeyBox = Ui.PasswordBox();
+        elevenRow.Children.Add(_elevenKeyBox);
+        var saveEleven = Ui.Link("Save", 11);
+        saveEleven.Margin = new Thickness(10, 0, 0, 0);
+        saveEleven.VerticalAlignment = VerticalAlignment.Center;
+        saveEleven.MouseLeftButtonUp += (_, _) =>
+        {
+            if (_elevenKeyBox.Password.Trim().Length == 0) return;
+            Settings.ElevenLabsKey = _elevenKeyBox.Password;
+            _elevenKeyBox.Password = "";
+            UpdateVoiceStatus();
+        };
+        Grid.SetColumn(saveEleven, 1);
+        elevenRow.Children.Add(saveEleven);
+        panel.Children.Add(elevenRow);
+
+        var elevenStatusRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        elevenStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        elevenStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _elevenKeyStatus = Ui.Text("", 10.5, "TextSecondaryBrush");
+        _elevenKeyStatus.TextWrapping = TextWrapping.Wrap;
+        elevenStatusRow.Children.Add(_elevenKeyStatus);
+        var removeEleven = Ui.Link("Remove", 10.5);
+        removeEleven.Margin = new Thickness(10, 0, 0, 0);
+        removeEleven.MouseLeftButtonUp += (_, _) =>
+        {
+            Settings.ElevenLabsKey = null;
+            UpdateVoiceStatus();
+        };
+        Grid.SetColumn(removeEleven, 1);
+        elevenStatusRow.Children.Add(removeEleven);
+        panel.Children.Add(elevenStatusRow);
+
+        var voiceIdHint = Ui.Text("Voice ID (optional — blank = Rachel)", 10, "TextSecondaryBrush");
+        voiceIdHint.Margin = new Thickness(0, 8, 0, 0);
+        panel.Children.Add(voiceIdHint);
+        var voiceIdBox = Ui.TextBox(Settings.ElevenLabsVoiceId);
+        voiceIdBox.Margin = new Thickness(0, 4, 0, 0);
+        voiceIdBox.LostFocus += (_, _) => Settings.ElevenLabsVoiceId = voiceIdBox.Text;
+        panel.Children.Add(voiceIdBox);
 
         panel.Children.Add(Ui.Divider(12, 10));
 

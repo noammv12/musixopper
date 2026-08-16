@@ -121,6 +121,24 @@ static class Settings
         }
     }
 
+    /// <summary>ElevenLabs API key — activates the premium voice tier.</summary>
+    public static string? ElevenLabsKey
+    {
+        get => GetProtectedValue("ElevenLabsKey");
+        set => SetProtectedValue("ElevenLabsKey", value);
+    }
+
+    /// <summary>ElevenLabs voice id; empty means their premade "Rachel".</summary>
+    public static string ElevenLabsVoiceId
+    {
+        get => Read("ElevenLabsVoiceId") is { Length: > 0 } id ? id : "";
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value)) DeleteValue("ElevenLabsVoiceId");
+            else WriteValue("ElevenLabsVoiceId", value.Trim());
+        }
+    }
+
     /// <summary>"auto" (cloud neural voice, offline fallback) or "windows"
     /// (offline voice only, nothing leaves the PC for speech).</summary>
     public static string VoicePreference
