@@ -6,17 +6,18 @@ using Windows.Media.SpeechSynthesis;
 namespace Bridget.Voice;
 
 /// <summary>
-/// Bridget's voice: Windows' built-in TTS (WinRT SpeechSynthesis) played
-/// through WASAPI. Picks a voice matching the text's language — Hebrew
-/// text gets a he-* voice when one is installed. One utterance at a time;
-/// Stop() interrupts. Raw WasapiOut is not a GSMTC media session, so
-/// speaking never trips the app's own music-pause logic.
+/// Bridget's voice. Provider chain: the free Edge neural voice (female
+/// "Hila" for Hebrew — Windows ships no female Hebrew voice at all) when
+/// online, falling back to the offline Windows voice. Playback goes
+/// through WASAPI; a raw WasapiOut is not a GSMTC media session, so
+/// speaking never trips the app's own music-pause logic. One utterance at
+/// a time; Stop() interrupts.
 /// </summary>
 sealed class Speaker : IDisposable
 {
     readonly object _gate = new();
     WasapiOut? _out;
-    WaveFileReader? _reader;
+    WaveStream? _reader;
     MemoryStream? _buffer;
     int _generation;
     bool _hebrewHintShown;
@@ -34,24 +35,42 @@ sealed class Speaker : IDisposable
         var gen = Interlocked.Increment(ref _generation);
         try
         {
-            // Synthesize fully into memory first — TTS clips are small, and
-            // it keeps the WinRT stream's lifetime out of the audio path.
-            using var synth = new SpeechSynthesizer();
-            if (PickVoice(text) is { } voice) synth.Voice = voice;
-            var winrtStream = await synth.SynthesizeTextToStreamAsync(text);
-            var buffer = new MemoryStream();
-            using (var src = winrtStream.AsStreamForRead())
+            WaveStream? reader = null;
+            MemoryStream? buffer = null;
+
+            if (Settings.VoicePreference != "windows")
             {
-                await src.CopyToAsync(buffer);
-            }
-            buffer.Position = 0;
-            if (gen != _generation)
-            {
-                buffer.Dispose();
-                return; // superseded while synthesizing
+                var voice = IsHebrew(text) ? EdgeTts.HebrewVoice : EdgeTts.DefaultVoice;
+                var mp3 = await EdgeTts.SynthesizeAsync(text, voice, CancellationToken.None);
+                if (gen != _generation) return; // superseded while synthesizing
+                if (mp3 is not null)
+                {
+                    try
+                    {
+                        buffer = new MemoryStream(mp3);
+                        reader = new Mp3FileReader(buffer);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Write($"Edge TTS audio unreadable: {ex.Message}");
+                        buffer?.Dispose();
+                        reader = null;
+                        buffer = null;
+                    }
+                }
             }
 
-            var reader = new WaveFileReader(buffer);
+            if (reader is null)
+            {
+                (reader, buffer) = await SynthesizeWindowsAsync(text);
+                if (gen != _generation || reader is null)
+                {
+                    reader?.Dispose();
+                    buffer?.Dispose();
+                    return;
+                }
+            }
+
             var device = new MMDeviceEnumerator().GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
             var output = new WasapiOut(device, AudioClientShareMode.Shared, true, 200);
             output.Init(reader);
@@ -90,12 +109,35 @@ sealed class Speaker : IDisposable
         SetSpeaking(false);
     }
 
-    VoiceInformation? PickVoice(string text)
+    async Task<(WaveStream? Reader, MemoryStream? Buffer)> SynthesizeWindowsAsync(string text)
     {
         try
         {
-            var wantsHebrew = text.Any(c => c is >= '֐' and <= '׿');
-            if (!wantsHebrew) return null; // default voice is fine for Latin text
+            // Fully into memory first — TTS clips are small, and it keeps the
+            // WinRT stream's lifetime out of the audio path.
+            using var synth = new SpeechSynthesizer();
+            if (PickWindowsVoice(text) is { } voice) synth.Voice = voice;
+            var winrtStream = await synth.SynthesizeTextToStreamAsync(text);
+            var buffer = new MemoryStream();
+            using (var src = winrtStream.AsStreamForRead())
+            {
+                await src.CopyToAsync(buffer);
+            }
+            buffer.Position = 0;
+            return (new WaveFileReader(buffer), buffer);
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Windows TTS failed: {ex.Message}");
+            return (null, null);
+        }
+    }
+
+    VoiceInformation? PickWindowsVoice(string text)
+    {
+        try
+        {
+            if (!IsHebrew(text)) return null; // default voice is fine for Latin text
 
             var hebrew = SpeechSynthesizer.AllVoices
                 .FirstOrDefault(v => v.Language.StartsWith("he", StringComparison.OrdinalIgnoreCase));
@@ -104,7 +146,7 @@ sealed class Speaker : IDisposable
             if (!_hebrewHintShown)
             {
                 _hebrewHintShown = true;
-                ToastRequested?.Invoke("For Hebrew replies, add the Hebrew voice: Windows Settings → Time & Language → Speech");
+                ToastRequested?.Invoke("Offline Hebrew voice missing — add it in Windows Settings → Time & Language → Speech");
             }
             return null;
         }
@@ -114,6 +156,8 @@ sealed class Speaker : IDisposable
             return null;
         }
     }
+
+    static bool IsHebrew(string text) => text.Any(c => c is >= '֐' and <= '׿');
 
     void CleanupPlayback()
     {

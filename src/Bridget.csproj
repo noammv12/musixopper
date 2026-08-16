@@ -30,8 +30,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- NAudio.Wasapi (not the metapackage) is pure managed — single-file safe. -->
+    <!-- NAudio.Wasapi + WinMM (not the metapackage) are pure managed — single-file
+         safe (WinMM is the ACM wrapper that decodes the cloud voice's MP3). -->
     <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+    <PackageReference Include="NAudio.WinMM" Version="2.2.1" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
     <PackageReference Include="Whisper.net" Version="1.9.1" />
     <!-- The runtime package ships its natives as loose content files that a

@@ -121,6 +121,14 @@ static class Settings
         }
     }
 
+    /// <summary>"auto" (cloud neural voice, offline fallback) or "windows"
+    /// (offline voice only, nothing leaves the PC for speech).</summary>
+    public static string VoicePreference
+    {
+        get => Read("VoicePreference") == "windows" ? "windows" : "auto";
+        set => WriteValue("VoicePreference", value == "windows" ? "windows" : "auto");
+    }
+
     /// <summary>Bridget speaks her answers out loud (never during a
     /// recorded call — the TTS would end up in the transcript).</summary>
     public static bool VoiceEnabled
