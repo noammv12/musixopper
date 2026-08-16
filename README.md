@@ -34,9 +34,9 @@ Press **Ctrl+Alt+B** (or the 💬 chip), ask out loud, press again — Bridget e
 - "מה שעון בניו יורק?" → she answers, in your language, briefly.
 - "תפתחי סיילספורס" → your Salesforce opens (see Commands below).
 
-Answers also land as a clickable toast and in the *Ask Bridget* panel with a Copy button. The hotkey is configurable there, and **Speak answers out loud** can be turned off. Needs your DeepSeek key (same one as notes) and a Groq key or the offline voice model for hearing you.
+She can also open **well-known sites with no setup at all** — "תפתחי יוטיוב" just opens YouTube, and "search for aircon suppliers" runs the Google search. Answers land as a clickable toast and in the *Ask Bridget* panel with a Copy button. The hotkey is configurable there, and **Speak answers out loud** can be turned off. Needs your DeepSeek key (same one as notes) and a Groq key or the offline voice model for hearing you. Every exchange (what she heard → what she decided) is logged, so a bad answer is diagnosable.
 
-**Voice:** Windows' built-in voice, offline and free. For Hebrew answers, add the Hebrew voice once: *Windows Settings → Time & Language → Speech → Add voices*. Bridget deliberately stays silent while a call is being recorded — her voice would end up in your transcript.
+**Voice:** Bridget speaks with **Hila** — Microsoft's natural female Hebrew neural voice (Aria for English), free, via the Edge speech service. It needs internet; offline she falls back to the Windows voice (male for Hebrew — Windows ships nothing better offline). Want the truly premium sound? Paste an **ElevenLabs** key in the VOICE section and she uses it first. A ▶ Preview button lets you hear the current voice, and "Windows only" mode keeps speech fully offline. Bridget deliberately stays silent while a call is being recorded — her voice would end up in your transcript.
 
 ## Commands
 
@@ -94,7 +94,7 @@ The flyout shows "Today: 14 calls · 1h 12m" under the status; **Stats…** open
 
 ## Network use
 
-Bridget talks to the network only when *you* opt in: the one-time voice-model download from `huggingface.co`, transcription requests to `api.groq.com` (Groq key), and requests to `api.deepseek.com` (DeepSeek key: call summaries, follow-up drafts, dictation polish when enabled, and Ask-Bridget questions). Her speaking voice is Windows' own — nothing leaves your PC for it. Nothing else, ever.
+Bridget talks to the network only when *you* opt in: the one-time voice-model download from `huggingface.co`, transcription requests to `api.groq.com` (Groq key), requests to `api.deepseek.com` (DeepSeek key: call summaries, follow-up drafts, dictation polish when enabled, and Ask-Bridget questions), and — for her speaking voice — the text of her replies goes to Microsoft's Edge speech service (or to `api.elevenlabs.io` with an ElevenLabs key). Switch the voice to "Windows only" and speech never leaves your PC. Nothing else, ever.
 
 ## Upgrading from Saley
 

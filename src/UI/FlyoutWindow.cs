@@ -78,6 +78,10 @@ sealed partial class FlyoutWindow : Window
     /// <summary>Set by Shell: re-registers the dock's Ctrl+Alt+1–9 snippet hotkeys.</summary>
     public Action? ApplySnippetHotkeys { get; set; }
 
+    /// <summary>Set by Shell: the hotkeys that actually registered — the main
+    /// panel caption must never advertise a combo another app owns.</summary>
+    public Func<(string? Ask, string? Dictate)>? GetLiveHotkeys { get; set; }
+
     public FlyoutWindow(CallEngine engine)
     {
         _engine = engine;
@@ -192,11 +196,13 @@ sealed partial class FlyoutWindow : Window
     /// <summary>The quiet what-are-my-hotkeys line under the main panel's links.</summary>
     void UpdateHotkeyCaption()
     {
-        var ask = Hotkey.LoadAssistant();
-        var dictate = Hotkey.LoadDictation();
+        // Live registration state when the dock is wired; settings otherwise.
+        var (ask, dictate) = GetLiveHotkeys?.Invoke()
+            ?? (Hotkey.LoadAssistant() is { IsOff: false } a ? a.ToString() : null,
+                Hotkey.LoadDictation() is { IsOff: false } d ? d.ToString() : null);
         var parts = new List<string>(2);
-        if (!ask.IsOff) parts.Add($"{ask} — ask Bridget");
-        if (!dictate.IsOff) parts.Add($"{dictate} — dictate");
+        if (ask is not null) parts.Add($"{ask} — ask Bridget");
+        if (dictate is not null) parts.Add($"{dictate} — dictate");
         _hotkeyCaption.Text = string.Join("   ·   ", parts);
         _hotkeyCaption.Visibility = parts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }

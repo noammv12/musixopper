@@ -19,6 +19,7 @@ sealed class Speaker : IDisposable
     WasapiOut? _out;
     WaveStream? _reader;
     MemoryStream? _buffer;
+    CancellationTokenSource? _synthCts;
     int _generation;
     bool _hebrewHintShown;
 
@@ -33,6 +34,13 @@ sealed class Speaker : IDisposable
         if (string.IsNullOrWhiteSpace(text)) return;
         Stop();
         var gen = Interlocked.Increment(ref _generation);
+        // Stop()/barge-in must be able to abort in-flight cloud synthesis,
+        // not just the playback after it.
+        using var synthCts = new CancellationTokenSource();
+        lock (_gate)
+        {
+            _synthCts = synthCts;
+        }
         try
         {
             WaveStream? reader = null;
@@ -48,12 +56,12 @@ sealed class Speaker : IDisposable
                 if (Settings.ElevenLabsKey is { } elevenKey)
                 {
                     var voiceId = Settings.ElevenLabsVoiceId is { Length: > 0 } id ? id : ElevenLabs.DefaultVoiceId;
-                    mp3 = await ElevenLabs.SynthesizeAsync(text, voiceId, elevenKey, hebrew, CancellationToken.None);
+                    mp3 = await ElevenLabs.SynthesizeAsync(text, voiceId, elevenKey, hebrew, synthCts.Token);
                     if (gen != _generation) return;
                 }
-                if (mp3 is null)
+                if (mp3 is null && !synthCts.IsCancellationRequested)
                 {
-                    mp3 = await EdgeTts.SynthesizeAsync(text, hebrew ? EdgeTts.HebrewVoice : EdgeTts.DefaultVoice, CancellationToken.None);
+                    mp3 = await EdgeTts.SynthesizeAsync(text, hebrew ? EdgeTts.HebrewVoice : EdgeTts.DefaultVoice, synthCts.Token);
                     if (gen != _generation) return;
                 }
 
@@ -109,6 +117,10 @@ sealed class Speaker : IDisposable
         }
         finally
         {
+            lock (_gate)
+            {
+                if (_synthCts == synthCts) _synthCts = null;
+            }
             if (gen == _generation)
             {
                 CleanupPlayback();
@@ -121,6 +133,16 @@ sealed class Speaker : IDisposable
     public void Stop()
     {
         Interlocked.Increment(ref _generation);
+        lock (_gate)
+        {
+            try
+            {
+                _synthCts?.Cancel();
+            }
+            catch
+            {
+            }
+        }
         CleanupPlayback();
         SetSpeaking(false);
     }

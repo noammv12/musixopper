@@ -122,13 +122,8 @@ static class EdgeTts
             }
         }
 
-        try
-        {
-            await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
-        }
-        catch
-        {
-        }
+        // No graceful close: the audio is fully buffered, and a blackholed
+        // connection would hang the close handshake forever. Disposal aborts.
         return audio.ToArray();
     }
 

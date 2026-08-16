@@ -175,7 +175,9 @@ partial class FlyoutWindow
         panel.Children.Add(voiceIdHint);
         var voiceIdBox = Ui.TextBox(Settings.ElevenLabsVoiceId);
         voiceIdBox.Margin = new Thickness(0, 4, 0, 0);
-        voiceIdBox.LostFocus += (_, _) => Settings.ElevenLabsVoiceId = voiceIdBox.Text;
+        // Committed per keystroke — the neighboring links are TextBlocks that
+        // never take focus, so LostFocus would silently drop the value.
+        voiceIdBox.TextChanged += (_, _) => Settings.ElevenLabsVoiceId = voiceIdBox.Text;
         panel.Children.Add(voiceIdBox);
 
         panel.Children.Add(Ui.Divider(12, 10));

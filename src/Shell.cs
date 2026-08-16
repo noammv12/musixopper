@@ -92,7 +92,16 @@ sealed class Shell : IDisposable
         };
         _dock.AssistantCancelRequested += _assistant.Cancel;
         _flyout.ApplyAssistantHotkey = _dock.ApplyAssistantHotkey;
-        _flyout.PreviewVoice = _assistant.PreviewVoiceAsync;
+        _flyout.GetLiveHotkeys = _dock.LiveHotkeys;
+        _flyout.PreviewVoice = () =>
+        {
+            // The mic is open during dictation — a preview through the
+            // speakers would be transcribed into the user's document.
+            if (!_dictation.IsActive) return _assistant.PreviewVoiceAsync();
+            _dock.ShowToast("Finish dictating first — the preview would get transcribed",
+                paused: false, showIcon: false, important: true);
+            return Task.CompletedTask;
+        };
 
         _engine.StateChanged += () =>
         {

@@ -385,6 +385,12 @@ sealed class DockWindow : Window
 
     bool AssistantHotkeyLive => !_assistantHotkey.IsOff && !_assistantHotkeyFailed;
 
+    /// <summary>The bindings that actually registered (null = off or taken) —
+    /// for UI that advertises hotkeys, so it never advertises a dead one.</summary>
+    public (string? Ask, string? Dictate) LiveHotkeys() => (
+        AssistantHotkeyLive ? _assistantHotkey.ToString() : null,
+        DictationHotkeyLive ? _dictationHotkey.ToString() : null);
+
     /// <summary>
     /// (Re)binds Ctrl+Alt+1–9 to the first nine snippets when the opt-in
     /// setting is on. Combos another app owns are skipped silently — a
@@ -497,6 +503,16 @@ sealed class DockWindow : Window
         Reposition();
         _fullscreenPoll.Start();
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplayChanged;
+
+        // Anything held before the window existed (e.g. the startup hotkey-
+        // conflict warning) replays now — nothing else fires it at launch.
+        if (_pendingToast is { } held)
+        {
+            _pendingToast = null;
+            Dispatcher.InvokeAsync(
+                () => ShowToast(held.Text, held.Paused, held.OnClick, held.ShowIcon, important: true),
+                DispatcherPriority.Loaded);
+        }
     }
 
     public void Shutdown()
