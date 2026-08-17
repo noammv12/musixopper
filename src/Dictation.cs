@@ -102,10 +102,10 @@ sealed class Dictation : IDisposable
                 return;
             }
 
-            if (Settings.DictationPolish && Settings.DeepSeekKey is { } key)
+            if (Settings.DictationPolish && AiChat.HasKey)
             {
                 StatusChanged?.Invoke("Polishing…");
-                var polished = await DeepSeekClient.PolishAsync(text, Settings.DictationProfessional, key, CancellationToken.None);
+                var polished = await AiChat.PolishAsync(text, Settings.DictationProfessional, CancellationToken.None);
                 // Null (API failure, text too long) keeps the raw transcript —
                 // the dictation itself is never lost to the polish step.
                 if (!string.IsNullOrWhiteSpace(polished)) text = polished;

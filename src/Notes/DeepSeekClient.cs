@@ -11,13 +11,15 @@ namespace Bridget.Notes;
 sealed record AssistResult(string Action, string? CommandId, string? Text, string? Url = null);
 
 /// <summary>
-/// DeepSeek's OpenAI-compatible chat API: call summaries, dictation
-/// polish, and follow-up drafts. Every failure returns null — AI output
-/// is never worth losing the underlying text over.
+/// Bridget's AI brain: an OpenAI-compatible chat client behind a provider
+/// chain — Gemini first when its key exists (free tier, 1,500 calls/day),
+/// DeepSeek as the second. Call summaries, dictation polish, follow-up
+/// drafts and Ask-Bridget intent all route through here. Every failure
+/// returns null and records LastError — AI output is never worth losing
+/// the underlying text over.
 /// </summary>
-static class DeepSeekClient
+static class AiChat
 {
-    const string Endpoint = "https://api.deepseek.com/chat/completions";
     const int MaxTranscriptChars = 100_000;
     const int MaxDictationChars = 8_000;
 
@@ -47,36 +49,42 @@ static class DeepSeekClient
 
     static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(60) };
 
-    /// <summary>Returns the summary, or null when unavailable (no retry beyond one).</summary>
-    public static Task<string?> SummarizeAsync(string transcript, string apiKey, CancellationToken ct)
+    /// <summary>Why the last ChatAsync returned null (per provider), for UI surfacing.</summary>
+    public static string? LastError { get; private set; }
+
+    /// <summary>True when any AI provider is configured.</summary>
+    public static bool HasKey => Settings.GeminiKey is not null || Settings.DeepSeekKey is not null;
+
+    /// <summary>Returns the summary, or null when unavailable.</summary>
+    public static Task<string?> SummarizeAsync(string transcript, CancellationToken ct)
     {
         if (transcript.Length > MaxTranscriptChars) transcript = transcript[..MaxTranscriptChars];
-        return ChatAsync(SummaryPrompt, "Transcript:\n" + transcript, 0.3, 400, apiKey, ct);
+        return ChatAsync(SummaryPrompt, "Transcript:\n" + transcript, 0.3, 400, ct);
     }
 
     /// <summary>Cleaned-up dictation, or null when unavailable (caller keeps the raw text).</summary>
-    public static Task<string?> PolishAsync(string text, bool professional, string apiKey, CancellationToken ct)
+    public static Task<string?> PolishAsync(string text, bool professional, CancellationToken ct)
     {
         if (text.Length > MaxDictationChars) return Task.FromResult<string?>(null); // too long to round-trip — keep raw
         // rejectTruncated: a polish cut off at the token cap must never
         // replace the full raw transcript.
-        return ChatAsync(professional ? ProfessionalPrompt : PolishPrompt, text, 0.2, 4096, apiKey, ct, rejectTruncated: true);
+        return ChatAsync(professional ? ProfessionalPrompt : PolishPrompt, text, 0.2, 4096, ct, rejectTruncated: true);
     }
 
     /// <summary>A paste-ready follow-up message, or null when unavailable.</summary>
-    public static Task<string?> FollowUpAsync(string noteText, string apiKey, CancellationToken ct)
+    public static Task<string?> FollowUpAsync(string noteText, CancellationToken ct)
     {
         if (noteText.Length > MaxTranscriptChars) noteText = noteText[..MaxTranscriptChars];
-        return ChatAsync(FollowUpPrompt, "Call notes:\n" + noteText, 0.5, 300, apiKey, ct);
+        return ChatAsync(FollowUpPrompt, "Call notes:\n" + noteText, 0.5, 300, ct);
     }
 
     /// <summary>
-    /// Ask-Bridget intent: either run one of the user's saved commands or
-    /// answer the question. Null only when the API is unreachable; malformed
-    /// model output degrades to treating the raw text as the answer.
+    /// Ask-Bridget intent: run a saved command, open a well-known URL, or
+    /// answer. Null only when every provider failed; malformed model output
+    /// degrades to treating plain-prose replies as the answer.
     /// </summary>
     public static async Task<AssistResult?> AssistAsync(
-        string question, IReadOnlyList<BridgetCommand> commands, string apiKey, CancellationToken ct)
+        string question, IReadOnlyList<BridgetCommand> commands, CancellationToken ct)
     {
         var prompt = new StringBuilder(
             "You are Bridget, a decisive personal assistant for a busy salesperson. The input is a " +
@@ -108,7 +116,7 @@ static class DeepSeekClient
 
         // rejectTruncated: half a JSON object must not reach the fallback
         // below, where it would be displayed — and spoken — verbatim.
-        var raw = await ChatAsync(prompt.ToString(), question, 0.2, 500, apiKey, ct, rejectTruncated: true);
+        var raw = await ChatAsync(prompt.ToString(), question, 0.2, 500, ct, rejectTruncated: true);
         if (raw is null) return null;
 
         try
@@ -144,17 +152,54 @@ static class DeepSeekClient
         return raw.StartsWith('{') ? null : new AssistResult("answer", null, raw);
     }
 
-    static async Task<string?> ChatAsync(string systemPrompt, string userContent, double temperature, int maxTokens, string apiKey, CancellationToken ct, bool rejectTruncated = false)
+    // ---- provider chain ---------------------------------------------------
+
+    sealed record Provider(string Name, string Url, string Model, string Key);
+
+    static IEnumerable<Provider> Providers()
+    {
+        // Gemini first: its free tier absorbs the daily volume; DeepSeek is
+        // the paid fallback. Either alone also works.
+        if (Settings.GeminiKey is { } gemini)
+            yield return new Provider("Gemini",
+                "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                Settings.GeminiModel, gemini);
+        if (Settings.DeepSeekKey is { } deepSeek)
+            yield return new Provider("DeepSeek", "https://api.deepseek.com/chat/completions", "deepseek-chat", deepSeek);
+    }
+
+    static async Task<string?> ChatAsync(string systemPrompt, string userContent, double temperature, int maxTokens, CancellationToken ct, bool rejectTruncated = false)
+    {
+        var errors = new List<string>(2);
+        foreach (var provider in Providers())
+        {
+            var (text, error) = await ChatOnceAsync(provider, systemPrompt, userContent, temperature, maxTokens, ct, rejectTruncated);
+            if (text is not null)
+            {
+                LastError = null;
+                return text;
+            }
+            errors.Add($"{provider.Name}: {error}");
+            if (ct.IsCancellationRequested) break;
+        }
+        LastError = errors.Count > 0 ? string.Join(" → ", errors) : "no AI key";
+        if (errors.Count > 0) Log.Write($"AI chain failed: {LastError}");
+        return null;
+    }
+
+    static async Task<(string? Text, string Error)> ChatOnceAsync(
+        Provider provider, string systemPrompt, string userContent,
+        double temperature, int maxTokens, CancellationToken ct, bool rejectTruncated)
     {
         for (var attempt = 0; attempt < 2; attempt++)
         {
             try
             {
-                using var request = new HttpRequestMessage(HttpMethod.Post, Endpoint);
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                using var request = new HttpRequestMessage(HttpMethod.Post, provider.Url);
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", provider.Key);
                 var body = new
                 {
-                    model = "deepseek-chat",
+                    model = provider.Model,
                     messages = new object[]
                     {
                         new { role = "system", content = systemPrompt },
@@ -173,52 +218,40 @@ static class DeepSeekClient
                     await Task.Delay(2000, ct);
                     continue;
                 }
-                if (response.StatusCode == HttpStatusCode.Unauthorized)
-                {
-                    Log.Write("DeepSeek: key rejected (401)");
-                    return null;
-                }
-                if (status == 402)
-                {
-                    Log.Write("DeepSeek: insufficient balance (402)");
-                    return null;
-                }
-                if (!response.IsSuccessStatusCode)
-                {
-                    Log.Write($"DeepSeek: HTTP {status}");
-                    return null;
-                }
+                if (response.StatusCode == HttpStatusCode.Unauthorized) return (null, "key rejected (401)");
+                if (status == 402) return (null, "insufficient balance (402)");
+                if (status == 429) return (null, "rate limited (429)");
+                if (!response.IsSuccessStatusCode) return (null, $"HTTP {status}");
 
                 using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
                 var choice = doc.RootElement.GetProperty("choices")[0];
                 if (rejectTruncated
                     && choice.TryGetProperty("finish_reason", out var finish)
                     && finish.GetString() == "length")
-                {
-                    Log.Write("DeepSeek: response hit the token cap — discarded");
-                    return null;
-                }
+                    return (null, "hit the token cap");
                 var content = choice.GetProperty("message").GetProperty("content").GetString();
-                return string.IsNullOrWhiteSpace(content) ? null : content.Trim();
+                return string.IsNullOrWhiteSpace(content) ? (null, "empty reply") : (content.Trim(), "");
             }
             catch (Exception ex) when (attempt == 0 && ex is not OperationCanceledException)
             {
-                Log.Write($"DeepSeek: {ex.Message} — retrying");
                 try
                 {
                     await Task.Delay(2000, ct);
                 }
                 catch
                 {
-                    return null;
+                    return (null, "cancelled");
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                return (null, "cancelled");
             }
             catch (Exception ex)
             {
-                Log.Write($"DeepSeek failed: {ex.Message}");
-                return null;
+                return (null, ex.Message);
             }
         }
-        return null;
+        return (null, "network error");
     }
 }

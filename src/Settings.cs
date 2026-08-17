@@ -179,6 +179,25 @@ static class Settings
         set => SetProtectedValue("DeepSeekKey", value);
     }
 
+    /// <summary>Gemini API key — the free-tier AI provider, tried first.</summary>
+    public static string? GeminiKey
+    {
+        get => GetProtectedValue("GeminiKey");
+        set => SetProtectedValue("GeminiKey", value);
+    }
+
+    /// <summary>Gemini model id; blank falls back to the -latest flash alias
+    /// so Google's model renames don't need an app update.</summary>
+    public static string GeminiModel
+    {
+        get => Read("GeminiModel") is { Length: > 0 } model ? model : "gemini-flash-latest";
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value)) DeleteValue("GeminiModel");
+            else WriteValue("GeminiModel", value.Trim());
+        }
+    }
+
     /// <summary>Groq API key for fast cloud transcription.</summary>
     public static string? GroqKey
     {

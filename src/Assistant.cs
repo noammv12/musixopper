@@ -75,9 +75,9 @@ sealed class Assistant : IDisposable
 
     void Start()
     {
-        if (Settings.DeepSeekKey is null)
+        if (!AiChat.HasKey)
         {
-            ToastRequested?.Invoke("Ask Bridget needs your DeepSeek key — paste it under Notes & dictation");
+            ToastRequested?.Invoke("Ask Bridget needs a Gemini or DeepSeek key — paste one under Notes & dictation");
             return;
         }
         if (!ChainTranscriber.Ready)
@@ -130,9 +130,9 @@ sealed class Assistant : IDisposable
             }
             Log.Write($"Bridget heard: \"{question}\"");
 
-            if (Settings.DeepSeekKey is not { } key) return; // removed mid-flight
+            if (!AiChat.HasKey) return; // removed mid-flight
             var commands = CommandStore.Load();
-            var result = await DeepSeekClient.AssistAsync(question, commands, key, CancellationToken.None);
+            var result = await AiChat.AssistAsync(question, commands, CancellationToken.None);
             if (result is null)
             {
                 Log.Write("Bridget intent: unusable model reply");

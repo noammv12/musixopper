@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using Bridget.Notes;
 
 namespace Bridget.UI;
 
@@ -38,7 +39,7 @@ partial class FlyoutWindow
         subtitle.Margin = new Thickness(0, 6, 0, 0);
         panel.Children.Add(subtitle);
 
-        _bridgetKeyHint = Ui.Text("Needs your DeepSeek key — paste it under Notes & dictation.", 10.5, "AmberBrush", FontWeights.SemiBold);
+        _bridgetKeyHint = Ui.Text("Needs a Gemini or DeepSeek key — paste one under Notes & dictation.", 10.5, "AmberBrush", FontWeights.SemiBold);
         _bridgetKeyHint.TextWrapping = TextWrapping.Wrap;
         _bridgetKeyHint.Margin = new Thickness(0, 8, 0, 0);
         panel.Children.Add(_bridgetKeyHint);
@@ -326,7 +327,7 @@ partial class FlyoutWindow
             Dispatcher.InvokeAsync(ShowBridget);
             return;
         }
-        _bridgetKeyHint.Visibility = Settings.DeepSeekKey is null ? Visibility.Visible : Visibility.Collapsed;
+        _bridgetKeyHint.Visibility = AiChat.HasKey ? Visibility.Collapsed : Visibility.Visible;
         RefreshAssistantHotkeyRow();
         UpdateVoiceStatus();
         ShowFlyoutCore(onboarding: false, force: true);

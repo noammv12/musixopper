@@ -18,6 +18,8 @@ partial class FlyoutWindow
     Border _modelProgressFill = null!;
     PasswordBox _keyBox = null!;
     TextBlock _keyStatus = null!;
+    PasswordBox _geminiKeyBox = null!;
+    TextBlock _geminiKeyStatus = null!;
     PasswordBox _groqKeyBox = null!;
     TextBlock _groqKeyStatus = null!;
     StackPanel _notesList = null!;
@@ -187,7 +189,47 @@ partial class FlyoutWindow
 
         panel.Children.Add(Ui.Divider(12, 10));
 
-        panel.Children.Add(Ui.Text("AI SUMMARY (DEEPSEEK)", 10, "TextSecondaryBrush", FontWeights.SemiBold));
+        panel.Children.Add(Ui.Text("AI BRAIN (GEMINI / DEEPSEEK)", 10, "TextSecondaryBrush", FontWeights.SemiBold));
+
+        var geminiRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        geminiRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        geminiRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _geminiKeyBox = Ui.PasswordBox();
+        geminiRow.Children.Add(_geminiKeyBox);
+        var saveGemini = Ui.Link("Save", 11);
+        saveGemini.Margin = new Thickness(10, 0, 0, 0);
+        saveGemini.VerticalAlignment = VerticalAlignment.Center;
+        saveGemini.MouseLeftButtonUp += (_, _) =>
+        {
+            if (_geminiKeyBox.Password.Trim().Length == 0) return;
+            Settings.GeminiKey = _geminiKeyBox.Password;
+            _geminiKeyBox.Password = "";
+            UpdateKeyStatus();
+        };
+        Grid.SetColumn(saveGemini, 1);
+        geminiRow.Children.Add(saveGemini);
+        panel.Children.Add(geminiRow);
+
+        var geminiStatusRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        geminiStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        geminiStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _geminiKeyStatus = Ui.Text("", 10.5, "TextSecondaryBrush");
+        _geminiKeyStatus.TextWrapping = TextWrapping.Wrap;
+        geminiStatusRow.Children.Add(_geminiKeyStatus);
+        var removeGemini = Ui.Link("Remove", 10.5);
+        removeGemini.Margin = new Thickness(10, 0, 0, 0);
+        removeGemini.MouseLeftButtonUp += (_, _) =>
+        {
+            Settings.GeminiKey = null;
+            UpdateKeyStatus();
+        };
+        Grid.SetColumn(removeGemini, 1);
+        geminiStatusRow.Children.Add(removeGemini);
+        panel.Children.Add(geminiStatusRow);
+
+        var deepSeekCaption = Ui.Text("DeepSeek (fallback)", 10, "TextSecondaryBrush");
+        deepSeekCaption.Margin = new Thickness(0, 10, 0, 0);
+        panel.Children.Add(deepSeekCaption);
         var keyRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
         keyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         keyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -338,9 +380,9 @@ partial class FlyoutWindow
         _polishHint.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         if (on)
         {
-            _polishHint.Text = Settings.DeepSeekKey is null
-                ? "Add a DeepSeek key above — until then the raw text is typed."
-                : "Fillers and punctuation are cleaned up (via DeepSeek) before typing.";
+            _polishHint.Text = AiChat.HasKey
+                ? "Fillers and punctuation are cleaned up by the AI before typing."
+                : "Add a Gemini or DeepSeek key above — until then the raw text is typed.";
         }
     }
 
@@ -470,10 +512,17 @@ partial class FlyoutWindow
 
     void UpdateKeyStatus()
     {
+        _geminiKeyStatus.Text = Settings.GeminiKey is null
+            ? "No key — free at aistudio.google.com (Flash tier, ~1,500 calls/day)."
+            : "Key saved ✓ — Gemini is the primary AI.";
         _keyStatus.Text = Settings.DeepSeekKey is null
-            ? "No key — notes will be transcript-only. Paste your DeepSeek key for AI summaries."
-            : "Key saved ✓ — summaries on.";
-        if (_polishHint is not null) UpdatePolishRows(); // key row is built before the dictation section
+            ? Settings.GeminiKey is null
+                ? "No key — without any AI key, notes are transcript-only."
+                : "No key — optional paid fallback."
+            : Settings.GeminiKey is null
+                ? "Key saved ✓ — DeepSeek is the AI."
+                : "Key saved ✓ — fallback after Gemini.";
+        if (_polishHint is not null) UpdatePolishRows(); // key rows are built before the dictation section
     }
 
     void RebuildNotesList()
@@ -515,17 +564,17 @@ partial class FlyoutWindow
             links.Children.Add(copy);
 
             var followHost = new StackPanel();
-            if (Settings.DeepSeekKey is not null)
+            if (AiChat.HasKey)
             {
                 var follow = Ui.Link("✨ Follow-up", 10.5);
                 follow.Margin = new Thickness(14, 0, 0, 0);
                 var busy = false;
                 follow.MouseLeftButtonUp += async (_, _) =>
                 {
-                    if (busy || Settings.DeepSeekKey is not { } key) return;
+                    if (busy || !AiChat.HasKey) return;
                     busy = true;
                     follow.Text = "Writing…";
-                    var text = await DeepSeekClient.FollowUpAsync(note.Summary ?? note.Transcript, key, CancellationToken.None);
+                    var text = await AiChat.FollowUpAsync(note.Summary ?? note.Transcript, CancellationToken.None);
                     busy = false;
                     if (string.IsNullOrWhiteSpace(text))
                     {

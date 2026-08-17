@@ -192,10 +192,10 @@ sealed class NotesPipeline : IDisposable
                         transcript = "(Microphone wasn't recorded — your side of the call may be missing.)\n" + transcript;
 
                     string? summary = null;
-                    if (Settings.DeepSeekKey is { } key)
+                    if (AiChat.HasKey)
                     {
                         StatusChanged?.Invoke("Summarizing…");
-                        summary = await DeepSeekClient.SummarizeAsync(transcript, key, CancellationToken.None);
+                        summary = await AiChat.SummarizeAsync(transcript, CancellationToken.None);
                     }
 
                     var durationSec = (int)Math.Max(session.Duration.TotalSeconds, audioLength.TotalSeconds);
