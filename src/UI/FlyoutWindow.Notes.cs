@@ -487,17 +487,21 @@ partial class FlyoutWindow
 
     void UpdateNotesHealth()
     {
-        var lastNote = NotesStore.Load().OrderByDescending(n => n.StartedUtc).FirstOrDefault();
-        var lastCall = CallStatsStore.Load().OrderByDescending(c => c.StartedUtc).FirstOrDefault();
+        var lastNote = NotesStore.Load().MaxBy(n => n.StartedUtc);
+        var lastCall = CallStatsStore.Load().MaxBy(c => c.StartedUtc);
         static string When(DateTime? utc) =>
             utc is { } u ? u.ToLocalTime().ToString("d MMM HH:mm") : "never";
         _notesHealth.Text =
             $"Last note: {When(lastNote?.StartedUtc)} · Last call Bridget saw: {When(lastCall?.StartedUtc)}";
 
-        // Bridget not seeing calls at all is the handler-misconfiguration
-        // signature (softphone still launching the old exe).
-        var noRecentCall = lastCall is null || lastCall.StartedUtc < DateTime.UtcNow.AddDays(-1);
-        var warn = noRecentCall && Settings.Trigger == TriggerMode.SoftphoneEvents;
+        // Bridget not seeing calls is the handler-misconfiguration signature —
+        // but only once there's history to compare against (calls seen before
+        // and gone quiet, or migrated notes with no call ever seen since).
+        // A fresh install that simply hasn't had a call yet stays calm.
+        var stale = lastCall is null
+            ? lastNote is not null
+            : lastCall.StartedUtc < DateTime.UtcNow.AddDays(-1);
+        var warn = stale && Settings.Trigger == TriggerMode.SoftphoneEvents;
         _notesHealthLink.Visibility = warn ? Visibility.Visible : Visibility.Collapsed;
         _notesHealth.SetResourceReference(TextBlock.ForegroundProperty,
             warn ? "AmberBrush" : "TextSecondaryBrush");

@@ -10,8 +10,9 @@ sealed record CallNote(
     int DurationSec,
     string? Summary,
     string Transcript,
-    string State,           // "ok" | "transcript-only" | "recovered"
-    string? Number = null); // caller's number when the softphone passed one
+    string State,                 // "ok" | "transcript-only" | "recovered"
+    string? Number = null,        // caller's number when the softphone passed one
+    string? SummaryError = null); // why the summary is missing, when one was expected
 
 /// <summary>
 /// Call notes persistence: a JSON index of the last 50 notes for the UI,

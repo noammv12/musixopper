@@ -56,8 +56,8 @@ sealed class Shell : IDisposable
         _notes.ToastRequested += message => _dock.ShowToast(message, paused: false, showIcon: false, important: true);
         _notes.StatusChanged += status => _dock.SetNotesStatus(status);
         _notes.NoteReady += note => _dock.ShowToast(
-            note.Summary is null && AiChat.HasKey
-                ? $"Notes ready, no summary ({AiChat.LastError ?? "AI failed"}) — click to view"
+            note.SummaryError is { } reason
+                ? $"Notes ready, no summary ({reason}) — click to view"
                 : note.Number is { } number ? $"Notes ready ({number}) — click to view"
                 : "Notes ready — click to view",
             paused: false, onClick: () => _flyout.ShowNotes(), showIcon: false, important: true);
@@ -139,8 +139,11 @@ sealed class Shell : IDisposable
             _dock.ShowToast("The old Saley is still running — quit it from its tray icon",
                 paused: false, showIcon: false, important: true);
         }
-        else
+        else if (!Settings.JustMigrated && !Settings.SaleyWarned)
         {
+            // One-shot (the migration launch already shows its own nudge, and
+            // the stale log's timestamp never changes, so this would otherwise
+            // re-fire on every launch for a day).
             try
             {
                 // Not running now, but has it run recently? A fresh Saley log
@@ -150,6 +153,7 @@ sealed class Shell : IDisposable
                 if (System.IO.File.Exists(saleyLog) &&
                     System.IO.File.GetLastWriteTimeUtc(saleyLog) > DateTime.UtcNow.AddDays(-1))
                 {
+                    Settings.SaleyWarned = true;
                     _dock.ShowToast("The old Saley ran recently — delete Saley.exe and point your softphone handlers at Bridget.exe",
                         paused: false, showIcon: false, important: true);
                 }

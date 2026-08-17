@@ -192,10 +192,11 @@ sealed class NotesPipeline : IDisposable
                         transcript = "(Microphone wasn't recorded — your side of the call may be missing.)\n" + transcript;
 
                     string? summary = null;
+                    string? summaryError = null;
                     if (AiChat.HasKey)
                     {
                         StatusChanged?.Invoke("Summarizing…");
-                        summary = await AiChat.SummarizeAsync(transcript, CancellationToken.None);
+                        (summary, summaryError) = await AiChat.SummarizeAsync(transcript, CancellationToken.None);
                     }
 
                     var durationSec = (int)Math.Max(session.Duration.TotalSeconds, audioLength.TotalSeconds);
@@ -206,7 +207,8 @@ sealed class NotesPipeline : IDisposable
                         summary,
                         transcript,
                         recovered ? "recovered" : summary is null ? "transcript-only" : "ok",
-                        number);
+                        number,
+                        summary is null ? summaryError : null);
                     NotesStore.Add(note);
                     NoteReady?.Invoke(note);
                 }

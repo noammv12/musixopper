@@ -179,6 +179,13 @@ static class Settings
         set => SetProtectedValue("DeepSeekKey", value);
     }
 
+    /// <summary>One-shot: the stale-Saley warning has already been shown.</summary>
+    public static bool SaleyWarned
+    {
+        get => Read("SaleyWarned") == "1";
+        set => WriteValue("SaleyWarned", value ? "1" : "0");
+    }
+
     /// <summary>Gemini API key — the free-tier AI provider, tried first.</summary>
     public static string? GeminiKey
     {

@@ -34,7 +34,7 @@ Press **Ctrl+Alt+B** (or the 💬 chip), ask out loud, press again — Bridget e
 - "מה שעון בניו יורק?" → she answers, in your language, briefly.
 - "תפתחי סיילספורס" → your Salesforce opens (see Commands below).
 
-She can also open **well-known sites with no setup at all** — "תפתחי יוטיוב" just opens YouTube, and "search for aircon suppliers" runs the Google search. Answers land as a clickable toast and in the *Ask Bridget* panel with a Copy button. The hotkey is configurable there, and **Speak answers out loud** can be turned off. Needs your DeepSeek key (same one as notes) and a Groq key or the offline voice model for hearing you. Every exchange (what she heard → what she decided) is logged, so a bad answer is diagnosable.
+She can also open **well-known sites with no setup at all** — "תפתחי יוטיוב" just opens YouTube, and "search for aircon suppliers" runs the Google search. Answers land as a clickable toast and in the *Ask Bridget* panel with a Copy button. The hotkey is configurable there, and **Speak answers out loud** can be turned off. Needs a Gemini or DeepSeek key (same as notes) and a Groq key or the offline voice model for hearing you. Every exchange (what she heard → what she decided) is logged, so a bad answer is diagnosable.
 
 **Voice:** Bridget speaks with **Hila** — Microsoft's natural female Hebrew neural voice (Aria for English), free, via the Edge speech service. It needs internet; offline she falls back to the Windows voice (male for Hebrew — Windows ships nothing better offline). Want the truly premium sound? Paste an **ElevenLabs** key in the VOICE section and she uses it first. A ▶ Preview button lets you hear the current voice, and "Windows only" mode keeps speech fully offline. Bridget deliberately stays silent while a call is being recorded — her voice would end up in your transcript.
 
@@ -65,11 +65,12 @@ Flyout → **Detect calls by**:
 
 1. During a call, Bridget records your mic + the caller's audio.
 2. When you hang up, she transcribes the call. **With a Groq API key** (free at console.groq.com) transcription runs on Groq's whisper-large-v3-turbo — excellent Hebrew, done in seconds. **Without a key** it runs locally with the offline Whisper model (~466 MB one-time download). With both, Groq is first and local is the automatic fallback.
-3. With a DeepSeek key she writes **3 bullets + the next step**; without one you get the transcript only.
+3. With an AI key she writes **3 bullets + the next step**; without one you get the transcript only. Best free option: a **Gemini** key (aistudio.google.com — free Flash tier, ~1,500 calls/day); a **DeepSeek** key works as the paid fallback. If a summary fails, the toast names the reason instead of failing silently.
 4. The note pops up in the dock, lands at the top of the notes panel with a Copy button, and is appended to a daily Markdown file (`%LOCALAPPDATA%\Bridget\notes\`). With `%NUMBER%` handlers, notes are tagged with the caller's number.
 5. **✨ Follow-up** on each note card drafts a short WhatsApp-style follow-up message from the call, ready to copy.
+6. The panel's health line — "Last note … · Last call Bridget saw …" — turns "notes stopped working" into a named cause: if Bridget isn't seeing calls at all, your softphone handlers are pointing at the wrong exe, and the line links straight to the setup.
 
-**Privacy:** recording is OFF by default. Audio is deleted right after processing — only text is kept, on your PC. Keys are stored encrypted (Windows DPAPI, bound to your Windows account). With a Groq key, call audio is uploaded to Groq for transcription; only text goes to DeepSeek. **Recording calls may require consent where you are — check your local law and company policy before enabling.**
+**Privacy:** recording is OFF by default. Audio is deleted right after processing — only text is kept, on your PC. Keys are stored encrypted (Windows DPAPI, bound to your Windows account). With a Groq key, call audio is uploaded to Groq for transcription; only text goes to your AI provider (Gemini/DeepSeek — note Gemini's free tier may use prompts to improve Google's products). **Recording calls may require consent where you are — check your local law and company policy before enabling.**
 
 The log at `%LOCALAPPDATA%\Bridget\log.txt` narrates every step — if a note doesn't appear, the reason is in there.
 
@@ -78,7 +79,7 @@ The log at `%LOCALAPPDATA%\Bridget\log.txt` narrates every step — if a note do
 Press **Ctrl+Alt+Space** (or the 🎙 chip), speak, press again — the text is typed straight into whatever app your cursor is in. Hebrew by default; works mid-call.
 
 - **Your hotkey:** *Notes & dictation…* → **Dictation** — click the combo box and press the keys you want, or turn it off.
-- **Polish with AI** (optional, DeepSeek): cleans punctuation and fillers before typing; **Professional tone** smooths phrasing. If the API is unreachable the raw transcript is typed — a dictation is never lost.
+- **Polish with AI** (optional, any AI key): cleans punctuation and fillers before typing; **Professional tone** smooths phrasing. If the API is unreachable the raw transcript is typed — a dictation is never lost.
 
 ## Snippets
 
@@ -94,7 +95,7 @@ The flyout shows "Today: 14 calls · 1h 12m" under the status; **Stats…** open
 
 ## Network use
 
-Bridget talks to the network only when *you* opt in: the one-time voice-model download from `huggingface.co`, transcription requests to `api.groq.com` (Groq key), requests to `api.deepseek.com` (DeepSeek key: call summaries, follow-up drafts, dictation polish when enabled, and Ask-Bridget questions), and — for her speaking voice — the text of her replies goes to Microsoft's Edge speech service (or to `api.elevenlabs.io` with an ElevenLabs key). Switch the voice to "Windows only" and speech never leaves your PC. Nothing else, ever.
+Bridget talks to the network only when *you* opt in: the one-time voice-model download from `huggingface.co`, transcription requests to `api.groq.com` (Groq key), AI requests to `generativelanguage.googleapis.com` (Gemini key) and/or `api.deepseek.com` (DeepSeek key) — call summaries, follow-up drafts, dictation polish when enabled, and Ask-Bridget questions, and — for her speaking voice — the text of her replies goes to Microsoft's Edge speech service (or to `api.elevenlabs.io` with an ElevenLabs key). Switch the voice to "Windows only" and speech never leaves your PC. Nothing else, ever.
 
 ## Upgrading from Saley
 

@@ -55,11 +55,12 @@ static class AiChat
     /// <summary>True when any AI provider is configured.</summary>
     public static bool HasKey => Settings.GeminiKey is not null || Settings.DeepSeekKey is not null;
 
-    /// <summary>Returns the summary, or null when unavailable.</summary>
-    public static Task<string?> SummarizeAsync(string transcript, CancellationToken ct)
+    /// <summary>The summary, or null plus the per-call failure reason —
+    /// returned inline so concurrent AI calls can't garble the reason.</summary>
+    public static Task<(string? Summary, string? Error)> SummarizeAsync(string transcript, CancellationToken ct)
     {
         if (transcript.Length > MaxTranscriptChars) transcript = transcript[..MaxTranscriptChars];
-        return ChatAsync(SummaryPrompt, "Transcript:\n" + transcript, 0.3, 400, ct);
+        return ChatCoreAsync(SummaryPrompt, "Transcript:\n" + transcript, 0.3, 400, ct);
     }
 
     /// <summary>Cleaned-up dictation, or null when unavailable (caller keeps the raw text).</summary>
@@ -154,7 +155,7 @@ static class AiChat
 
     // ---- provider chain ---------------------------------------------------
 
-    sealed record Provider(string Name, string Url, string Model, string Key);
+    sealed record Provider(string Name, string Url, string Model, string Key, bool IsGemini);
 
     static IEnumerable<Provider> Providers()
     {
@@ -163,12 +164,15 @@ static class AiChat
         if (Settings.GeminiKey is { } gemini)
             yield return new Provider("Gemini",
                 "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-                Settings.GeminiModel, gemini);
+                Settings.GeminiModel, gemini, IsGemini: true);
         if (Settings.DeepSeekKey is { } deepSeek)
-            yield return new Provider("DeepSeek", "https://api.deepseek.com/chat/completions", "deepseek-chat", deepSeek);
+            yield return new Provider("DeepSeek", "https://api.deepseek.com/chat/completions", "deepseek-chat", deepSeek, IsGemini: false);
     }
 
-    static async Task<string?> ChatAsync(string systemPrompt, string userContent, double temperature, int maxTokens, CancellationToken ct, bool rejectTruncated = false)
+    static async Task<string?> ChatAsync(string systemPrompt, string userContent, double temperature, int maxTokens, CancellationToken ct, bool rejectTruncated = false) =>
+        (await ChatCoreAsync(systemPrompt, userContent, temperature, maxTokens, ct, rejectTruncated)).Text;
+
+    static async Task<(string? Text, string? Error)> ChatCoreAsync(string systemPrompt, string userContent, double temperature, int maxTokens, CancellationToken ct, bool rejectTruncated = false)
     {
         var errors = new List<string>(2);
         foreach (var provider in Providers())
@@ -177,14 +181,15 @@ static class AiChat
             if (text is not null)
             {
                 LastError = null;
-                return text;
+                return (text, null);
             }
             errors.Add($"{provider.Name}: {error}");
             if (ct.IsCancellationRequested) break;
         }
-        LastError = errors.Count > 0 ? string.Join(" → ", errors) : "no AI key";
-        if (errors.Count > 0) Log.Write($"AI chain failed: {LastError}");
-        return null;
+        var reason = errors.Count > 0 ? string.Join(" → ", errors) : "no AI key";
+        LastError = reason;
+        if (errors.Count > 0) Log.Write($"AI chain failed: {reason}");
+        return (null, reason);
     }
 
     static async Task<(string? Text, string Error)> ChatOnceAsync(
@@ -197,18 +202,22 @@ static class AiChat
             {
                 using var request = new HttpRequestMessage(HttpMethod.Post, provider.Url);
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", provider.Key);
-                var body = new
+                var body = new Dictionary<string, object>
                 {
-                    model = provider.Model,
-                    messages = new object[]
+                    ["model"] = provider.Model,
+                    ["messages"] = new object[]
                     {
                         new { role = "system", content = systemPrompt },
                         new { role = "user", content = userContent },
                     },
-                    temperature,
-                    max_tokens = maxTokens,
-                    stream = false,
+                    ["temperature"] = temperature,
+                    ["stream"] = false,
+                    // Gemini Flash thinks by default and thinking tokens count
+                    // against max_tokens — the caps sized for deepseek-chat
+                    // would be eaten by reasoning and return empty replies.
+                    ["max_tokens"] = provider.IsGemini ? Math.Max(maxTokens * 4, 2048) : maxTokens,
                 };
+                if (provider.IsGemini) body["reasoning_effort"] = "low";
                 request.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
 
                 using var response = await Http.SendAsync(request, ct);
@@ -252,6 +261,8 @@ static class AiChat
                 return (null, ex.Message);
             }
         }
+        // Not reachable — attempt 1 always returns above; the compiler just
+        // can't prove it.
         return (null, "network error");
     }
 }
