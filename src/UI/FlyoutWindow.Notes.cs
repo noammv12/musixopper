@@ -21,6 +21,8 @@ partial class FlyoutWindow
     PasswordBox _groqKeyBox = null!;
     TextBlock _groqKeyStatus = null!;
     StackPanel _notesList = null!;
+    TextBlock _notesHealth = null!;
+    TextBlock _notesHealthLink = null!;
     Border _hotkeyBox = null!;
     TextBlock _hotkeyLabel = null!;
     TextBlock _hotkeyStatus = null!;
@@ -63,6 +65,19 @@ partial class FlyoutWindow
         var toggleRow = Ui.ToggleRow("Take notes on my calls", _notesSwitch);
         toggleRow.Margin = new Thickness(0, 12, 0, 0);
         panel.Children.Add(toggleRow);
+
+        // The health line turns "notes stopped working" into a named cause.
+        _notesHealth = Ui.Text("", 10.5, "TextSecondaryBrush");
+        _notesHealth.TextWrapping = TextWrapping.Wrap;
+        _notesHealth.Margin = new Thickness(0, 8, 0, 0);
+        panel.Children.Add(_notesHealth);
+
+        _notesHealthLink = Ui.Link("No recent calls seen — check the handlers point at Bridget.exe →", 10.5);
+        _notesHealthLink.TextWrapping = TextWrapping.Wrap;
+        _notesHealthLink.Margin = new Thickness(0, 4, 0, 0);
+        _notesHealthLink.Visibility = Visibility.Collapsed;
+        _notesHealthLink.MouseLeftButtonUp += (_, _) => ShowSoftphoneSetup();
+        panel.Children.Add(_notesHealthLink);
 
         panel.Children.Add(Ui.Divider(12, 10));
 
@@ -312,6 +327,7 @@ partial class FlyoutWindow
         UpdateGroqStatus();
         RefreshHotkeyRow();
         UpdatePolishRows();
+        UpdateNotesHealth();
         return panel;
     }
 
@@ -425,6 +441,24 @@ partial class FlyoutWindow
             _modelAction.Visibility = Visibility.Visible;
             _modelProgressTrack.Visibility = Visibility.Collapsed;
         }
+    }
+
+    void UpdateNotesHealth()
+    {
+        var lastNote = NotesStore.Load().OrderByDescending(n => n.StartedUtc).FirstOrDefault();
+        var lastCall = CallStatsStore.Load().OrderByDescending(c => c.StartedUtc).FirstOrDefault();
+        static string When(DateTime? utc) =>
+            utc is { } u ? u.ToLocalTime().ToString("d MMM HH:mm") : "never";
+        _notesHealth.Text =
+            $"Last note: {When(lastNote?.StartedUtc)} · Last call Bridget saw: {When(lastCall?.StartedUtc)}";
+
+        // Bridget not seeing calls at all is the handler-misconfiguration
+        // signature (softphone still launching the old exe).
+        var noRecentCall = lastCall is null || lastCall.StartedUtc < DateTime.UtcNow.AddDays(-1);
+        var warn = noRecentCall && Settings.Trigger == TriggerMode.SoftphoneEvents;
+        _notesHealthLink.Visibility = warn ? Visibility.Visible : Visibility.Collapsed;
+        _notesHealth.SetResourceReference(TextBlock.ForegroundProperty,
+            warn ? "AmberBrush" : "TextSecondaryBrush");
     }
 
     void UpdateGroqStatus()
@@ -560,6 +594,7 @@ partial class FlyoutWindow
         UpdateKeyStatus();
         UpdateGroqStatus();
         RefreshHotkeyRow();
+        UpdateNotesHealth();
         ShowFlyoutCore(onboarding: false, force: true);
         ShowPanel(_notesPanel);
     }

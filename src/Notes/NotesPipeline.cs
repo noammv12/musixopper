@@ -114,7 +114,14 @@ sealed class NotesPipeline : IDisposable
         if (state == CallState.OnCall && was != CallState.OnCall)
         {
             _activeCallNumber = _engine.CurrentNumber;
-            if (!Settings.NotesEnabled || !TranscriberReady()) return;
+            if (!Settings.NotesEnabled) return;
+            if (!TranscriberReady())
+            {
+                // Silent skips read as "notes stopped working" — say why.
+                Log.Write("Notes skipped — transcriber not ready (no Groq key and no offline model)");
+                ToastRequested?.Invoke("Notes skipped — add a Groq key or download the offline model");
+                return;
+            }
             if (_recorder.Start(NotesStore.TmpDir) is null)
             {
                 ToastRequested?.Invoke("Notes: couldn't record audio");

@@ -34,6 +34,7 @@ sealed class Shell : IDisposable
         _tray = new TrayHost();
 
         _tray.OpenRequested += () => _flyout.ShowFlyout();
+        _tray.NotesRequested += () => _flyout.ShowNotes();
         _tray.QuitRequested += Quit;
         _flyout.QuitRequested += Quit;
         _dock.OpenFlyoutRequested += () => _flyout.ShowSnippets();
@@ -127,12 +128,32 @@ sealed class Shell : IDisposable
         _dock.SyncState(_engine.State); // StateChanged won't fire until the state moves
 
         // A still-running Saley build won't collide on the renamed mutex or
-        // events — it would fight over the mic and media sessions. Warn once.
+        // events — it would fight over the mic, the media sessions, and the
+        // softphone handlers (which would silently kill Bridget's notes).
         if (EventWaitHandle.TryOpenExisting(@"Local\Saley.ShowFlyout", out var oldApp))
         {
             oldApp.Dispose();
             _dock.ShowToast("The old Saley is still running — quit it from its tray icon",
                 paused: false, showIcon: false, important: true);
+        }
+        else
+        {
+            try
+            {
+                // Not running now, but has it run recently? A fresh Saley log
+                // means something still launches it (autostart, handlers).
+                var saleyLog = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Saley", "log.txt");
+                if (System.IO.File.Exists(saleyLog) &&
+                    System.IO.File.GetLastWriteTimeUtc(saleyLog) > DateTime.UtcNow.AddDays(-1))
+                {
+                    _dock.ShowToast("The old Saley ran recently — delete Saley.exe and point your softphone handlers at Bridget.exe",
+                        paused: false, showIcon: false, important: true);
+                }
+            }
+            catch
+            {
+            }
         }
 
         if (!Settings.OnboardingDone)

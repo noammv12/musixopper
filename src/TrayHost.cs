@@ -12,6 +12,7 @@ sealed class TrayHost : IDisposable
     CallState _state = CallState.Idle;
 
     public event Action? OpenRequested;
+    public event Action? NotesRequested;
     public event Action? QuitRequested;
 
     public TrayHost()
@@ -19,9 +20,12 @@ sealed class TrayHost : IDisposable
         var menu = new ContextMenuStrip();
         var open = new ToolStripMenuItem("Open Bridget");
         open.Click += (_, _) => OpenRequested?.Invoke();
+        var notes = new ToolStripMenuItem("Notes");
+        notes.Click += (_, _) => NotesRequested?.Invoke();
         var quit = new ToolStripMenuItem("Quit");
         quit.Click += (_, _) => QuitRequested?.Invoke();
         menu.Items.Add(open);
+        menu.Items.Add(notes);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(quit);
 
