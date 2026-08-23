@@ -23,6 +23,7 @@ sealed class Shell : IDisposable
     readonly DispatcherTimer _ticker;
     readonly EventWaitHandle _showFlyoutSignal;
     readonly RegisteredWaitHandle _showFlyoutWait;
+    CallState _lastEngineState = CallState.Idle;
 
     public Shell()
     {
@@ -110,9 +111,12 @@ sealed class Shell : IDisposable
 
         _engine.StateChanged += () =>
         {
-            _tray.SetState(_engine.State);
+            var state = _engine.State;
+            if (state == CallState.OnCall && _lastEngineState != CallState.OnCall) ShowCallerBrief();
+            _lastEngineState = state;
+            _tray.SetState(state);
             _flyout.SyncFromEngine();
-            _dock.SyncState(_engine.State);
+            _dock.SyncState(state);
         };
         _engine.MusicPaused += () => _dock.ShowToast("Paused for your call", paused: true);
         _engine.MusicResumed += () => _dock.ShowToast("Music resumed", paused: false);
@@ -170,6 +174,8 @@ sealed class Shell : IDisposable
             }
         }
 
+        UpdateCheck.Run(_flyout.SetUpdateAvailable);
+
         if (!Settings.OnboardingDone)
         {
             OpenFlyoutSoon(() => _flyout.ShowFlyout(onboarding: true));
@@ -183,6 +189,29 @@ sealed class Shell : IDisposable
                 _flyout.ShowSoftphoneSetup("Palon replaces Bridget — update your softphone handlers.");
             });
         }
+    }
+
+    /// <summary>When a known number calls, the dock briefs you before you say
+    /// hello: how long since the last call and the next step you promised.</summary>
+    void ShowCallerBrief()
+    {
+        if (_engine.CurrentNumber is not { } number) return;
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                var lastNote = NotesStore.Load()
+                    .Where(n => Agent.PhoneMatch.Same(n.Number, number))
+                    .MaxBy(n => n.StartedUtc);
+                if (lastNote is null) return;
+                _dock.ShowToast(NoteBrief.Compose(lastNote, DateTime.UtcNow),
+                    paused: false, onClick: () => _flyout.ShowNotes(), showIcon: false, important: true);
+            }
+            catch (Exception ex)
+            {
+                Log.Write($"Caller brief failed: {ex.Message}");
+            }
+        });
     }
 
     static bool TryDisposeExisting(string eventName)

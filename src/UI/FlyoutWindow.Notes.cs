@@ -587,13 +587,13 @@ partial class FlyoutWindow
                     }
                     follow.Text = "✨ Follow-up";
                     _followUps[note.Id] = text;
-                    RenderFollowUp(followHost, text);
+                    RenderFollowUp(followHost, text, note.Number);
                 };
                 links.Children.Add(follow);
             }
             stack.Children.Add(links);
             stack.Children.Add(followHost);
-            if (_followUps.TryGetValue(note.Id, out var cached)) RenderFollowUp(followHost, cached);
+            if (_followUps.TryGetValue(note.Id, out var cached)) RenderFollowUp(followHost, cached, note.Number);
 
             var card = new Border
             {
@@ -607,20 +607,40 @@ partial class FlyoutWindow
         }
     }
 
-    static void RenderFollowUp(StackPanel host, string text)
+    static void RenderFollowUp(StackPanel host, string text, string? number)
     {
         host.Children.Clear();
         var inner = new StackPanel();
         var body = Ui.Text(text, 11, "TextPrimaryBrush");
         body.TextWrapping = TextWrapping.Wrap;
         inner.Children.Add(body);
+        var links = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
         var copy = Ui.Link("Copy", 10.5);
-        copy.Margin = new Thickness(0, 6, 0, 0);
         copy.MouseLeftButtonUp += (_, _) =>
         {
             if (SnippetPaster.TrySetClipboard(text)) Ui.Flash(copy, "Copied ✓", "Copy");
         };
-        inner.Children.Add(copy);
+        links.Children.Add(copy);
+        // The number came from the softphone handler — one tap sends the
+        // draft where it belongs.
+        if (Phones.WaMeUrl(number, text) is { } waMe)
+        {
+            var whatsApp = Ui.Link("Open in WhatsApp", 10.5);
+            whatsApp.Margin = new Thickness(14, 0, 0, 0);
+            whatsApp.MouseLeftButtonUp += (_, _) =>
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo(waMe) { UseShellExecute = true });
+                }
+                catch (Exception ex)
+                {
+                    Log.Write($"Open WhatsApp failed: {ex.Message}");
+                }
+            };
+            links.Children.Add(whatsApp);
+        }
+        inner.Children.Add(links);
         var box = new Border
         {
             CornerRadius = new CornerRadius(8),

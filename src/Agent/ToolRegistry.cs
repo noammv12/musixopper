@@ -17,6 +17,8 @@ static class ToolRegistry
         new ListRemindersTool(),
         new SearchNotesTool(),
         new CallStatsTool(),
+        new OpenWhatsAppTool(),
+        new DailyRecapTool(),
         new ControlMusicTool(),
     };
 

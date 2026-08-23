@@ -46,6 +46,13 @@ static class AiChat
         " Then lightly smooth the phrasing so it reads as clear, professional business " +
         "writing — still without adding or removing information.";
 
+    const string RecapPrompt =
+        "You write a short spoken end-of-day recap for a salesperson from their raw activity log. " +
+        "Reply in the language most of the log is in (Hebrew → Hebrew, male grammatical forms for " +
+        "yourself). 4 to 6 short lines: calls and talk time, the two or three things that mattered, " +
+        "the next steps that were promised, then pending reminders if any. Plain text — no emoji, " +
+        "no headings, no bullets.";
+
     const string FollowUpPrompt =
         "You draft the short follow-up message a salesperson sends right after a call, " +
         "WhatsApp style. Write in the language of the notes (Hebrew notes → Hebrew " +
@@ -77,6 +84,10 @@ static class AiChat
         // replace the full raw transcript.
         return ChatAsync(professional ? ProfessionalPrompt : PolishPrompt, text, 0.2, 4096, ct, rejectTruncated: true);
     }
+
+    /// <summary>The end-of-day recap, or null when unavailable.</summary>
+    public static Task<string?> RecapAsync(string activityData, CancellationToken ct) =>
+        ChatAsync(RecapPrompt, activityData, 0.4, 500, ct);
 
     /// <summary>A paste-ready follow-up message, or null when unavailable.</summary>
     public static Task<string?> FollowUpAsync(string noteText, CancellationToken ct)

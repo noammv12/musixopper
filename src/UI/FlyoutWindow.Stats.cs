@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using Palon.Notes;
 
 namespace Palon.UI;
 
@@ -9,6 +10,9 @@ partial class FlyoutWindow
     readonly StackPanel _statsPanel;
     TextBlock _statsLine = null!;
     StackPanel _statsList = null!;
+    TextBlock _recapLink = null!;
+    StackPanel _recapHost = null!;
+    bool _recapBusy;
 
     StackPanel BuildStatsPanel()
     {
@@ -23,6 +27,14 @@ partial class FlyoutWindow
 
         _statsList = new StackPanel();
         panel.Children.Add(_statsList);
+
+        _recapLink = Ui.Link("✨ Recap my day", 11);
+        _recapLink.Margin = new Thickness(2, 14, 2, 0);
+        _recapLink.MouseLeftButtonUp += async (_, _) => await RunRecapAsync();
+        panel.Children.Add(_recapLink);
+
+        _recapHost = new StackPanel();
+        panel.Children.Add(_recapHost);
 
         var done = Ui.PrimaryButton("Done");
         done.Margin = new Thickness(0, 14, 0, 0);
@@ -100,6 +112,59 @@ partial class FlyoutWindow
         if (t.TotalHours >= 1) return $"{(int)t.TotalHours}h {t.Minutes}m";
         if (t.TotalMinutes >= 1) return $"{(int)t.TotalMinutes}m";
         return $"{t.Seconds}s";
+    }
+
+    async Task RunRecapAsync()
+    {
+        if (_recapBusy) return;
+        if (!AiChat.HasKey)
+        {
+            _recapLink.Text = "✨ Recap my day — needs a Gemini or DeepSeek key";
+            return;
+        }
+        _recapBusy = true;
+        _recapLink.Text = "Writing your recap…";
+        try
+        {
+            var data = await Task.Run(DailyRecap.BuildData);
+            var recap = await AiChat.RecapAsync(data, CancellationToken.None);
+            if (string.IsNullOrWhiteSpace(recap))
+            {
+                _recapLink.Text = "✨ Recap my day (failed — see log)";
+                return;
+            }
+            _recapLink.Text = "✨ Recap my day";
+            RenderRecap(recap!);
+        }
+        finally
+        {
+            _recapBusy = false;
+        }
+    }
+
+    void RenderRecap(string text)
+    {
+        _recapHost.Children.Clear();
+        var stack = new StackPanel();
+        var body = Ui.Text(text, 11, "TextPrimaryBrush");
+        body.TextWrapping = TextWrapping.Wrap;
+        stack.Children.Add(body);
+        var copy = Ui.Link("Copy", 10.5);
+        copy.Margin = new Thickness(0, 6, 0, 0);
+        copy.MouseLeftButtonUp += (_, _) =>
+        {
+            if (SnippetPaster.TrySetClipboard(text)) Ui.Flash(copy, "Copied ✓", "Copy");
+        };
+        stack.Children.Add(copy);
+        var card = new Border
+        {
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(10, 8, 10, 8),
+            Margin = new Thickness(0, 8, 0, 0),
+            Child = stack,
+        };
+        card.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
+        _recapHost.Children.Add(card);
     }
 
     public void ShowStats()

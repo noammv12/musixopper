@@ -38,7 +38,7 @@ Press **Ctrl+Alt+P** (or the 💬 chip) and just talk — **Palon stops listenin
 - "כמה שיחות עשיתי היום?" → your stats, spoken.
 - "עצור את המוזיקה" → the music pauses.
 
-He can also open **well-known sites with no setup at all** — "תפתח יוטיוב" just opens YouTube, and "search for aircon suppliers" runs the Google search. **Follow-ups work**: for a few minutes Palon remembers the exchange, so "ומה מחר?" continues the conversation. **Mid-call he knows who you're talking to** — when your softphone passes the caller's number, your last note about that caller is already in his head.
+He can also open **well-known sites with no setup at all** — "תפתח יוטיוב" just opens YouTube, and "search for aircon suppliers" runs the Google search. **Follow-ups work**: for a few minutes Palon remembers the exchange, so "ומה מחר?" continues the conversation. **Mid-call he knows who you're talking to** — when your softphone passes the caller's number, your last note about that caller is already in his head, **and the moment a known number calls, the dock briefs you**: how long since you last spoke and the next step you promised. Two more he handles by voice: "תכין הודעת פולו-אפ לדני ותפתח בוואטסאפ" opens the WhatsApp chat with the drafted message prefilled, and "סכם לי את היום" gets you a spoken end-of-day recap (also a click away under **Stats… → ✨ Recap my day**).
 
 Answers land as a clickable toast and in the *Ask Palon* panel with a Copy button. The hotkey is configurable there, and **Speak answers out loud** can be turned off. Needs a Gemini or DeepSeek key (same as notes) and a Groq key or the offline voice model for hearing you. Every exchange (what he heard → which tools he used) is logged, so a bad answer is diagnosable.
 
@@ -75,7 +75,7 @@ Flyout → **Detect calls by**:
 2. When you hang up, he transcribes the call. **With a Groq API key** (free at console.groq.com) transcription runs on Groq's whisper-large-v3-turbo — excellent Hebrew, done in seconds. **Without a key** it runs locally with the offline Whisper model (~466 MB one-time download). With both, Groq is first and local is the automatic fallback.
 3. With an AI key he writes **3 bullets + the next step**; without one you get the transcript only. Best free option: a **Gemini** key (aistudio.google.com — free Flash tier, ~1,500 calls/day); a **DeepSeek** key works as the paid fallback. If a summary fails, the toast names the reason instead of failing silently.
 4. The note pops up in the dock, lands at the top of the notes panel with a Copy button, and is appended to a daily Markdown file (`%LOCALAPPDATA%\Palon\notes\`). With `%NUMBER%` handlers, notes are tagged with the caller's number.
-5. **✨ Follow-up** on each note card drafts a short WhatsApp-style follow-up message from the call, ready to copy.
+5. **✨ Follow-up** on each note card drafts a short WhatsApp-style follow-up message from the call — Copy it, or when the caller's number is known, **Open in WhatsApp** lands it straight in their chat, prefilled.
 6. The panel's health line — "Last note … · Last call Palon saw …" — turns "notes stopped working" into a named cause: if Palon isn't seeing calls at all, your softphone handlers are pointing at the wrong exe, and the line links straight to the setup.
 
 **Privacy:** recording is OFF by default. Audio is deleted right after processing — only text is kept, on your PC. Keys are stored encrypted (Windows DPAPI, bound to your Windows account). With a Groq key, call audio is uploaded to Groq for transcription; only text goes to your AI provider (Gemini/DeepSeek — note Gemini's free tier may use prompts to improve Google's products). When you ask Palon something that needs your notes or stats, the matching snippets go to the AI provider as tool results — same consent as summaries. **Recording calls may require consent where you are — check your local law and company policy before enabling.**
@@ -111,6 +111,7 @@ Palon talks to the network only when *you* opt in: the one-time voice-model down
 
 ## Good to know
 
+- Once a day Palon quietly checks GitHub for a newer release; when there is one, a small "v8.x available →" link appears in the flyout footer. No auto-update — the link just opens the release page.
 - Only media on the same Windows PC can be controlled — not a phone or another device.
 - Turning "Pause music during calls" off mid-call deliberately does *not* resume the music into your call.
 - Troubleshooting transcription: if it fails to start, install the Microsoft VC++ 2022 x64 redistributable; check `%LOCALAPPDATA%\Palon\log.txt`.

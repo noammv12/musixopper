@@ -40,6 +40,8 @@ sealed partial class FlyoutWindow : Window
     PillSwitch _switchEnabled = null!;
     PillSwitch _switchStartup = null!;
     TextBlock _hotkeyCaption = null!;
+    TextBlock _updateLink = null!;
+    string? _updateUrl;
 
     // onboarding
     readonly StackPanel _welcomePanel;
@@ -207,6 +209,20 @@ sealed partial class FlyoutWindow : Window
         _hotkeyCaption.Visibility = parts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    /// <summary>Called (from any thread) when a newer release exists — a
+    /// quiet link in the footer, never a popup.</summary>
+    public void SetUpdateAvailable(string version, string url)
+    {
+        if (!CheckAccess())
+        {
+            Dispatcher.InvokeAsync(() => SetUpdateAvailable(version, url));
+            return;
+        }
+        _updateUrl = url; // may fire twice (remembered + fresh) — handler is attached once
+        _updateLink.Text = $"v{version} available →";
+        _updateLink.Visibility = Visibility.Visible;
+    }
+
     /// <summary>Top-of-panel return affordance — panels can be taller than the
     /// screen now, and the Done button lives at the (scrolled) bottom.</summary>
     TextBlock BackLink()
@@ -327,13 +343,33 @@ sealed partial class FlyoutWindow : Window
         var footer = new Grid();
         var appName = Ui.Text($"Palon {Program.Version}", 10.5, "TextSecondaryBrush");
         appName.VerticalAlignment = VerticalAlignment.Center;
+        _updateLink = Ui.Link("", 10.5);
+        _updateLink.VerticalAlignment = VerticalAlignment.Center;
+        _updateLink.Margin = new Thickness(8, 0, 0, 0);
+        _updateLink.Visibility = Visibility.Collapsed;
+        _updateLink.MouseLeftButtonUp += (_, _) =>
+        {
+            if (_updateUrl is null) return;
+            try
+            {
+                System.Diagnostics.Process.Start(
+                    new System.Diagnostics.ProcessStartInfo(_updateUrl) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                Log.Write($"Open release page failed: {ex.Message}");
+            }
+        };
+        var footerLeft = new StackPanel { Orientation = Orientation.Horizontal };
+        footerLeft.Children.Add(appName);
+        footerLeft.Children.Add(_updateLink);
         var quit = Ui.Text("Quit", 11, "TextSecondaryBrush");
         quit.Cursor = Cursors.Hand;
         quit.HorizontalAlignment = HorizontalAlignment.Right;
         quit.MouseEnter += (_, _) => quit.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
         quit.MouseLeave += (_, _) => quit.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
         quit.MouseLeftButtonUp += (_, _) => QuitRequested?.Invoke();
-        footer.Children.Add(appName);
+        footer.Children.Add(footerLeft);
         footer.Children.Add(quit);
         panel.Children.Add(footer);
 

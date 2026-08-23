@@ -221,6 +221,31 @@ static class Settings
         }
     }
 
+    /// <summary>When the GitHub releases API was last asked for updates.</summary>
+    public static DateTime? UpdateLastCheckedUtc
+    {
+        get => long.TryParse(Read("UpdateLastCheckedUtc"), out var ticks)
+            ? new DateTime(ticks, DateTimeKind.Utc)
+            : null;
+        set
+        {
+            if (value is { } utc) WriteValue("UpdateLastCheckedUtc", utc.Ticks.ToString());
+            else DeleteValue("UpdateLastCheckedUtc");
+        }
+    }
+
+    /// <summary>Latest release seen, as "version url" — shown even on
+    /// launches that skip the daily fetch.</summary>
+    public static string? UpdateLatestSeen
+    {
+        get => Read("UpdateLatestSeen");
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value)) DeleteValue("UpdateLatestSeen");
+            else WriteValue("UpdateLatestSeen", value);
+        }
+    }
+
     /// <summary>Groq API key for fast cloud transcription.</summary>
     public static string? GroqKey
     {

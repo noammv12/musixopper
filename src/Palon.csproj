@@ -21,9 +21,9 @@
     <Description>Palon.AI — your personal sales aide: pauses music on calls, takes your notes, runs your commands, and answers when you ask.</Description>
     <Company>Palon.AI</Company>
     <Copyright>© 2026 Palon.AI</Copyright>
-    <Version>8.1.0</Version>
-    <FileVersion>8.1.0.0</FileVersion>
-    <AssemblyVersion>8.1.0.0</AssemblyVersion>
+    <Version>8.2.0</Version>
+    <FileVersion>8.2.0.0</FileVersion>
+    <AssemblyVersion>8.2.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>

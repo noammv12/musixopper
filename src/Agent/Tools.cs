@@ -79,7 +79,8 @@ sealed class CreateReminderTool : AgentTool
         {"type":"object","properties":{
           "label":{"type":"string","description":"Short text shown when the reminder fires, in the user's language (e.g. the person to call back)."},
           "due_at":{"type":"string","description":"Local time to fire, formatted \"yyyy-MM-dd HH:mm\" (24h)."},
-          "url":{"type":"string","description":"Optional http(s) link to open from the reminder (CRM page, WhatsApp chat)."}
+          "url":{"type":"string","description":"Optional http(s) link to open from the reminder (CRM page)."},
+          "phone":{"type":"string","description":"Optional phone number — the reminder will open its WhatsApp chat."}
         },"required":["label","due_at"]}
         """;
 
@@ -91,7 +92,10 @@ sealed class CreateReminderTool : AgentTool
         if (!TryParseDueLocal(Str(args, "due_at"), DateTime.Now, out var dueLocal))
             return Task.FromResult(new ToolOutcome("Bad due_at — use \"yyyy-MM-dd HH:mm\" local time, in the future."));
 
-        var reminder = ReminderStore.Add(Str(args, "url") ?? "", label, dueLocal.ToUniversalTime());
+        var url = Str(args, "url") ?? "";
+        if (url.Length == 0 && Phones.WaMeUrl(Str(args, "phone")) is { } waMe) url = waMe;
+
+        var reminder = ReminderStore.Add(url, label, dueLocal.ToUniversalTime());
         return Task.FromResult(reminder is null
             ? new ToolOutcome("Saving the reminder failed (too many pending, or a bad link).")
             : new ToolOutcome($"Reminder \"{reminder.DisplayLabel}\" set for {dueLocal:ddd d MMM HH:mm}."));
@@ -213,6 +217,54 @@ sealed class CallStatsTool : AgentTool
             : $"{calls.Count} call(s), {TimeSpan.FromSeconds(calls.Sum(c => (long)c.DurationSec)):h\\:mm\\:ss} on the line";
         return Task.FromResult(new ToolOutcome($"Today: {Line(today)}. Last 7 days: {Line(week)}."));
     }
+}
+
+/// <summary>Opens a WhatsApp chat, optionally with a drafted message
+/// prefilled. Terminal: WhatsApp opening is its own feedback.</summary>
+sealed class OpenWhatsAppTool : AgentTool
+{
+    public override string Name => "open_whatsapp";
+    public override string Description =>
+        "Open a WhatsApp chat with a phone number, optionally with a message prefilled (compose it " +
+        "yourself, in the user's language — e.g. a follow-up drafted from their call notes). Take " +
+        "the number from the context or from search_notes when the user doesn't dictate one.";
+    public override string ParametersJson => """
+        {"type":"object","properties":{
+          "phone":{"type":"string","description":"The phone number, any common format."},
+          "message":{"type":"string","description":"Optional message text to prefill in the chat."}
+        },"required":["phone"]}
+        """;
+
+    public override Task<ToolOutcome> ExecuteAsync(JsonElement args, CancellationToken ct)
+    {
+        if (Phones.WaMeUrl(Str(args, "phone"), Str(args, "message")) is not { } url)
+            return Task.FromResult(new ToolOutcome("That doesn't look like a linkable phone number."));
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            return Task.FromResult(new ToolOutcome("Opened WhatsApp.", EndTurn: true, Toast: "Opening WhatsApp"));
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Open WhatsApp failed: {ex.Message}");
+            return Task.FromResult(new ToolOutcome("Opening WhatsApp failed.",
+                EndTurn: true, Toast: "Couldn't open WhatsApp — see log"));
+        }
+    }
+}
+
+/// <summary>Hands the model today's raw activity so it can speak the recap.</summary>
+sealed class DailyRecapTool : AgentTool
+{
+    public override string Name => "daily_recap";
+    public override string Description =>
+        "Get today's raw activity — call count, talk time, call-note summaries, pending reminders — " +
+        "when the user asks for a recap or summary of their day. Recap it faithfully; a few short " +
+        "lines is the right length.";
+    public override string ParametersJson => """{"type":"object","properties":{}}""";
+
+    public override Task<ToolOutcome> ExecuteAsync(JsonElement args, CancellationToken ct) =>
+        Task.FromResult(new ToolOutcome(DailyRecap.BuildData()));
 }
 
 /// <summary>Pauses or resumes the user's media by voice. Terminal — the
