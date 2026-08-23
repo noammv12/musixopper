@@ -313,6 +313,27 @@ static class Ui
         return viewer;
     }
 
+    /// <summary>An inner list hands the wheel to the outer card at its
+    /// extent instead of trapping it — WPF marks the wheel handled even
+    /// when a ScrollViewer can't move any further.</summary>
+    public static ScrollViewer ChainWheel(ScrollViewer inner)
+    {
+        inner.PreviewMouseWheel += (_, e) =>
+        {
+            var atTop = e.Delta > 0 && inner.VerticalOffset <= 0;
+            var atBottom = e.Delta < 0 && inner.VerticalOffset >= inner.ScrollableHeight;
+            if (!atTop && !atBottom) return;
+            e.Handled = true; // stop the trapped original...
+            if (inner.Parent is not UIElement parent) return;
+            parent.RaiseEvent(new MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta)
+            {
+                RoutedEvent = UIElement.MouseWheelEvent, // ...and re-raise above the list
+                Source = inner,
+            });
+        };
+        return inner;
+    }
+
     static Style ThinScrollBarStyle()
     {
         if (_thinScrollBarStyle is not null) return _thinScrollBarStyle;

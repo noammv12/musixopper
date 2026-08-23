@@ -499,14 +499,14 @@ sealed partial class FlyoutWindow : Window
         panel.Children.Add(hotkeyHint);
 
         _snippetList = new StackPanel();
-        var scroll = Ui.ThinScroll(new ScrollViewer
+        var scroll = Ui.ChainWheel(Ui.ThinScroll(new ScrollViewer
         {
             MaxHeight = 300,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             Content = _snippetList,
             Margin = new Thickness(0, 2, 0, 0),
-        });
+        }));
         panel.Children.Add(scroll);
 
         _addSnippetLink = Ui.Link("+ Add snippet", Font.Body);

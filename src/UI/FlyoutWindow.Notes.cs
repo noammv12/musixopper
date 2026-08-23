@@ -87,13 +87,13 @@ partial class FlyoutWindow
         // transcription/key plumbing lives below.
         panel.Children.Add(Ui.Caption("RECENT NOTES"));
         _notesList = new StackPanel();
-        var scroll = Ui.ThinScroll(new ScrollViewer
+        var scroll = Ui.ChainWheel(Ui.ThinScroll(new ScrollViewer
         {
             MaxHeight = 220,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             Content = _notesList,
-        });
+        }));
         panel.Children.Add(scroll);
 
         var openFolder = Ui.Link("Open notes folder", Font.Small);
