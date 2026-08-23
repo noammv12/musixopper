@@ -16,38 +16,52 @@ static class ElevenLabs
     /// closest premade match to Palon's composed-aide register.</summary>
     public const string DefaultVoiceId = "onwK4e9ZLuTAKqWW03F9";
 
-    static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
+    static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(40) };
 
-    public static async Task<byte[]?> SynthesizeAsync(string text, string voiceId, string apiKey, bool hebrew, CancellationToken ct)
+    /// <summary>Streams the utterance's MP3 to onChunk via the /stream
+    /// endpoint. True once any audio arrived (even if the stream then died —
+    /// playing the truncated audio beats double-playing via the next tier);
+    /// false means none did and the Speaker should fall down the chain.</summary>
+    public static async Task<bool> StreamAsync(
+        string text, string voiceId, string apiKey, bool hebrew, Action<byte[]> onChunk, CancellationToken ct)
     {
+        var delivered = false;
         try
         {
             // Hebrew arrived with the v3 model family; multilingual v2 is the
             // stable default for everything else.
             var model = hebrew ? "eleven_v3" : "eleven_multilingual_v2";
             using var request = new HttpRequestMessage(HttpMethod.Post,
-                $"https://api.elevenlabs.io/v1/text-to-speech/{voiceId}?output_format=mp3_44100_64");
+                $"https://api.elevenlabs.io/v1/text-to-speech/{voiceId}/stream?output_format=mp3_44100_64");
             request.Headers.Add("xi-api-key", apiKey);
             request.Content = new StringContent(
                 JsonSerializer.Serialize(new { text, model_id = model }),
                 Encoding.UTF8, "application/json");
 
-            using var response = await Http.SendAsync(request, ct);
+            using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
             if (!response.IsSuccessStatusCode)
             {
                 Log.Write($"ElevenLabs: HTTP {(int)response.StatusCode}");
-                return null;
+                return false;
             }
-            return await response.Content.ReadAsByteArrayAsync(ct);
+            await using var stream = await response.Content.ReadAsStreamAsync(ct);
+            var buffer = new byte[16 * 1024];
+            int read;
+            while ((read = await stream.ReadAsync(buffer, ct)) > 0)
+            {
+                delivered = true;
+                onChunk(buffer[..read]);
+            }
+            return delivered;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            return null;
+            return delivered;
         }
         catch (Exception ex)
         {
-            Log.Write($"ElevenLabs failed: {ex.Message}");
-            return null;
+            Log.Write($"ElevenLabs failed{(delivered ? " mid-stream (playing what arrived)" : "")}: {ex.Message}");
+            return delivered;
         }
     }
 }

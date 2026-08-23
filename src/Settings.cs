@@ -155,6 +155,22 @@ static class Settings
         set => WriteValue("VoiceEnabled", value ? "1" : "0");
     }
 
+    /// <summary>Ask Palon stops listening by itself once you go quiet
+    /// (press once, talk, done). On by default.</summary>
+    public static bool AssistantAutoStop
+    {
+        get => Read("AssistantAutoStop") != "0";
+        set => WriteValue("AssistantAutoStop", value ? "1" : "0");
+    }
+
+    /// <summary>After speaking an answer, Palon reopens the mic for a
+    /// follow-up question. Off by default — it's a hot-mic posture change.</summary>
+    public static bool ConversationMode
+    {
+        get => Read("ConversationMode") == "1";
+        set => WriteValue("ConversationMode", value ? "1" : "0");
+    }
+
     /// <summary>Clean up dictated text with DeepSeek before typing it.</summary>
     public static bool DictationPolish
     {

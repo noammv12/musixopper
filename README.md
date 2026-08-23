@@ -29,7 +29,7 @@ The settings card (flyout) is draggable too — grab any empty spot on it. It ne
 
 ## Ask Palon 💬
 
-Press **Ctrl+Alt+P** (or the 💬 chip), ask out loud, press again. Palon is a real agent now — he decides what the request needs, uses his tools, and either **answers out loud** or **does the thing**:
+Press **Ctrl+Alt+P** (or the 💬 chip) and just talk — **Palon stops listening by himself when you go quiet** (turn that off under LISTENING to go back to press-twice). He decides what the request needs, uses his tools, and either **answers out loud** or **does the thing**:
 
 - "מה שעון בניו יורק?" → he answers, in your language, briefly.
 - "תפתח סיילספורס" → your Salesforce opens (see Commands below).
@@ -42,7 +42,9 @@ He can also open **well-known sites with no setup at all** — "תפתח יוט�
 
 Answers land as a clickable toast and in the *Ask Palon* panel with a Copy button. The hotkey is configurable there, and **Speak answers out loud** can be turned off. Needs a Gemini or DeepSeek key (same as notes) and a Groq key or the offline voice model for hearing you. Every exchange (what he heard → which tools he used) is logged, so a bad answer is diagnosable.
 
-**Voice:** Palon speaks with **Avri** — Microsoft's natural male Hebrew neural voice (**Ryan**, a composed British male, for English), free, via the Edge speech service. It needs internet; offline he falls back to the Windows voice. Want the truly premium sound? Paste an **ElevenLabs** key in the VOICE section and he uses it first (default voice: their British "Daniel"). A ▶ Preview button lets you hear the current voice, and "Windows only" mode keeps speech fully offline. Palon deliberately stays silent while a call is being recorded — his voice would end up in your transcript.
+**Follow-ups without the hotkey:** turn on **Keep listening after answers** and Palon reopens the mic for a beat once he finishes speaking — ask the next thing, or say nothing and it closes itself. Off by default (it's a hot-mic preference).
+
+**Voice:** Palon speaks with **Avri** — Microsoft's natural male Hebrew neural voice (**Ryan**, a composed British male, for English), free, via the Edge speech service. Replies **stream**: he starts talking well under a second after the answer is ready, while the rest is still being synthesized (ElevenLabs streams too). It needs internet; offline he falls back to the Windows voice. Want the truly premium sound? Paste an **ElevenLabs** key in the VOICE section and he uses it first (default voice: their British "Daniel"). A ▶ Preview button lets you hear the current voice, and "Windows only" mode keeps speech fully offline. Palon deliberately stays silent while a call is being recorded — his voice would end up in your transcript.
 
 ## Commands
 

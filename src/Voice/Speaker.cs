@@ -8,10 +8,11 @@ namespace Palon.Voice;
 /// <summary>
 /// Palon's voice. Provider chain: the free Edge neural voice (male "Avri"
 /// for Hebrew, British "Ryan" for English — the Jarvis register) when
-/// online, falling back to the offline Windows voice. Playback goes
-/// through WASAPI; a raw WasapiOut is not a GSMTC media session, so
-/// speaking never trips the app's own music-pause logic. One utterance at
-/// a time; Stop() interrupts.
+/// online, falling back to the offline Windows voice. The cloud tiers
+/// stream: MP3 chunks play while synthesis is still running, so the first
+/// sound lands in well under a second. Playback goes through WASAPI; a raw
+/// WasapiOut is not a GSMTC media session, so speaking never trips the
+/// app's own music-pause logic. One utterance at a time; Stop() interrupts.
 /// </summary>
 sealed class Speaker : IDisposable
 {
@@ -19,6 +20,7 @@ sealed class Speaker : IDisposable
     WasapiOut? _out;
     WaveStream? _reader;
     MemoryStream? _buffer;
+    StreamingMp3Player? _player;
     CancellationTokenSource? _synthCts;
     int _generation;
     bool _hebrewHintShown;
@@ -43,56 +45,17 @@ sealed class Speaker : IDisposable
         }
         try
         {
-            WaveStream? reader = null;
-            MemoryStream? buffer = null;
+            if (Settings.VoicePreference != "windows"
+                && await TryStreamCloudAsync(text, gen, synthCts.Token))
+                return;
+            if (gen != _generation || synthCts.IsCancellationRequested) return;
 
-            if (Settings.VoicePreference != "windows")
+            var (reader, buffer) = await SynthesizeWindowsAsync(text);
+            if (gen != _generation || reader is null)
             {
-                var hebrew = IsHebrew(text);
-                byte[]? mp3 = null;
-
-                // Premium tier first when a key is present, then the free
-                // Edge neural voice.
-                if (Settings.ElevenLabsKey is { } elevenKey)
-                {
-                    var voiceId = Settings.ElevenLabsVoiceId is { Length: > 0 } id ? id : ElevenLabs.DefaultVoiceId;
-                    mp3 = await ElevenLabs.SynthesizeAsync(text, voiceId, elevenKey, hebrew, synthCts.Token);
-                    if (gen != _generation) return;
-                }
-                if (mp3 is null && !synthCts.IsCancellationRequested)
-                {
-                    mp3 = await EdgeTts.SynthesizeAsync(text, hebrew ? EdgeTts.HebrewVoice : EdgeTts.DefaultVoice, synthCts.Token);
-                    if (gen != _generation) return;
-                }
-
-                if (mp3 is not null)
-                {
-                    try
-                    {
-                        buffer = new MemoryStream(mp3);
-                        // Mp3FileReader lives in the NAudio metapackage; the
-                        // split packages expose the same thing as base+ACM.
-                        reader = new Mp3FileReaderBase(buffer, wf => new AcmMp3FrameDecompressor(wf));
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Write($"Cloud TTS audio unreadable: {ex.Message}");
-                        buffer?.Dispose();
-                        reader = null;
-                        buffer = null;
-                    }
-                }
-            }
-
-            if (reader is null)
-            {
-                (reader, buffer) = await SynthesizeWindowsAsync(text);
-                if (gen != _generation || reader is null)
-                {
-                    reader?.Dispose();
-                    buffer?.Dispose();
-                    return;
-                }
+                reader?.Dispose();
+                buffer?.Dispose();
+                return;
             }
 
             var device = new MMDeviceEnumerator().GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
@@ -127,6 +90,51 @@ sealed class Speaker : IDisposable
                 SetSpeaking(false);
             }
         }
+    }
+
+    /// <summary>Premium tier first when a key is present, then the free Edge
+    /// neural voice, both streaming into one player. True when cloud audio
+    /// happened (or a barge-in ended the turn); false hands the utterance to
+    /// the offline Windows voice.</summary>
+    async Task<bool> TryStreamCloudAsync(string text, int gen, CancellationToken ct)
+    {
+        var hebrew = IsHebrew(text);
+        var player = new StreamingMp3Player();
+        // Fires from the network thread on first audible frame — that's the
+        // moment Palon is actually "speaking", not when synthesis started.
+        player.PlaybackStarted += () =>
+        {
+            if (gen == _generation) SetSpeaking(true);
+        };
+        lock (_gate)
+        {
+            _player = player;
+        }
+
+        var streamed = false;
+        if (Settings.ElevenLabsKey is { } elevenKey)
+        {
+            var voiceId = Settings.ElevenLabsVoiceId is { Length: > 0 } id ? id : ElevenLabs.DefaultVoiceId;
+            streamed = await ElevenLabs.StreamAsync(text, voiceId, elevenKey, hebrew, player.Write, ct);
+        }
+        if (!streamed && !ct.IsCancellationRequested)
+            streamed = await EdgeTts.StreamAsync(
+                text, hebrew ? EdgeTts.HebrewVoice : EdgeTts.DefaultVoice, player.Write, ct);
+
+        if (gen != _generation || ct.IsCancellationRequested) return true; // barged in — Stop() cleans up
+        if (streamed && player.HasAudio)
+        {
+            await player.FinishAsync(ct);
+            return true;
+        }
+
+        // No cloud audio at all — release the player and fall offline.
+        lock (_gate)
+        {
+            _player = null;
+        }
+        player.Dispose();
+        return false;
     }
 
     /// <summary>Cuts off the current utterance (and cancels one being synthesized).</summary>
@@ -218,9 +226,11 @@ sealed class Speaker : IDisposable
             _out?.Dispose();
             _reader?.Dispose();
             _buffer?.Dispose();
+            _player?.Dispose();
             _out = null;
             _reader = null;
             _buffer = null;
+            _player = null;
         }
     }
 

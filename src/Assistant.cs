@@ -22,12 +22,19 @@ sealed class Assistant : IDisposable
 
     readonly DictationRecorder _recorder = new();
     readonly Speaker _speaker = new();
+    static readonly TimeSpan FollowUpMaxLength = TimeSpan.FromSeconds(20);
+
     readonly Func<CallState> _callState;
     readonly AssistantSession _session;
     readonly DispatcherTimer _cap;
     bool _busy;
+    bool _followUp; // current listening round auto-opened after an answer
 
     public bool IsListening { get; private set; }
+
+    /// <summary>Set by Shell: whether conversation mode may auto-open the mic
+    /// right now (false while dictation holds it).</summary>
+    public Func<bool>? CanAutoListen { get; set; }
 
     public event Action? Started;
     public event Action? Stopped;
@@ -47,6 +54,23 @@ sealed class Assistant : IDisposable
         };
         _speaker.ToastRequested += message => ToastRequested?.Invoke(message);
         _speaker.SpeakingChanged += speaking => StatusChanged?.Invoke(speaking ? "Speaking…" : "");
+        // Raised on the capture thread — hop to the UI thread before state.
+        _recorder.AutoStopped += hadSpeech => _cap.Dispatcher.InvokeAsync(() => OnAutoStopped(hadSpeech));
+    }
+
+    void OnAutoStopped(bool hadSpeech)
+    {
+        if (!IsListening) return;
+        if (hadSpeech)
+        {
+            _ = StopAndActAsync();
+            return;
+        }
+        // Open mic, nobody spoke: a follow-up window simply closes; a
+        // deliberate press deserves to hear why nothing happened.
+        var wasFollowUp = _followUp;
+        Cancel();
+        if (!wasFollowUp) ToastRequested?.Invoke("Didn't hear anything");
     }
 
     public void Toggle()
@@ -74,12 +98,13 @@ sealed class Assistant : IDisposable
         _speaker.Stop();
         if (!IsListening) return;
         IsListening = false;
+        _followUp = false;
         _cap.Stop();
         TryDelete(_recorder.Stop());
         Stopped?.Invoke();
     }
 
-    void Start()
+    void Start(bool followUp = false)
     {
         if (!AiChat.HasKey)
         {
@@ -91,12 +116,15 @@ sealed class Assistant : IDisposable
             ToastRequested?.Invoke("Ask Palon needs a Groq key or the offline voice model");
             return;
         }
-        if (_recorder.Start(NotesStore.TmpDir) is null)
+        if (_recorder.Start(NotesStore.TmpDir, autoStop: Settings.AssistantAutoStop) is null)
         {
             ToastRequested?.Invoke("Couldn't open the microphone");
             return;
         }
         IsListening = true;
+        _followUp = followUp;
+        // A follow-up window is short — it self-closes if the user moved on.
+        _cap.Interval = followUp ? FollowUpMaxLength : MaxLength;
         _cap.Start();
         Started?.Invoke();
     }
@@ -104,6 +132,8 @@ sealed class Assistant : IDisposable
     async Task StopAndActAsync()
     {
         IsListening = false;
+        var wasFollowUp = _followUp;
+        _followUp = false;
         _cap.Stop();
         _busy = true;
         var wav = _recorder.Stop();
@@ -131,7 +161,8 @@ sealed class Assistant : IDisposable
             if (question.Length == 0)
             {
                 Log.Write("Palon heard nothing usable");
-                ToastRequested?.Invoke("Didn't catch that");
+                // A silent follow-up window just closes — no nagging toast.
+                if (!wasFollowUp) ToastRequested?.Invoke("Didn't catch that");
                 return;
             }
             Log.Write($"Palon heard: \"{question}\"");
@@ -221,6 +252,17 @@ sealed class Assistant : IDisposable
             // Speaking during a recorded call would leak into the
             // transcript via loopback capture — screen-only then.
             await _speaker.SpeakAsync(answer);
+
+            // Conversation mode: the answer just finished — reopen the mic
+            // for a follow-up. Only with auto-stop on (the window must be
+            // able to close itself), never over a barge-in (IsListening),
+            // a new round (_busy), a call, or an active dictation.
+            if (Settings.ConversationMode && Settings.AssistantAutoStop
+                && !IsListening && !_busy && _callState() != CallState.OnCall
+                && (CanAutoListen?.Invoke() ?? true))
+            {
+                Start(followUp: true);
+            }
         }
     }
 

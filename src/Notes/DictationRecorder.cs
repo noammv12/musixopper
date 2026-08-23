@@ -1,6 +1,7 @@
 using System.IO;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
+using Palon.Voice;
 
 namespace Palon.Notes;
 
@@ -11,7 +12,12 @@ sealed class DictationRecorder : IDisposable
     WaveFileWriter? _writer;
     string? _path;
 
-    public string? Start(string dir)
+    /// <summary>Auto-stop verdict (true = speech was heard, the recording is
+    /// worth processing). Raised at most once per Start, on the capture
+    /// thread — marshal to the UI thread before touching state.</summary>
+    public event Action<bool>? AutoStopped;
+
+    public string? Start(string dir, bool autoStop = false)
     {
         if (_mic is not null) return _path;
 
@@ -34,6 +40,9 @@ sealed class DictationRecorder : IDisposable
             var path = Path.Combine(dir, $"dictation-{DateTime.Now:yyyyMMdd-HHmmss-fff}.wav");
             var target = writer = new WaveFileWriter(path, mic.WaveFormat);
             var lastFlush = DateTime.UtcNow;
+            var meter = autoStop ? new VoiceActivityMeter() : null;
+            var meterFormat = mic.WaveFormat;
+            var autoStopRaised = false;
             mic.DataAvailable += (_, e) =>
             {
                 try
@@ -43,6 +52,17 @@ sealed class DictationRecorder : IDisposable
                     {
                         lastFlush = DateTime.UtcNow;
                         target.Flush();
+                    }
+                    if (meter is not null && !autoStopRaised && meterFormat.AverageBytesPerSecond > 0)
+                    {
+                        var db = VoiceActivityMeter.RmsDb(e.Buffer, e.BytesRecorded, meterFormat.BitsPerSample);
+                        var ms = e.BytesRecorded * 1000.0 / meterFormat.AverageBytesPerSecond;
+                        var verdict = meter.Feed(db, ms);
+                        if (verdict != VoiceActivityMeter.Verdict.Continue)
+                        {
+                            autoStopRaised = true;
+                            AutoStopped?.Invoke(verdict == VoiceActivityMeter.Verdict.StopAfterSpeech);
+                        }
                     }
                 }
                 catch

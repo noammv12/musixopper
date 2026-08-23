@@ -80,6 +80,7 @@ sealed class Shell : IDisposable
         _flyout.SuspendGlobalHotkeys = _dock.SuspendHotkeys;
 
         _assistant = new Assistant(() => _engine.State, () => _engine.CurrentNumber);
+        _assistant.CanAutoListen = () => !_dictation.IsActive;
         _assistant.Started += () => _dock.SetAssistant(true);
         _assistant.Stopped += () => _dock.SetAssistant(false);
         _assistant.StatusChanged += status => _dock.SetAssistantStatus(status);

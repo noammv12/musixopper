@@ -102,6 +102,27 @@ partial class FlyoutWindow
 
         panel.Children.Add(Ui.Divider(12, 10));
 
+        panel.Children.Add(Ui.Text("LISTENING", 10, "TextSecondaryBrush", FontWeights.SemiBold));
+
+        var autoStopSwitch = new PillSwitch(Settings.AssistantAutoStop);
+        autoStopSwitch.Toggled += on => Settings.AssistantAutoStop = on;
+        var autoStopRow = Ui.ToggleRow("Stop when you go quiet", autoStopSwitch);
+        autoStopRow.Margin = new Thickness(0, 8, 0, 0);
+        panel.Children.Add(autoStopRow);
+
+        var conversationSwitch = new PillSwitch(Settings.ConversationMode);
+        conversationSwitch.Toggled += on => Settings.ConversationMode = on;
+        var conversationRow = Ui.ToggleRow("Keep listening after answers", conversationSwitch);
+        conversationRow.Margin = new Thickness(0, 10, 0, 0);
+        panel.Children.Add(conversationRow);
+
+        var conversationHint = Ui.Text("Palon reopens the mic briefly for a follow-up and it closes itself if you say nothing. Needs “stop when you go quiet” on.", 10.5, "TextSecondaryBrush");
+        conversationHint.TextWrapping = TextWrapping.Wrap;
+        conversationHint.Margin = new Thickness(0, 6, 0, 0);
+        panel.Children.Add(conversationHint);
+
+        panel.Children.Add(Ui.Divider(12, 10));
+
         panel.Children.Add(Ui.Text("VOICE", 10, "TextSecondaryBrush", FontWeights.SemiBold));
 
         var voiceSwitch = new PillSwitch(Settings.VoiceEnabled);

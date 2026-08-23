@@ -11,8 +11,8 @@ namespace Palon.Voice;
 /// "Ryan", a composed British male — the aide register). This is the
 /// browser's own endpoint, not an official API: each connection is signed
 /// the way Edge signs it (Sec-MS-GEC), and the classic host is tried first
-/// with the newer one Microsoft is migrating to as backup. Any failure
-/// returns null and the Speaker falls back to the offline Windows voice.
+/// with the newer one Microsoft is migrating to as backup. Delivering no
+/// audio at all sends the Speaker down the chain to the offline Windows voice.
 /// </summary>
 static class EdgeTts
 {
@@ -32,33 +32,46 @@ static class EdgeTts
     public const string HebrewVoice = "he-IL-AvriNeural";
     public const string DefaultVoice = "en-GB-RyanNeural";
 
-    /// <summary>MP3 bytes for the utterance, or null on any failure (logged).</summary>
-    public static async Task<byte[]?> SynthesizeAsync(string text, string voice, CancellationToken ct)
+    /// <summary>
+    /// Streams the utterance's MP3 to onChunk as the service synthesizes it,
+    /// so playback can start before synthesis ends. True once any audio was
+    /// delivered — including a stream that then died (playing the truncated
+    /// audio beats replaying from another host); false means no audio at all
+    /// (caller falls down the voice chain).
+    /// </summary>
+    public static async Task<bool> StreamAsync(string text, string voice, Action<byte[]> onChunk, CancellationToken ct)
     {
         foreach (var host in Hosts)
         {
+            var delivered = false;
             try
             {
-                var audio = await SynthesizeOnceAsync(host, text, voice, ct);
-                if (audio is { Length: > 0 }) return audio;
+                await StreamOnceAsync(host, text, voice, chunk =>
+                {
+                    delivered = true;
+                    onChunk(chunk);
+                }, ct);
+                if (delivered) return true;
                 Log.Write($"Edge TTS via {host.Split('/')[0]}: empty audio");
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                return null;
+                return delivered;
             }
             catch (Exception ex)
             {
-                Log.Write($"Edge TTS via {host.Split('/')[0]} failed: {ex.Message}");
+                Log.Write($"Edge TTS via {host.Split('/')[0]} failed"
+                    + (delivered ? " mid-stream (playing what arrived)" : "") + $": {ex.Message}");
+                if (delivered) return true; // never restart audio from another host
             }
         }
-        return null;
+        return false;
     }
 
-    static async Task<byte[]?> SynthesizeOnceAsync(string host, string text, string voice, CancellationToken ct)
+    static async Task StreamOnceAsync(string host, string text, string voice, Action<byte[]> onChunk, CancellationToken ct)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(TimeSpan.FromSeconds(15));
+        timeout.CancelAfter(TimeSpan.FromSeconds(40)); // whole synthesis; audio streams out long before this
         var token = timeout.Token;
 
         using var ws = new ClientWebSocket();
@@ -92,7 +105,6 @@ static class EdgeTts
             "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>" +
             $"<voice name='{voice}'>{Escape(text)}</voice></speak>", token);
 
-        using var audio = new MemoryStream();
         using var message = new MemoryStream();
         var buffer = new byte[32 * 1024];
         while (true)
@@ -102,8 +114,7 @@ static class EdgeTts
             do
             {
                 result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), token);
-                if (result.MessageType == WebSocketMessageType.Close)
-                    return audio.Length > 0 ? audio.ToArray() : null;
+                if (result.MessageType == WebSocketMessageType.Close) return;
                 message.Write(buffer, 0, result.Count);
             } while (!result.EndOfMessage);
 
@@ -119,13 +130,12 @@ static class EdgeTts
                 var start = 2 + headerLength;
                 if (start > data.Length) continue;
                 if (!Encoding.UTF8.GetString(data, 2, headerLength).Contains("Path:audio")) continue;
-                audio.Write(data, start, data.Length - start);
+                if (data.Length > start) onChunk(data[start..]);
             }
         }
 
-        // No graceful close: the audio is fully buffered, and a blackholed
+        // No graceful close: the audio has been handed off, and a blackholed
         // connection would hang the close handshake forever. Disposal aborts.
-        return audio.ToArray();
     }
 
     static Task SendTextAsync(ClientWebSocket ws, string message, CancellationToken ct) =>
