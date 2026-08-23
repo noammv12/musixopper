@@ -379,7 +379,7 @@ sealed partial class FlyoutWindow : Window
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
         panel.Children.Add(Ui.Title("Welcome to Palon"));
-        var subtitle = Ui.Small("Your music pauses when a call starts and comes back when it ends — and once you're set up, press Ctrl+Alt+P and just ask.");
+        var subtitle = Ui.Small($"Your music pauses when a call starts and comes back when it ends — and once you're set up, press {Hotkey.AssistantDefault} and just ask.");
         subtitle.TextWrapping = TextWrapping.Wrap;
         subtitle.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(subtitle);

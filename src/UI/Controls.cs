@@ -587,25 +587,39 @@ static class Ui
         desc.Margin = new Thickness(0, 2, 0, 0);
         stack.Children.Add(desc);
 
+        // The selection ring is an overlay faded in and out — a brush swap
+        // can't animate (the palette brushes are frozen), an opacity can.
+        var ring = new Border
+        {
+            CornerRadius = new CornerRadius(Radius.Card),
+            BorderThickness = new Thickness(1),
+            Margin = new Thickness(-Pad.CardLoose.Left, -Pad.CardLoose.Top, -Pad.CardLoose.Right, -Pad.CardLoose.Bottom),
+            IsHitTestVisible = false,
+            Opacity = 0,
+        };
+        ring.SetResourceReference(Border.BorderBrushProperty, "AccentBrush");
+        var host = new Grid();
+        host.Children.Add(stack);
+        host.Children.Add(ring);
+
         var card = new Border
         {
             CornerRadius = new CornerRadius(Radius.Card),
             Padding = Pad.CardLoose,
-            BorderThickness = new Thickness(1), // whole pixels only — 1.5 blurs at every DPI
-
-            BorderBrush = Brushes.Transparent,
             Cursor = Cursors.Hand,
-            Child = stack,
+            Child = host,
+            Tag = ring,
         };
         card.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
         HoverFill(card);
+        PressSpring(card); // choosing a card should answer the press like the button below it
         return card;
     }
 
     public static void SetCardSelected(Border card, bool selected)
     {
-        if (selected) card.SetResourceReference(Border.BorderBrushProperty, "AccentBrush");
-        else card.BorderBrush = Brushes.Transparent;
+        if (card.Tag is not Border ring) return;
+        ring.BeginAnimation(UIElement.OpacityProperty, Motion.Fade(selected ? 1 : 0, Motion.Fast));
     }
 
     /// <summary>A labeled, copyable command line for the softphone setup.</summary>
