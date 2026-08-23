@@ -175,7 +175,11 @@ sealed partial class FlyoutWindow : Window
         Deactivated += (_, _) => HideFlyout();
         PreviewKeyDown += (_, e) =>
         {
-            if (e.Key == Key.Escape) HideFlyout();
+            // This tunnels ahead of the capture box's own handler — while a
+            // capture is armed, Esc must cancel the capture, not the flyout.
+            if (e.Key != Key.Escape) return;
+            if (Keyboard.FocusedElement is HotkeyCaptureBox { IsCapturing: true }) return;
+            HideFlyout();
         };
 
         // A panel switch can double the height — keep the card anchored and
@@ -994,6 +998,11 @@ sealed partial class FlyoutWindow : Window
 
     void OnRootDragStart(object sender, MouseButtonEventArgs e)
     {
+        // Click-away ends an armed hotkey capture — nothing else in the card
+        // is focusable, so without this the capture (and the global-hotkey
+        // suspension it holds) would outlive the user's attention.
+        if (Keyboard.FocusedElement is HotkeyCaptureBox { IsCapturing: true } armed && !armed.IsMouseOver)
+            Keyboard.ClearFocus();
         if (InsideInteractive(e.OriginalSource as DependencyObject)) return;
         NativeMethods.GetCursorPos(out _dragStartPt);
         _dragStartLeft = Left;

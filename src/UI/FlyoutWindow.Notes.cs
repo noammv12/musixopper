@@ -25,8 +25,7 @@ partial class FlyoutWindow
     StackPanel _notesList = null!;
     TextBlock _notesHealth = null!;
     TextBlock _notesHealthLink = null!;
-    Border _hotkeyBox = null!;
-    TextBlock _hotkeyLabel = null!;
+    HotkeyCaptureBox _hotkeyBox = null!;
     TextBlock _hotkeyStatus = null!;
     PillSwitch _polishSwitch = null!;
     Grid _toneRow = null!;
@@ -225,34 +224,12 @@ partial class FlyoutWindow
         hotkeyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         hotkeyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        _hotkeyLabel = Ui.Text("", Font.Body, "TextPrimaryBrush", FontWeights.SemiBold);
-        _hotkeyLabel.HorizontalAlignment = HorizontalAlignment.Center;
-        _hotkeyBox = new Border
-        {
-            CornerRadius = new CornerRadius(Radius.Control),
-            Padding = new Thickness(10, 6, 10, 6),
-            Cursor = Cursors.Hand,
-            Focusable = true,
-            Child = _hotkeyLabel,
-        };
-        _hotkeyBox.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
-        Ui.SetNoDrag(_hotkeyBox, true); // a shaky click must arm capture, not drag the card
-        Ui.HoverFill(_hotkeyBox);
-        _hotkeyBox.MouseLeftButtonUp += (_, _) => Keyboard.Focus(_hotkeyBox);
-        _hotkeyBox.GotKeyboardFocus += (_, _) =>
-        {
-            // Release Palon's own hotkeys so pressing e.g. the current combo
-            // reaches the capture box instead of starting a dictation.
-            SuspendGlobalHotkeys?.Invoke();
-            _hotkeyLabel.Text = "Press a key combo…";
-            SetHotkeyStatus("Esc cancels. Include Ctrl, Alt or Win.", warn: false);
-        };
-        _hotkeyBox.LostKeyboardFocus += (_, _) =>
-        {
-            RestoreGlobalHotkeys();
-            RefreshHotkeyRow();
-        };
-        _hotkeyBox.PreviewKeyDown += OnHotkeyCapture;
+        _hotkeyBox = new HotkeyCaptureBox(
+            load: Hotkey.LoadDictation,
+            save: SaveHotkey,
+            status: SetHotkeyStatus,
+            suspend: () => SuspendGlobalHotkeys?.Invoke(),
+            restore: RestoreGlobalHotkeys);
         hotkeyRow.Children.Add(_hotkeyBox);
 
         var resetHotkey = Ui.Link("Reset", Font.Caption);
@@ -327,25 +304,6 @@ partial class FlyoutWindow
         }
     }
 
-    void OnHotkeyCapture(object sender, KeyEventArgs e)
-    {
-        e.Handled = true;
-        var key = e.Key == Key.System ? e.SystemKey : e.Key;
-        if (key == Key.Escape)
-        {
-            Keyboard.ClearFocus(); // LostKeyboardFocus restores the label
-            return;
-        }
-        if (Hotkey.IsModifierKey(key)) return; // mid-combo — keep waiting
-        if (Hotkey.FromKeyEvent(e) is not { } combo)
-        {
-            SetHotkeyStatus("Include Ctrl, Alt or Win in the combo.", warn: true);
-            return;
-        }
-        Keyboard.ClearFocus();
-        SaveHotkey(combo);
-    }
-
     void SaveHotkey(Hotkey combo)
     {
         var previous = Settings.DictationHotkey;
@@ -372,11 +330,7 @@ partial class FlyoutWindow
         _hotkeyStatus.SetResourceReference(TextBlock.ForegroundProperty, warn ? "AmberBrush" : "TextSecondaryBrush");
     }
 
-    void RefreshHotkeyRow()
-    {
-        var combo = Hotkey.LoadDictation();
-        _hotkeyLabel.Text = combo.IsOff ? "Off — click to set" : combo.ToString();
-    }
+    void RefreshHotkeyRow() => _hotkeyBox.Refresh();
 
     void OnModelProgress(long received, long total)
     {

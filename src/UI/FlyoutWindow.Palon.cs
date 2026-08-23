@@ -10,8 +10,7 @@ partial class FlyoutWindow
 {
     readonly StackPanel _palonPanel;
     TextBlock _palonKeyHint = null!;
-    Border _asstHotkeyBox = null!;
-    TextBlock _asstHotkeyLabel = null!;
+    HotkeyCaptureBox _asstHotkeyBox = null!;
     TextBlock _asstHotkeyStatus = null!;
     TextBlock _voiceStatus = null!;
     PasswordBox _elevenKeyBox = null!;
@@ -53,32 +52,12 @@ partial class FlyoutWindow
         hotkeyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         hotkeyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        _asstHotkeyLabel = Ui.Text("", Font.Body, "TextPrimaryBrush", FontWeights.SemiBold);
-        _asstHotkeyLabel.HorizontalAlignment = HorizontalAlignment.Center;
-        _asstHotkeyBox = new Border
-        {
-            CornerRadius = new CornerRadius(Radius.Control),
-            Padding = new Thickness(10, 6, 10, 6),
-            Cursor = Cursors.Hand,
-            Focusable = true,
-            Child = _asstHotkeyLabel,
-        };
-        _asstHotkeyBox.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
-        Ui.SetNoDrag(_asstHotkeyBox, true); // a shaky click must arm capture, not drag the card
-        Ui.HoverFill(_asstHotkeyBox);
-        _asstHotkeyBox.MouseLeftButtonUp += (_, _) => Keyboard.Focus(_asstHotkeyBox);
-        _asstHotkeyBox.GotKeyboardFocus += (_, _) =>
-        {
-            SuspendGlobalHotkeys?.Invoke();
-            _asstHotkeyLabel.Text = "Press a key combo…";
-            SetAssistantHotkeyStatus("Esc cancels. Include Ctrl, Alt or Win.", warn: false);
-        };
-        _asstHotkeyBox.LostKeyboardFocus += (_, _) =>
-        {
-            RestoreGlobalHotkeys();
-            RefreshAssistantHotkeyRow();
-        };
-        _asstHotkeyBox.PreviewKeyDown += OnAssistantHotkeyCapture;
+        _asstHotkeyBox = new HotkeyCaptureBox(
+            load: Hotkey.LoadAssistant,
+            save: SaveAssistantHotkey,
+            status: SetAssistantHotkeyStatus,
+            suspend: () => SuspendGlobalHotkeys?.Invoke(),
+            restore: RestoreGlobalHotkeys);
         hotkeyRow.Children.Add(_asstHotkeyBox);
 
         var reset = Ui.Link("Reset", Font.Caption);
@@ -245,25 +224,6 @@ partial class FlyoutWindow
         ApplySnippetHotkeys?.Invoke();
     }
 
-    void OnAssistantHotkeyCapture(object sender, KeyEventArgs e)
-    {
-        e.Handled = true;
-        var key = e.Key == Key.System ? e.SystemKey : e.Key;
-        if (key == Key.Escape)
-        {
-            Keyboard.ClearFocus(); // LostKeyboardFocus restores the label
-            return;
-        }
-        if (Hotkey.IsModifierKey(key)) return; // mid-combo — keep waiting
-        if (Hotkey.FromKeyEvent(e) is not { } combo)
-        {
-            SetAssistantHotkeyStatus("Include Ctrl, Alt or Win in the combo.", warn: true);
-            return;
-        }
-        Keyboard.ClearFocus();
-        SaveAssistantHotkey(combo);
-    }
-
     void SaveAssistantHotkey(Hotkey combo)
     {
         var previous = Settings.AssistantHotkey;
@@ -289,11 +249,7 @@ partial class FlyoutWindow
         _asstHotkeyStatus.SetResourceReference(TextBlock.ForegroundProperty, warn ? "AmberBrush" : "TextSecondaryBrush");
     }
 
-    void RefreshAssistantHotkeyRow()
-    {
-        var combo = Hotkey.LoadAssistant();
-        _asstHotkeyLabel.Text = combo.IsOff ? "Off — click to set" : combo.ToString();
-    }
+    void RefreshAssistantHotkeyRow() => _asstHotkeyBox.Refresh();
 
     /// <summary>Shows the latest Q&A in the panel (called from any thread).</summary>
     public void SetLastExchange(string question, string answer)

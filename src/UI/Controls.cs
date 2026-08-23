@@ -179,6 +179,102 @@ sealed class Segmented : Grid
     }
 }
 
+/// <summary>The click-to-set hotkey capture box, shared by the dictation and
+/// assistant rows. While armed it shows a silver focus ring (stronger than
+/// hover, unlike the old label-only swap); Esc or clicking away cancels the
+/// capture without touching the flyout.</summary>
+sealed class HotkeyCaptureBox : Border
+{
+    readonly TextBlock _label;
+    readonly Border _ring;
+    readonly Func<Hotkey> _load;
+    readonly Action<Hotkey> _save;
+    readonly Action<string, bool> _status;
+
+    /// <summary>True while armed — the window's Esc-to-close handler defers
+    /// to the box so Esc cancels the capture, not the flyout.</summary>
+    public bool IsCapturing { get; private set; }
+
+    public HotkeyCaptureBox(Func<Hotkey> load, Action<Hotkey> save, Action<string, bool> status,
+        Action? suspend, Action? restore)
+    {
+        _load = load;
+        _save = save;
+        _status = status;
+
+        _label = Ui.Text("", Font.Body, "TextPrimaryBrush", FontWeights.SemiBold);
+        _label.HorizontalAlignment = HorizontalAlignment.Center;
+        _ring = new Border
+        {
+            CornerRadius = new CornerRadius(Radius.Control),
+            BorderThickness = new Thickness(1),
+            Margin = new Thickness(-10, -6, -10, -6), // back out over the padding to the box edge
+            IsHitTestVisible = false,
+            Opacity = 0,
+        };
+        _ring.SetResourceReference(BorderBrushProperty, "AccentBrush");
+        var host = new Grid();
+        host.Children.Add(_label);
+        host.Children.Add(_ring);
+
+        CornerRadius = new CornerRadius(Radius.Control);
+        Padding = new Thickness(10, 6, 10, 6);
+        Cursor = Cursors.Hand;
+        Focusable = true;
+        Child = host;
+        SetResourceReference(BackgroundProperty, "ControlFillBrush");
+        Ui.SetNoDrag(this, true); // a shaky click must arm capture, not drag the card
+        Ui.HoverFill(this);
+
+        MouseLeftButtonUp += (_, _) => Keyboard.Focus(this);
+        GotKeyboardFocus += (_, _) =>
+        {
+            // Release the app's own global hotkeys so pressing e.g. the
+            // current combo reaches the box instead of triggering it.
+            IsCapturing = true;
+            suspend?.Invoke();
+            _label.Text = "Press a key combo…";
+            _ring.BeginAnimation(OpacityProperty, Motion.Fade(1, Motion.Fast));
+            _status("Esc cancels. Include Ctrl, Alt or Win.", false);
+        };
+        LostKeyboardFocus += (_, _) =>
+        {
+            IsCapturing = false;
+            restore?.Invoke();
+            _ring.BeginAnimation(OpacityProperty, Motion.Fade(0, Motion.Fast));
+            Refresh();
+        };
+        PreviewKeyDown += OnCapture;
+        Refresh();
+    }
+
+    /// <summary>Re-reads the stored combo into the label.</summary>
+    public void Refresh()
+    {
+        var combo = _load();
+        _label.Text = combo.IsOff ? "Off — click to set" : combo.ToString();
+    }
+
+    void OnCapture(object sender, KeyEventArgs e)
+    {
+        e.Handled = true;
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key == Key.Escape)
+        {
+            Keyboard.ClearFocus(); // LostKeyboardFocus restores the label
+            return;
+        }
+        if (Hotkey.IsModifierKey(key)) return; // mid-combo — keep waiting
+        if (Hotkey.FromKeyEvent(e) is not { } combo)
+        {
+            _status("Include Ctrl, Alt or Win in the combo.", true);
+            return;
+        }
+        Keyboard.ClearFocus();
+        _save(combo);
+    }
+}
+
 /// <summary>Small factories shared by the flyout panels.</summary>
 static class Ui
 {
