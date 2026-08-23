@@ -115,43 +115,23 @@ partial class FlyoutWindow
         panel.Children.Add(Ui.Divider(Space.Section, Space.Row));
 
         panel.Children.Add(Ui.Caption("FAST TRANSCRIPTION (GROQ)"));
-        var groqRow = new Grid { Margin = Ui.Top(Space.Tight) };
-        groqRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        groqRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _groqKeyBox = Ui.PasswordBox();
-        groqRow.Children.Add(_groqKeyBox);
-        var saveGroq = Ui.Link("Save", Font.Small);
-        saveGroq.Margin = Ui.Left(Space.Row);
-        saveGroq.VerticalAlignment = VerticalAlignment.Center;
-        saveGroq.MouseLeftButtonUp += (_, _) =>
-        {
-            if (_groqKeyBox.Password.Trim().Length == 0) return;
-            Settings.GroqKey = _groqKeyBox.Password;
-            _groqKeyBox.Password = "";
-            UpdateGroqStatus();
-            UpdateModelRow();
-        };
-        Grid.SetColumn(saveGroq, 1);
-        groqRow.Children.Add(saveGroq);
-        panel.Children.Add(groqRow);
-
-        var groqStatusRow = new Grid { Margin = Ui.Top(Space.Tight) };
-        groqStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        groqStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _groqKeyStatus = Ui.Small("");
-        _groqKeyStatus.TextWrapping = TextWrapping.Wrap;
-        groqStatusRow.Children.Add(_groqKeyStatus);
-        var removeGroq = Ui.Link("Remove", Font.Small);
-        removeGroq.Margin = Ui.Left(Space.Row);
-        removeGroq.MouseLeftButtonUp += (_, _) =>
-        {
-            Settings.GroqKey = null;
-            UpdateGroqStatus();
-            UpdateModelRow();
-        };
-        Grid.SetColumn(removeGroq, 1);
-        groqStatusRow.Children.Add(removeGroq);
-        panel.Children.Add(groqStatusRow);
+        var groq = Ui.KeyRow(_groqKeyBox,
+            onSave: key =>
+            {
+                Settings.GroqKey = key;
+                UpdateGroqStatus();
+                UpdateModelRow();
+            },
+            onRemove: () =>
+            {
+                Settings.GroqKey = null;
+                UpdateGroqStatus();
+                UpdateModelRow();
+            });
+        _groqKeyStatus = groq.Status;
+        panel.Children.Add(groq.InputRow);
+        panel.Children.Add(groq.StatusRow);
 
         panel.Children.Add(Ui.Divider(Space.Section, 2));
 
@@ -191,80 +171,40 @@ partial class FlyoutWindow
 
         panel.Children.Add(Ui.Caption("AI BRAIN (GEMINI / DEEPSEEK)"));
 
-        var geminiRow = new Grid { Margin = Ui.Top(Space.Tight) };
-        geminiRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        geminiRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _geminiKeyBox = Ui.PasswordBox();
-        geminiRow.Children.Add(_geminiKeyBox);
-        var saveGemini = Ui.Link("Save", Font.Small);
-        saveGemini.Margin = Ui.Left(Space.Row);
-        saveGemini.VerticalAlignment = VerticalAlignment.Center;
-        saveGemini.MouseLeftButtonUp += (_, _) =>
-        {
-            if (_geminiKeyBox.Password.Trim().Length == 0) return;
-            Settings.GeminiKey = _geminiKeyBox.Password;
-            _geminiKeyBox.Password = "";
-            UpdateKeyStatus();
-        };
-        Grid.SetColumn(saveGemini, 1);
-        geminiRow.Children.Add(saveGemini);
-        panel.Children.Add(geminiRow);
-
-        var geminiStatusRow = new Grid { Margin = Ui.Top(Space.Tight) };
-        geminiStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        geminiStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _geminiKeyStatus = Ui.Small("");
-        _geminiKeyStatus.TextWrapping = TextWrapping.Wrap;
-        geminiStatusRow.Children.Add(_geminiKeyStatus);
-        var removeGemini = Ui.Link("Remove", Font.Small);
-        removeGemini.Margin = Ui.Left(Space.Row);
-        removeGemini.MouseLeftButtonUp += (_, _) =>
-        {
-            Settings.GeminiKey = null;
-            UpdateKeyStatus();
-        };
-        Grid.SetColumn(removeGemini, 1);
-        geminiStatusRow.Children.Add(removeGemini);
-        panel.Children.Add(geminiStatusRow);
+        var gemini = Ui.KeyRow(_geminiKeyBox,
+            onSave: key =>
+            {
+                Settings.GeminiKey = key;
+                UpdateKeyStatus();
+            },
+            onRemove: () =>
+            {
+                Settings.GeminiKey = null;
+                UpdateKeyStatus();
+            });
+        _geminiKeyStatus = gemini.Status;
+        panel.Children.Add(gemini.InputRow);
+        panel.Children.Add(gemini.StatusRow);
 
         var deepSeekCaption = Ui.Caption("DeepSeek (fallback)");
         deepSeekCaption.Margin = Ui.Top(Space.Row);
         panel.Children.Add(deepSeekCaption);
-        var keyRow = new Grid { Margin = Ui.Top(Space.Tight) };
-        keyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        keyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _keyBox = Ui.PasswordBox();
-        keyRow.Children.Add(_keyBox);
-        var saveKey = Ui.Link("Save", Font.Small);
-        saveKey.Margin = Ui.Left(Space.Row);
-        saveKey.VerticalAlignment = VerticalAlignment.Center;
-        saveKey.MouseLeftButtonUp += (_, _) =>
-        {
-            if (_keyBox.Password.Trim().Length == 0) return;
-            Settings.DeepSeekKey = _keyBox.Password;
-            _keyBox.Password = "";
-            UpdateKeyStatus();
-        };
-        Grid.SetColumn(saveKey, 1);
-        keyRow.Children.Add(saveKey);
-        panel.Children.Add(keyRow);
-
-        var keyStatusRow = new Grid { Margin = Ui.Top(Space.Tight) };
-        keyStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        keyStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _keyStatus = Ui.Small("");
-        _keyStatus.TextWrapping = TextWrapping.Wrap;
-        keyStatusRow.Children.Add(_keyStatus);
-        var removeKey = Ui.Link("Remove", Font.Small);
-        removeKey.Margin = Ui.Left(Space.Row);
-        removeKey.MouseLeftButtonUp += (_, _) =>
-        {
-            Settings.DeepSeekKey = null;
-            UpdateKeyStatus();
-        };
-        Grid.SetColumn(removeKey, 1);
-        keyStatusRow.Children.Add(removeKey);
-        panel.Children.Add(keyStatusRow);
+        var deepSeek = Ui.KeyRow(_keyBox,
+            onSave: key =>
+            {
+                Settings.DeepSeekKey = key;
+                UpdateKeyStatus();
+            },
+            onRemove: () =>
+            {
+                Settings.DeepSeekKey = null;
+                UpdateKeyStatus();
+            });
+        _keyStatus = deepSeek.Status;
+        panel.Children.Add(deepSeek.InputRow);
+        panel.Children.Add(deepSeek.StatusRow);
 
         panel.Children.Add(Ui.Divider(Space.Section, Space.Row));
 
@@ -556,12 +496,7 @@ partial class FlyoutWindow
             stack.Children.Add(preview);
 
             var links = new StackPanel { Orientation = Orientation.Horizontal, Margin = Ui.Top(Space.Tight) };
-            var copy = Ui.Link("Copy", Font.Caption);
-            copy.MouseLeftButtonUp += (_, _) =>
-            {
-                if (SnippetPaster.TrySetClipboard(note.Summary ?? note.Transcript)) Ui.Flash(copy, "Copied ✓", "Copy");
-            };
-            links.Children.Add(copy);
+            links.Children.Add(Ui.CopyLink(() => note.Summary ?? note.Transcript));
 
             var followHost = new StackPanel();
             if (AiChat.HasKey)
@@ -578,24 +513,28 @@ partial class FlyoutWindow
                     busy = false;
                     if (string.IsNullOrWhiteSpace(text))
                     {
-                        follow.Text = "✨ Follow-up (failed — see log)";
+                        // Lingers long enough to read, then the link recovers.
+                        Ui.Flash(follow, "Follow-up failed — see log", "✨ Follow-up", Motion.Linger);
                         return;
                     }
                     follow.Text = "✨ Follow-up";
                     _followUps[note.Id] = text;
-                    RenderFollowUp(followHost, text, note.Number);
+                    RenderAiDraft(followHost, text, note.Number, nested: true);
                 };
                 links.Children.Add(follow);
             }
             stack.Children.Add(links);
             stack.Children.Add(followHost);
-            if (_followUps.TryGetValue(note.Id, out var cached)) RenderFollowUp(followHost, cached, note.Number);
+            if (_followUps.TryGetValue(note.Id, out var cached)) RenderAiDraft(followHost, cached, note.Number, nested: true);
 
             _notesList.Children.Add(Ui.Card(stack));
         }
     }
 
-    static void RenderFollowUp(StackPanel host, string text, string? number)
+    /// <summary>An AI-written draft (follow-up or recap): body + Copy, plus
+    /// Open-in-WhatsApp when a number is known. Nested drafts sit inside a
+    /// note card, so they get the inner-box treatment instead of a card.</summary>
+    static void RenderAiDraft(Panel host, string text, string? number, bool nested)
     {
         host.Children.Clear();
         var inner = new StackPanel();
@@ -603,12 +542,7 @@ partial class FlyoutWindow
         body.TextWrapping = TextWrapping.Wrap;
         inner.Children.Add(body);
         var links = new StackPanel { Orientation = Orientation.Horizontal, Margin = Ui.Top(Space.Tight) };
-        var copy = Ui.Link("Copy", Font.Caption);
-        copy.MouseLeftButtonUp += (_, _) =>
-        {
-            if (SnippetPaster.TrySetClipboard(text)) Ui.Flash(copy, "Copied ✓", "Copy");
-        };
-        links.Children.Add(copy);
+        links.Children.Add(Ui.CopyLink(() => text));
         // The number came from the softphone handler — one tap sends the
         // draft where it belongs.
         if (Phones.WaMeUrl(number, text) is { } waMe)
@@ -629,6 +563,11 @@ partial class FlyoutWindow
             links.Children.Add(whatsApp);
         }
         inner.Children.Add(links);
+        if (!nested)
+        {
+            host.Children.Add(Ui.Card(inner));
+            return;
+        }
         var box = new Border
         {
             CornerRadius = new CornerRadius(Radius.Control),

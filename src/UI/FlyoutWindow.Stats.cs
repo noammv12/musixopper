@@ -119,7 +119,7 @@ partial class FlyoutWindow
         if (_recapBusy) return;
         if (!AiChat.HasKey)
         {
-            _recapLink.Text = "✨ Recap my day — needs a Gemini or DeepSeek key";
+            Ui.Flash(_recapLink, "Needs a Gemini or DeepSeek key — see Notes & dictation", "✨ Recap my day", Motion.Linger);
             return;
         }
         _recapBusy = true;
@@ -130,33 +130,16 @@ partial class FlyoutWindow
             var recap = await AiChat.RecapAsync(data, CancellationToken.None);
             if (string.IsNullOrWhiteSpace(recap))
             {
-                _recapLink.Text = "✨ Recap my day (failed — see log)";
+                Ui.Flash(_recapLink, "Recap failed — see log", "✨ Recap my day", Motion.Linger);
                 return;
             }
             _recapLink.Text = "✨ Recap my day";
-            RenderRecap(recap!);
+            RenderAiDraft(_recapHost, recap!, null, nested: false);
         }
         finally
         {
             _recapBusy = false;
         }
-    }
-
-    void RenderRecap(string text)
-    {
-        _recapHost.Children.Clear();
-        var stack = new StackPanel();
-        var body = Ui.Small(text, "TextPrimaryBrush");
-        body.TextWrapping = TextWrapping.Wrap;
-        stack.Children.Add(body);
-        var copy = Ui.Link("Copy", Font.Caption);
-        copy.Margin = Ui.Top(Space.Tight);
-        copy.MouseLeftButtonUp += (_, _) =>
-        {
-            if (SnippetPaster.TrySetClipboard(text)) Ui.Flash(copy, "Copied ✓", "Copy");
-        };
-        stack.Children.Add(copy);
-        _recapHost.Children.Add(Ui.Card(stack));
     }
 
     public void ShowStats()

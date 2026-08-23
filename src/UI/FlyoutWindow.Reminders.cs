@@ -185,7 +185,7 @@ partial class FlyoutWindow
     void ShowReminderStatus(string text)
     {
         _reminderStatus.Text = text;
-        var clear = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+        var clear = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Motion.Linger) };
         clear.Tick += (_, _) =>
         {
             clear.Stop();

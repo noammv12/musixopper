@@ -371,13 +371,14 @@ static class Ui
     // instead of stacking timers, so feedback never reverts early.
     static readonly System.Runtime.CompilerServices.ConditionalWeakTable<TextBlock, DispatcherTimer> FlashTimers = new();
 
-    /// <summary>Standard action feedback on a link: swap the text, revert after 1.2 s.</summary>
-    public static void Flash(TextBlock link, string message, string revertTo)
+    /// <summary>Standard action feedback on a link: swap the text, revert
+    /// after 1.2 s (or a caller-chosen hold, e.g. Motion.Linger for errors).</summary>
+    public static void Flash(TextBlock link, string message, string revertTo, int ms = Motion.Revert)
     {
         link.Text = message;
         var timer = FlashTimers.GetValue(link, l =>
         {
-            var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Motion.Revert) };
+            var t = new DispatcherTimer();
             t.Tick += (_, _) =>
             {
                 t.Stop();
@@ -387,7 +388,55 @@ static class Ui
         });
         timer.Tag = revertTo;
         timer.Stop();
+        timer.Interval = TimeSpan.FromMilliseconds(ms);
         timer.Start();
+    }
+
+    /// <summary>The standard Copy link: caption-size, flashes "Copied ✓".</summary>
+    public static TextBlock CopyLink(Func<string?> text)
+    {
+        var copy = Link("Copy", Font.Caption);
+        copy.MouseLeftButtonUp += (_, _) =>
+        {
+            if (text() is { } t && SnippetPaster.TrySetClipboard(t)) Flash(copy, "Copied ✓", "Copy");
+        };
+        return copy;
+    }
+
+    /// <summary>An API-key section: masked box + Save, status line + Remove.
+    /// The caller owns the status text via the returned TextBlock.</summary>
+    public static (Grid InputRow, Grid StatusRow, TextBlock Status) KeyRow(
+        PasswordBox box, Action<string> onSave, Action onRemove)
+    {
+        var inputRow = new Grid { Margin = Top(Space.Tight) };
+        inputRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        inputRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        inputRow.Children.Add(box);
+        var save = Link("Save", Font.Small);
+        save.Margin = Left(Space.Row);
+        save.VerticalAlignment = VerticalAlignment.Center;
+        save.MouseLeftButtonUp += (_, _) =>
+        {
+            if (box.Password.Trim().Length == 0) return;
+            onSave(box.Password);
+            box.Password = "";
+        };
+        Grid.SetColumn(save, 1);
+        inputRow.Children.Add(save);
+
+        var statusRow = new Grid { Margin = Top(Space.Tight) };
+        statusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        statusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var status = Small("");
+        status.TextWrapping = TextWrapping.Wrap;
+        statusRow.Children.Add(status);
+        var remove = Link("Remove", Font.Small);
+        remove.Margin = Left(Space.Row);
+        remove.MouseLeftButtonUp += (_, _) => onRemove();
+        Grid.SetColumn(remove, 1);
+        statusRow.Children.Add(remove);
+
+        return (inputRow, statusRow, status);
     }
 
     /// <summary>Standard hover treatment for a clickable filled surface.</summary>
@@ -576,18 +625,9 @@ static class Ui
         copy.Margin = Left(Space.Row);
         copy.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(copy, 1);
-        var revert = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Motion.Revert) };
-        revert.Tick += (_, _) =>
-        {
-            revert.Stop();
-            copy.Text = "Copy";
-        };
         copy.MouseLeftButtonUp += (_, _) =>
         {
-            if (!SnippetPaster.TrySetClipboard(command)) return;
-            copy.Text = "Copied ✓";
-            revert.Stop();
-            revert.Start();
+            if (SnippetPaster.TrySetClipboard(command)) Flash(copy, "Copied ✓", "Copy");
         };
         line.Children.Add(copy);
         stack.Children.Add(line);

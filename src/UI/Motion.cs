@@ -18,6 +18,7 @@ static class Motion
     public const int PulseFast = 700; // dictation dot breathing
     public const int PulseSlow = 1200; // status halo breathing
     public const int Revert = 1200;   // feedback timers ("Copied ✓" → back), DispatcherTimer ms
+    public const int Linger = 4000;   // error/status lines hold long enough to read, then clear
 
     public static readonly IEasingFunction Out = Freeze(new CubicEase { EasingMode = EasingMode.EaseOut });
     public static readonly IEasingFunction InOut = Freeze(new CubicEase { EasingMode = EasingMode.EaseInOut });

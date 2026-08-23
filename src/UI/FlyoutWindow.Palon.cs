@@ -156,41 +156,21 @@ partial class FlyoutWindow
         elevenCaption.Margin = Ui.Top(Space.Section);
         panel.Children.Add(elevenCaption);
 
-        var elevenRow = new Grid { Margin = Ui.Top(Space.Tight) };
-        elevenRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        elevenRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _elevenKeyBox = Ui.PasswordBox();
-        elevenRow.Children.Add(_elevenKeyBox);
-        var saveEleven = Ui.Link("Save", Font.Small);
-        saveEleven.Margin = Ui.Left(Space.Row);
-        saveEleven.VerticalAlignment = VerticalAlignment.Center;
-        saveEleven.MouseLeftButtonUp += (_, _) =>
-        {
-            if (_elevenKeyBox.Password.Trim().Length == 0) return;
-            Settings.ElevenLabsKey = _elevenKeyBox.Password;
-            _elevenKeyBox.Password = "";
-            UpdateVoiceStatus();
-        };
-        Grid.SetColumn(saveEleven, 1);
-        elevenRow.Children.Add(saveEleven);
-        panel.Children.Add(elevenRow);
-
-        var elevenStatusRow = new Grid { Margin = Ui.Top(Space.Tight) };
-        elevenStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        elevenStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _elevenKeyStatus = Ui.Small("");
-        _elevenKeyStatus.TextWrapping = TextWrapping.Wrap;
-        elevenStatusRow.Children.Add(_elevenKeyStatus);
-        var removeEleven = Ui.Link("Remove", Font.Small);
-        removeEleven.Margin = Ui.Left(Space.Row);
-        removeEleven.MouseLeftButtonUp += (_, _) =>
-        {
-            Settings.ElevenLabsKey = null;
-            UpdateVoiceStatus();
-        };
-        Grid.SetColumn(removeEleven, 1);
-        elevenStatusRow.Children.Add(removeEleven);
-        panel.Children.Add(elevenStatusRow);
+        var eleven = Ui.KeyRow(_elevenKeyBox,
+            onSave: key =>
+            {
+                Settings.ElevenLabsKey = key;
+                UpdateVoiceStatus();
+            },
+            onRemove: () =>
+            {
+                Settings.ElevenLabsKey = null;
+                UpdateVoiceStatus();
+            });
+        _elevenKeyStatus = eleven.Status;
+        panel.Children.Add(eleven.InputRow);
+        panel.Children.Add(eleven.StatusRow);
 
         var voiceIdHint = Ui.Caption("Voice ID (optional — blank = Daniel)");
         voiceIdHint.Margin = Ui.Top(Space.Row);
@@ -217,12 +197,8 @@ partial class FlyoutWindow
         _lastAnswer.TextWrapping = TextWrapping.Wrap;
         _lastAnswer.Margin = Ui.Top(Space.Tight);
         exchangeStack.Children.Add(_lastAnswer);
-        _copyAnswerLink = Ui.Link("Copy", Font.Caption);
+        _copyAnswerLink = Ui.CopyLink(() => _lastAnswer.Text);
         _copyAnswerLink.Margin = Ui.Top(Space.Tight);
-        _copyAnswerLink.MouseLeftButtonUp += (_, _) =>
-        {
-            if (SnippetPaster.TrySetClipboard(_lastAnswer.Text)) Ui.Flash(_copyAnswerLink, "Copied ✓", "Copy");
-        };
         exchangeStack.Children.Add(_copyAnswerLink);
         _exchangeCard = Ui.Card(exchangeStack);
         _exchangeCard.Visibility = Visibility.Collapsed;
