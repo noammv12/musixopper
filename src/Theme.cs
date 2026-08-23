@@ -67,6 +67,8 @@ static class Theme
         Set(r, "SwitchOffBrush", "#FF3A3A40");
         Set(r, "StatusGoodBrush", "#FF32D74B"); // semantic: listening / enabled
         Set(r, "AmberBrush", "#FFFF9F0A");      // semantic: on a call
+        Set(r, "DangerBrush", "#FFFF453A");     // semantic: destructive actions
+        Set(r, "KnobBrush", "#FFFFFFFF");       // the switch knob — the one pure white
     }
 
     static void Set(ResourceDictionary resources, string key, string hex)
