@@ -191,12 +191,20 @@ sealed class DockWindow : Window
         _toastContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 16, 0) };
         _toastContent.Children.Add(_toastIcon);
         _toastContent.Children.Add(_toastText);
+        // Like the chips (:939): an actionable toast must claim the press,
+        // or _pill.CaptureMouse() routes the whole gesture to the pill and
+        // this MouseLeftButtonUp never fires — the click was silently inert.
+        // Actionless toasts stay draggable.
+        _toastContent.MouseLeftButtonDown += (_, e) =>
+        {
+            if (_toastAction is not null) e.Handled = true;
+        };
         _toastContent.MouseLeftButtonUp += (_, _) =>
         {
             if (_dragging || _toastAction is not { } action) return;
             _toastAction = null;
             _toastTimer.Stop();
-            SetState(RestState() == DockState.Dictation ? DockState.Dictation : DockState.Collapsed);
+            SetState(RestState()); // hovered stays expanded instead of slamming shut
             action();
         };
 
