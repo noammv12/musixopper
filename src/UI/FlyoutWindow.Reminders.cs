@@ -31,28 +31,28 @@ partial class FlyoutWindow
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
         panel.Children.Add(BackLink());
-        panel.Children.Add(Ui.Text("Reminders", 15, "TextPrimaryBrush", FontWeights.SemiBold));
-        var subtitle = Ui.Text("Type what to do (or paste the lead's link), pick a time — Palon pops it above the taskbar when it's time to call.", 11.5, "TextSecondaryBrush");
+        panel.Children.Add(Ui.Title("Reminders"));
+        var subtitle = Ui.Small("Type what to do (or paste the lead's link), pick a time — Palon pops it above the taskbar when it's time to call.");
         subtitle.TextWrapping = TextWrapping.Wrap;
-        subtitle.Margin = new Thickness(0, 6, 0, 0);
+        subtitle.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(subtitle);
 
-        var urlCaption = Ui.Text("Link (optional — CRM, WhatsApp, anything)", 10.5, "TextSecondaryBrush", FontWeights.SemiBold);
-        urlCaption.Margin = new Thickness(2, 12, 0, 0);
+        var urlCaption = Ui.Caption("Link (optional — CRM, WhatsApp, anything)");
+        urlCaption.Margin = new Thickness(2, Space.Section, 0, 0);
         panel.Children.Add(urlCaption);
         _reminderUrlBox = Ui.TextBox("");
-        _reminderUrlBox.Margin = new Thickness(0, 4, 0, 0);
+        _reminderUrlBox.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(_reminderUrlBox);
 
-        var labelCaption = Ui.Text("Label (what it's about)", 10.5, "TextSecondaryBrush", FontWeights.SemiBold);
-        labelCaption.Margin = new Thickness(2, 8, 0, 0);
+        var labelCaption = Ui.Caption("Label (what it's about)");
+        labelCaption.Margin = new Thickness(2, Space.Row, 0, 0);
         panel.Children.Add(labelCaption);
         _reminderLabelBox = Ui.TextBox("");
         _reminderLabelBox.MaxLength = 40;
-        _reminderLabelBox.Margin = new Thickness(0, 4, 0, 0);
+        _reminderLabelBox.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(_reminderLabelBox);
 
-        var chipRow = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
+        var chipRow = new WrapPanel { Margin = Ui.Top(Space.Row) };
         for (var i = 0; i < TimeChoices.Length; i++)
         {
             var index = i;
@@ -66,17 +66,17 @@ partial class FlyoutWindow
         _reminderCustomTimeBox = Ui.TextBox("18:30");
         _reminderCustomTimeBox.Width = 64;
         _reminderCustomTimeBox.HorizontalAlignment = HorizontalAlignment.Left;
-        _reminderCustomTimeBox.Margin = new Thickness(0, 8, 0, 0);
+        _reminderCustomTimeBox.Margin = Ui.Top(Space.Row);
         _reminderCustomTimeBox.Visibility = Visibility.Collapsed;
         panel.Children.Add(_reminderCustomTimeBox);
 
         var add = Ui.PrimaryButton("Set reminder");
-        add.Margin = new Thickness(0, 12, 0, 0);
+        add.Margin = Ui.Top(Space.Section);
         add.MouseLeftButtonUp += (_, _) => AddReminder();
         panel.Children.Add(add);
 
-        _reminderStatus = Ui.Text("", 10.5, "TextSecondaryBrush");
-        _reminderStatus.Margin = new Thickness(2, 6, 2, 0);
+        _reminderStatus = Ui.Small("");
+        _reminderStatus.Margin = new Thickness(2, Space.Tight, 2, 0);
         _reminderStatus.TextWrapping = TextWrapping.Wrap;
         panel.Children.Add(_reminderStatus);
 
@@ -93,7 +93,7 @@ partial class FlyoutWindow
         panel.Children.Add(scroll);
 
         var done = Ui.PrimaryButton("Done");
-        done.Margin = new Thickness(0, 12, 0, 0);
+        done.Margin = Ui.Top(Space.Section);
         done.MouseLeftButtonUp += (_, _) => ShowPanel(_mainPanel);
         panel.Children.Add(done);
 
@@ -111,16 +111,16 @@ partial class FlyoutWindow
         var label = new TextBlock
         {
             Text = text,
-            FontSize = 11,
+            FontSize = Font.Small,
             FontWeight = FontWeights.SemiBold,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
         };
         var chip = new Border
         {
-            CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(10, 4, 10, 5),
-            Margin = new Thickness(0, 0, 6, 6),
+            CornerRadius = new CornerRadius(Radius.Card),
+            Padding = Pad.Chip,
+            Margin = new Thickness(0, 0, Space.Row, Space.Row),
             Cursor = System.Windows.Input.Cursors.Hand,
             Child = label,
         };
@@ -204,32 +204,32 @@ partial class FlyoutWindow
 
         if (pending.Count == 0)
         {
-            var empty = Ui.Text("Nothing pending.", 11, "TextSecondaryBrush");
-            empty.Margin = new Thickness(2, 8, 0, 0);
+            var empty = Ui.Small("Nothing pending.");
+            empty.Margin = new Thickness(2, Space.Row, 0, 0);
             _reminderList.Children.Add(empty);
             return;
         }
 
         foreach (var reminder in pending)
         {
-            var row = new Grid { Margin = new Thickness(0, 8, 0, 0) };
+            var row = new Grid { Margin = Ui.Top(Space.Row) };
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            var label = Ui.Text(reminder.DisplayLabel, 12, "TextPrimaryBrush", FontWeights.SemiBold);
+            var label = Ui.Text(reminder.DisplayLabel, Font.Body, "TextPrimaryBrush", FontWeights.SemiBold);
             label.TextTrimming = TextTrimming.CharacterEllipsis;
             label.VerticalAlignment = VerticalAlignment.Center;
             row.Children.Add(label);
 
-            var due = Ui.Text(FormatDue(reminder.DueAtUtc), 11, "TextSecondaryBrush");
+            var due = Ui.Small(FormatDue(reminder.DueAtUtc));
             due.VerticalAlignment = VerticalAlignment.Center;
-            due.Margin = new Thickness(10, 0, 0, 0);
+            due.Margin = Ui.Left(Space.Row);
             Grid.SetColumn(due, 1);
             row.Children.Add(due);
 
-            var delete = Ui.Link("✕", 11);
-            delete.Margin = new Thickness(10, 0, 0, 0);
+            var delete = Ui.Link("✕", Font.Small);
+            delete.Margin = Ui.Left(Space.Row);
             delete.VerticalAlignment = VerticalAlignment.Center;
             delete.MouseLeftButtonUp += (_, _) =>
             {

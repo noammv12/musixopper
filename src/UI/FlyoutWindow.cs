@@ -99,7 +99,7 @@ sealed partial class FlyoutWindow : Window
         WindowStartupLocation = WindowStartupLocation.Manual;
         Left = -10000;
         Top = -10000;
-        FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI, sans-serif");
+        FontFamily = Font.Family;
 
         _statusOverrideTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
         _statusOverrideTimer.Tick += (_, _) =>
@@ -145,8 +145,8 @@ sealed partial class FlyoutWindow : Window
             IsHitTestVisible = false,
             Height = 90,
             VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Thickness(-15), // reach under _root's padding to its edge
-            CornerRadius = new CornerRadius(11, 11, 0, 0),
+            Margin = new Thickness(-Space.Block), // reach under _root's padding to its edge
+            CornerRadius = new CornerRadius(Radius.Panel - 1, Radius.Panel - 1, 0, 0), // inside the 1px stroke
         };
         sheen.SetResourceReference(Border.BackgroundProperty, "GlassSheenBrush");
         var glassHost = new Grid();
@@ -155,8 +155,8 @@ sealed partial class FlyoutWindow : Window
 
         _root = new Border
         {
-            CornerRadius = new CornerRadius(12),
-            Padding = new Thickness(16),
+            CornerRadius = new CornerRadius(Radius.Panel),
+            Padding = new Thickness(Space.Block),
             Margin = new Thickness(ShadowMargin),
             RenderTransform = new TransformGroup { Children = { _rootScale, _rootSlide } },
             RenderTransformOrigin = new Point(0.5, 1),
@@ -227,8 +227,8 @@ sealed partial class FlyoutWindow : Window
     /// screen now, and the Done button lives at the (scrolled) bottom.</summary>
     TextBlock BackLink()
     {
-        var back = Ui.Link("‹ Back", 10.5);
-        back.Margin = new Thickness(0, 0, 0, 8);
+        var back = Ui.Link("‹ Back", Font.Caption);
+        back.Margin = new Thickness(0, 0, 0, Space.Row);
         back.HorizontalAlignment = HorizontalAlignment.Left;
         back.MouseLeftButtonUp += (_, _) => ShowPanel(_mainPanel);
         return back;
@@ -256,27 +256,27 @@ sealed partial class FlyoutWindow : Window
         dotHost.Children.Add(_statusHalo);
         dotHost.Children.Add(_statusDot);
 
-        _statusText = Ui.Text("Listening for calls", 13.5, "TextPrimaryBrush", FontWeights.SemiBold);
+        _statusText = Ui.Lead("Listening for calls");
         _statusText.VerticalAlignment = VerticalAlignment.Center;
-        _statusText.Margin = new Thickness(8, 0, 0, 0);
+        _statusText.Margin = Ui.Left(Space.Row);
 
         var statusRow = new StackPanel { Orientation = Orientation.Horizontal };
         statusRow.Children.Add(dotHost);
         statusRow.Children.Add(_statusText);
         panel.Children.Add(statusRow);
 
-        _statsLine = Ui.Text("", 10.5, "TextSecondaryBrush");
-        _statsLine.Margin = new Thickness(20, 4, 0, 0); // aligns under the status text
+        _statsLine = Ui.Text("", Font.Caption, "TextSecondaryBrush");
+        _statsLine.Margin = new Thickness(Space.Edge, Space.Tight, 0, 0); // aligns under the status text
         _statsLine.Visibility = Visibility.Collapsed;
         panel.Children.Add(_statsLine);
 
-        panel.Children.Add(Ui.Divider(12, 12));
+        panel.Children.Add(Ui.Divider(Space.Section, Space.Section));
 
-        panel.Children.Add(Ui.Text("Detect calls by", 11, "TextSecondaryBrush"));
+        panel.Children.Add(Ui.Small("Detect calls by"));
 
         _segmented = new Segmented("Microphone", "Call events", (int)_engine.Mode)
         {
-            Margin = new Thickness(0, 8, 0, 0),
+            Margin = Ui.Top(Space.Row),
         };
         _segmented.SelectionChanged += index =>
         {
@@ -285,17 +285,17 @@ sealed partial class FlyoutWindow : Window
         };
         panel.Children.Add(_segmented);
 
-        _caption = Ui.Text("", 11, "TextSecondaryBrush");
+        _caption = Ui.Small("");
         _caption.TextWrapping = TextWrapping.Wrap;
-        _caption.Margin = new Thickness(2, 8, 2, 0);
+        _caption.Margin = new Thickness(2, Space.Row, 2, 0);
         panel.Children.Add(_caption);
 
-        _setupLink = Ui.Link("Set up Softphone.Pro…", 11);
-        _setupLink.Margin = new Thickness(2, 6, 2, 0);
+        _setupLink = Ui.Link("Set up Softphone.Pro…", Font.Small);
+        _setupLink.Margin = new Thickness(2, Space.Tight, 2, 0);
         _setupLink.MouseLeftButtonUp += (_, _) => ShowSoftphoneSetup();
         panel.Children.Add(_setupLink);
 
-        panel.Children.Add(Ui.Divider(12, 12));
+        panel.Children.Add(Ui.Divider(Space.Section, Space.Section));
 
         _switchEnabled = new PillSwitch(_engine.Enabled);
         _switchEnabled.Toggled += on => _engine.SetEnabled(on);
@@ -304,12 +304,12 @@ sealed partial class FlyoutWindow : Window
         _switchStartup = new PillSwitch(Settings.StartWithWindows);
         _switchStartup.Toggled += on => Settings.StartWithWindows = on;
         var startupRow = Ui.ToggleRow("Start with Windows", _switchStartup);
-        startupRow.Margin = new Thickness(0, 10, 0, 0);
+        startupRow.Margin = Ui.Top(Space.Row);
         panel.Children.Add(startupRow);
 
         // Six destinations read better as a tight two-column grid than a
         // scrolling list of links.
-        var linkGrid = new Grid { Margin = new Thickness(2, 12, 2, 0) };
+        var linkGrid = new Grid { Margin = new Thickness(2, Space.Section, 2, 0) };
         linkGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         linkGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         for (var r = 0; r < 3; r++)
@@ -317,8 +317,8 @@ sealed partial class FlyoutWindow : Window
 
         void AddLink(string text, int row, int column, Action onClick)
         {
-            var link = Ui.Link(text, 11);
-            link.Margin = new Thickness(0, row == 0 ? 0 : 10, 0, 0);
+            var link = Ui.Link(text, Font.Small);
+            link.Margin = new Thickness(0, row == 0 ? 0 : Space.Row, 0, 0);
             link.MouseLeftButtonUp += (_, _) => onClick();
             Grid.SetRow(link, row);
             Grid.SetColumn(link, column);
@@ -333,19 +333,19 @@ sealed partial class FlyoutWindow : Window
         AddLink("Stats…", 2, 1, ShowStats);
         panel.Children.Add(linkGrid);
 
-        _hotkeyCaption = Ui.Text("", 10, "TextSecondaryBrush");
+        _hotkeyCaption = Ui.Text("", Font.Caption, "TextSecondaryBrush");
         _hotkeyCaption.TextWrapping = TextWrapping.Wrap;
-        _hotkeyCaption.Margin = new Thickness(2, 10, 2, 0);
+        _hotkeyCaption.Margin = new Thickness(2, Space.Row, 2, 0);
         panel.Children.Add(_hotkeyCaption);
 
-        panel.Children.Add(Ui.Divider(12, 10));
+        panel.Children.Add(Ui.Divider(Space.Section, Space.Row));
 
         var footer = new Grid();
-        var appName = Ui.Text($"Palon {Program.Version}", 10.5, "TextSecondaryBrush");
+        var appName = Ui.Text($"Palon {Program.Version}", Font.Caption, "TextSecondaryBrush");
         appName.VerticalAlignment = VerticalAlignment.Center;
-        _updateLink = Ui.Link("", 10.5);
+        _updateLink = Ui.Link("", Font.Caption);
         _updateLink.VerticalAlignment = VerticalAlignment.Center;
-        _updateLink.Margin = new Thickness(8, 0, 0, 0);
+        _updateLink.Margin = Ui.Left(Space.Row);
         _updateLink.Visibility = Visibility.Collapsed;
         _updateLink.MouseLeftButtonUp += (_, _) =>
         {
@@ -363,7 +363,7 @@ sealed partial class FlyoutWindow : Window
         var footerLeft = new StackPanel { Orientation = Orientation.Horizontal };
         footerLeft.Children.Add(appName);
         footerLeft.Children.Add(_updateLink);
-        var quit = Ui.Text("Quit", 11, "TextSecondaryBrush");
+        var quit = Ui.Text("Quit", Font.Small, "TextSecondaryBrush");
         quit.Cursor = Cursors.Hand;
         quit.HorizontalAlignment = HorizontalAlignment.Right;
         quit.MouseEnter += (_, _) => quit.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
@@ -381,28 +381,28 @@ sealed partial class FlyoutWindow : Window
     {
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
-        panel.Children.Add(Ui.Text("Welcome to Palon", 15, "TextPrimaryBrush", FontWeights.SemiBold));
-        var subtitle = Ui.Text("Your music pauses when a call starts and comes back when it ends — and once you're set up, press Ctrl+Alt+P and just ask.", 11.5, "TextSecondaryBrush");
+        panel.Children.Add(Ui.Title("Welcome to Palon"));
+        var subtitle = Ui.Small("Your music pauses when a call starts and comes back when it ends — and once you're set up, press Ctrl+Alt+P and just ask.");
         subtitle.TextWrapping = TextWrapping.Wrap;
-        subtitle.Margin = new Thickness(0, 6, 0, 0);
+        subtitle.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(subtitle);
 
-        var question = Ui.Text("How should calls be detected?", 12, "TextPrimaryBrush", FontWeights.SemiBold);
-        question.Margin = new Thickness(0, 14, 0, 0);
+        var question = Ui.Text("How should calls be detected?", Font.Body, "TextPrimaryBrush", FontWeights.SemiBold);
+        question.Margin = Ui.Top(Space.Section);
         panel.Children.Add(question);
 
         _cardMic = Ui.OptionCard("Microphone", "Pauses whenever any app uses your mic. No setup.");
-        _cardMic.Margin = new Thickness(0, 10, 0, 0);
+        _cardMic.Margin = Ui.Top(Space.Row);
         _cardMic.MouseLeftButtonUp += (_, _) => SelectWelcomeCard(0);
         panel.Children.Add(_cardMic);
 
         _cardEvents = Ui.OptionCard("Softphone events", "Pauses only on answered calls. Best for outbound sales.");
-        _cardEvents.Margin = new Thickness(0, 8, 0, 0);
+        _cardEvents.Margin = Ui.Top(Space.Row);
         _cardEvents.MouseLeftButtonUp += (_, _) => SelectWelcomeCard(1);
         panel.Children.Add(_cardEvents);
 
         var cont = Ui.PrimaryButton("Continue");
-        cont.Margin = new Thickness(0, 14, 0, 0);
+        cont.Margin = Ui.Top(Space.Section);
         cont.MouseLeftButtonUp += (_, _) => FinishWelcome();
         panel.Children.Add(cont);
 
@@ -414,17 +414,17 @@ sealed partial class FlyoutWindow : Window
     {
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
-        panel.Children.Add(Ui.Text("Connect Softphone.Pro", 15, "TextPrimaryBrush", FontWeights.SemiBold));
+        panel.Children.Add(Ui.Title("Connect Softphone.Pro"));
 
-        _softphoneNotice = Ui.Text("", 11, "AmberBrush", FontWeights.SemiBold);
+        _softphoneNotice = Ui.Text("", Font.Small, "AmberBrush", FontWeights.SemiBold);
         _softphoneNotice.TextWrapping = TextWrapping.Wrap;
-        _softphoneNotice.Margin = new Thickness(0, 6, 0, 0);
+        _softphoneNotice.Margin = Ui.Top(Space.Tight);
         _softphoneNotice.Visibility = Visibility.Collapsed;
         panel.Children.Add(_softphoneNotice);
 
-        var body = Ui.Text("In Softphone.Pro, open Settings → Integration → Third-party systems and add three handlers:", 11.5, "TextSecondaryBrush");
+        var body = Ui.Small("In Softphone.Pro, open Settings → Integration → Third-party systems and add three handlers:");
         body.TextWrapping = TextWrapping.Wrap;
-        body.Margin = new Thickness(0, 6, 0, 0);
+        body.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(body);
 
         // Softphone.Pro launches the string as "path + arguments" without
@@ -440,35 +440,35 @@ sealed partial class FlyoutWindow : Window
             ("Incoming call answer", $"{exe} pause %NUMBER%"),
             ("Call end", $"{exe} resume"),
         };
-        double top = 12;
+        double top = Space.Section;
         foreach (var (caption, command) in rows)
         {
             var row = Ui.CommandRow(caption, command);
             row.Margin = new Thickness(0, top, 0, 0);
-            top = 8;
+            top = Space.Row;
             panel.Children.Add(row);
         }
         if (hasSpaces)
         {
-            var spaceHint = Ui.Text("If a handler doesn't fire, move Palon.exe to a folder without spaces (e.g. C:\\Tools) — some softphones don't handle quoted paths.", 10.5, "TextSecondaryBrush");
+            var spaceHint = Ui.Small("If a handler doesn't fire, move Palon.exe to a folder without spaces (e.g. C:\\Tools) — some softphones don't handle quoted paths.");
             spaceHint.TextWrapping = TextWrapping.Wrap;
-            spaceHint.Margin = new Thickness(0, 8, 0, 0);
+            spaceHint.Margin = Ui.Top(Space.Row);
             panel.Children.Add(spaceHint);
         }
 
-        var hint = Ui.Text("Tip: run “Palon test” in a terminal — your music pauses for 8 seconds, then resumes.", 11, "TextSecondaryBrush");
+        var hint = Ui.Small("Tip: run “Palon test” in a terminal — your music pauses for 8 seconds, then resumes.");
         hint.TextWrapping = TextWrapping.Wrap;
-        hint.Margin = new Thickness(0, 12, 0, 0);
+        hint.Margin = Ui.Top(Space.Section);
         panel.Children.Add(hint);
 
         var done = Ui.PrimaryButton("Done");
-        done.Margin = new Thickness(0, 14, 0, 0);
+        done.Margin = Ui.Top(Space.Section);
         done.MouseLeftButtonUp += (_, _) => ShowPanel(_mainPanel);
         panel.Children.Add(done);
 
-        var note = Ui.Text("You can change this anytime from this menu.", 10.5, "TextSecondaryBrush");
+        var note = Ui.Text("You can change this anytime from this menu.", Font.Caption, "TextSecondaryBrush");
         note.HorizontalAlignment = HorizontalAlignment.Center;
-        note.Margin = new Thickness(0, 8, 0, 0);
+        note.Margin = Ui.Top(Space.Row);
         panel.Children.Add(note);
 
         return panel;
@@ -479,10 +479,10 @@ sealed partial class FlyoutWindow : Window
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
         panel.Children.Add(BackLink());
-        panel.Children.Add(Ui.Text("Snippets", 15, "TextPrimaryBrush", FontWeights.SemiBold));
-        var subtitle = Ui.Text("Hover the dock above the taskbar and click a chip to paste it into the app you're working in. Right-click copies.", 11.5, "TextSecondaryBrush");
+        panel.Children.Add(Ui.Title("Snippets"));
+        var subtitle = Ui.Small("Hover the dock above the taskbar and click a chip to paste it into the app you're working in. Right-click copies.");
         subtitle.TextWrapping = TextWrapping.Wrap;
-        subtitle.Margin = new Thickness(0, 6, 0, 0);
+        subtitle.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(subtitle);
 
         var hotkeySwitch = new PillSwitch(Settings.SnippetHotkeys);
@@ -493,12 +493,12 @@ sealed partial class FlyoutWindow : Window
             RebuildSnippetList(); // show/hide the number badges
         };
         var hotkeyRow = Ui.ToggleRow("Paste with Ctrl+Alt+1–9", hotkeySwitch);
-        hotkeyRow.Margin = new Thickness(0, 10, 0, 0);
+        hotkeyRow.Margin = Ui.Top(Space.Row);
         panel.Children.Add(hotkeyRow);
 
-        var hotkeyHint = Ui.Text("Global shortcuts — if you type with AltGr, leave this off.", 10.5, "TextSecondaryBrush");
+        var hotkeyHint = Ui.Small("Global shortcuts — if you type with AltGr, leave this off.");
         hotkeyHint.TextWrapping = TextWrapping.Wrap;
-        hotkeyHint.Margin = new Thickness(0, 4, 0, 0);
+        hotkeyHint.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(hotkeyHint);
 
         _snippetList = new StackPanel();
@@ -512,8 +512,8 @@ sealed partial class FlyoutWindow : Window
         };
         panel.Children.Add(scroll);
 
-        _addSnippetLink = Ui.Link("+ Add snippet", 11.5);
-        _addSnippetLink.Margin = new Thickness(2, 10, 2, 0);
+        _addSnippetLink = Ui.Link("+ Add snippet", Font.Body);
+        _addSnippetLink.Margin = new Thickness(2, Space.Row, 2, 0);
         _addSnippetLink.MouseLeftButtonUp += (_, _) =>
         {
             if (_snippets.Count >= SnippetStore.MaxSnippets) return;
@@ -524,7 +524,7 @@ sealed partial class FlyoutWindow : Window
         panel.Children.Add(_addSnippetLink);
 
         var done = Ui.PrimaryButton("Done");
-        done.Margin = new Thickness(0, 12, 0, 0);
+        done.Margin = Ui.Top(Space.Section);
         done.MouseLeftButtonUp += (_, _) => ShowPanel(_mainPanel);
         panel.Children.Add(done);
 
@@ -552,15 +552,15 @@ sealed partial class FlyoutWindow : Window
 
         var titleText = snippet.Label.Length > 0 ? snippet.Label : "(untitled)";
         if (Settings.SnippetHotkeys && index < 9) titleText = $"{index + 1} · {titleText}";
-        var title = Ui.Text(titleText, 12, "TextPrimaryBrush", FontWeights.SemiBold);
+        var title = Ui.Lead(titleText);
         title.TextTrimming = TextTrimming.CharacterEllipsis;
         title.VerticalAlignment = VerticalAlignment.Center;
         header.Children.Add(title);
 
         TextBlock Link(string text, int column, Action onClick, bool enabled = true)
         {
-            var link = Ui.Text(text, 11, enabled ? "AccentBrush" : "TextSecondaryBrush", FontWeights.SemiBold);
-            link.Margin = new Thickness(10, 0, 0, 0);
+            var link = Ui.Text(text, Font.Small, enabled ? "AccentBrush" : "TextSecondaryBrush", FontWeights.SemiBold);
+            link.Margin = Ui.Left(Space.Row);
             link.VerticalAlignment = VerticalAlignment.Center;
             if (enabled)
             {
@@ -586,21 +586,20 @@ sealed partial class FlyoutWindow : Window
         {
             var labelBox = Ui.TextBox(snippet.Label);
             labelBox.MaxLength = SnippetStore.MaxLabelLength;
-            labelBox.Margin = new Thickness(0, 8, 0, 0);
+            labelBox.Margin = Ui.Top(Space.Row);
             stack.Children.Add(labelBox);
             var textBox = Ui.TextBox(snippet.Text, multiline: true);
             textBox.MaxLength = SnippetStore.MaxTextLength;
-            textBox.Margin = new Thickness(0, 6, 0, 0);
+            textBox.Margin = Ui.Top(Space.Tight);
             stack.Children.Add(textBox);
 
-            var buttons = new Grid { Margin = new Thickness(0, 8, 0, 0) };
+            var buttons = new Grid { Margin = Ui.Top(Space.Row) };
             buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            var delete = Ui.Text("Delete", 11, "TextSecondaryBrush", FontWeights.SemiBold);
-            delete.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x45, 0x3A));
+            var delete = Ui.Text("Delete", Font.Small, "DangerBrush", FontWeights.SemiBold);
             delete.Cursor = Cursors.Hand;
             delete.MouseLeftButtonUp += (_, _) =>
             {
@@ -610,9 +609,9 @@ sealed partial class FlyoutWindow : Window
             };
             buttons.Children.Add(delete);
 
-            var cancel = Ui.Text("Cancel", 11, "TextSecondaryBrush", FontWeights.SemiBold);
+            var cancel = Ui.Text("Cancel", Font.Small, "TextSecondaryBrush", FontWeights.SemiBold);
             cancel.Cursor = Cursors.Hand;
-            cancel.Margin = new Thickness(0, 0, 12, 0);
+            cancel.Margin = new Thickness(0, 0, Space.Section, 0);
             Grid.SetColumn(cancel, 2);
             cancel.MouseLeftButtonUp += (_, _) =>
             {
@@ -622,7 +621,7 @@ sealed partial class FlyoutWindow : Window
             };
             buttons.Children.Add(cancel);
 
-            var save = Ui.Text("Save", 11, "AccentBrush", FontWeights.SemiBold);
+            var save = Ui.Text("Save", Font.Small, "AccentBrush", FontWeights.SemiBold);
             save.Cursor = Cursors.Hand;
             Grid.SetColumn(save, 3);
             save.MouseLeftButtonUp += (_, _) =>
@@ -638,9 +637,9 @@ sealed partial class FlyoutWindow : Window
 
         var card = new Border
         {
-            CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(10, 8, 10, 8),
-            Margin = new Thickness(0, 8, 0, 0),
+            CornerRadius = new CornerRadius(Radius.Card),
+            Padding = Pad.Card,
+            Margin = Ui.Top(Space.Row),
             Child = stack,
         };
         card.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
@@ -751,7 +750,7 @@ sealed partial class FlyoutWindow : Window
         // glides to the incoming panel's height instead of snapping.
         var targetPanelHeight = MeasurePanelHeight(panel);
         var outgoing = current;
-        var fadeOut = Motion.Fade(0, 90);
+        var fadeOut = Motion.Fade(0, Motion.Exit);
         fadeOut.Completed += (_, _) =>
         {
             outgoing.Visibility = Visibility.Collapsed;
@@ -857,7 +856,7 @@ sealed partial class FlyoutWindow : Window
 
         if (shouldPulse)
         {
-            var grow = new DoubleAnimation(1, 2.1, TimeSpan.FromSeconds(1.2))
+            var grow = new DoubleAnimation(1, 2.1, TimeSpan.FromMilliseconds(Motion.PulseSlow))
             {
                 RepeatBehavior = RepeatBehavior.Forever,
                 EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
@@ -865,7 +864,7 @@ sealed partial class FlyoutWindow : Window
             _haloScale.BeginAnimation(ScaleTransform.ScaleXProperty, grow);
             _haloScale.BeginAnimation(ScaleTransform.ScaleYProperty, grow);
             _statusHalo.BeginAnimation(OpacityProperty,
-                new DoubleAnimation(0.55, 0, TimeSpan.FromSeconds(1.2)) { RepeatBehavior = RepeatBehavior.Forever });
+                new DoubleAnimation(0.55, 0, TimeSpan.FromMilliseconds(Motion.PulseSlow)) { RepeatBehavior = RepeatBehavior.Forever });
         }
         else
         {
@@ -921,19 +920,11 @@ sealed partial class FlyoutWindow : Window
         Dispatcher.InvokeAsync(() =>
         {
             PositionNearTray();
-            BeginAnimation(OpacityProperty,
-                new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180))
-                {
-                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
-                });
-            _rootSlide.BeginAnimation(TranslateTransform.YProperty,
-                new DoubleAnimation(8, 0, TimeSpan.FromMilliseconds(180))
-                {
-                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
-                });
+            BeginAnimation(OpacityProperty, Motion.FromTo(0, 1, Motion.Base));
+            _rootSlide.BeginAnimation(TranslateTransform.YProperty, Motion.FromTo(8, 0, Motion.Base));
             // The glass springs up as it fades in.
-            _rootScale.BeginAnimation(ScaleTransform.ScaleXProperty, Motion.FromTo(0.97, 1, 220, Motion.Overshoot));
-            _rootScale.BeginAnimation(ScaleTransform.ScaleYProperty, Motion.FromTo(0.97, 1, 220, Motion.Overshoot));
+            _rootScale.BeginAnimation(ScaleTransform.ScaleXProperty, Motion.FromTo(0.97, 1, Motion.Slow, Motion.Overshoot));
+            _rootScale.BeginAnimation(ScaleTransform.ScaleYProperty, Motion.FromTo(0.97, 1, Motion.Slow, Motion.Overshoot));
             Activate();
             UpdatePulse();
         }, DispatcherPriority.Loaded);
@@ -943,7 +934,7 @@ sealed partial class FlyoutWindow : Window
     {
         if (!IsVisible || _hiding) return;
         _hiding = true;
-        var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(120))
+        var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(Motion.Fast))
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn },
         };

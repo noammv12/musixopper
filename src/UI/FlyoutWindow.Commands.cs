@@ -1,7 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
 
 namespace Palon.UI;
 
@@ -19,10 +18,10 @@ partial class FlyoutWindow
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
         panel.Children.Add(BackLink());
-        panel.Children.Add(Ui.Text("Commands", 15, "TextPrimaryBrush", FontWeights.SemiBold));
-        var subtitle = Ui.Text("Your one-click launches — a link, an app, a folder. Once Ask Palon is set up, saying “open Salesforce” runs them too.", 11.5, "TextSecondaryBrush");
+        panel.Children.Add(Ui.Title("Commands"));
+        var subtitle = Ui.Small("Your one-click launches — a link, an app, a folder. Once Ask Palon is set up, saying “open Salesforce” runs them too.");
         subtitle.TextWrapping = TextWrapping.Wrap;
-        subtitle.Margin = new Thickness(0, 6, 0, 0);
+        subtitle.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(subtitle);
 
         _commandList = new StackPanel();
@@ -36,8 +35,8 @@ partial class FlyoutWindow
         };
         panel.Children.Add(scroll);
 
-        _addCommandLink = Ui.Link("+ Add command", 11.5);
-        _addCommandLink.Margin = new Thickness(2, 10, 2, 0);
+        _addCommandLink = Ui.Link("+ Add command", Font.Body);
+        _addCommandLink.Margin = new Thickness(2, Space.Row, 2, 0);
         _addCommandLink.MouseLeftButtonUp += (_, _) =>
         {
             if (_commands.Count >= CommandStore.MaxCommands) return;
@@ -48,7 +47,7 @@ partial class FlyoutWindow
         panel.Children.Add(_addCommandLink);
 
         var done = Ui.PrimaryButton("Done");
-        done.Margin = new Thickness(0, 12, 0, 0);
+        done.Margin = Ui.Top(Space.Section);
         done.MouseLeftButtonUp += (_, _) => ShowPanel(_mainPanel);
         panel.Children.Add(done);
 
@@ -60,9 +59,9 @@ partial class FlyoutWindow
         _commandList.Children.Clear();
         if (_commands.Count == 0)
         {
-            var empty = Ui.Text("Nothing yet. Add your go-to places — Salesforce, WhatsApp Web, your CRM — and open them in one click (or by asking).", 11, "TextSecondaryBrush");
+            var empty = Ui.Small("Nothing yet. Add your go-to places — Salesforce, WhatsApp Web, your CRM — and open them in one click (or by asking).");
             empty.TextWrapping = TextWrapping.Wrap;
-            empty.Margin = new Thickness(2, 8, 0, 0);
+            empty.Margin = new Thickness(2, Space.Row, 0, 0);
             _commandList.Children.Add(empty);
         }
         for (var i = 0; i < _commands.Count; i++)
@@ -81,15 +80,15 @@ partial class FlyoutWindow
         for (var c = 0; c < 4; c++)
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var title = Ui.Text(command.Label.Length > 0 ? command.Label : "(untitled)", 12, "TextPrimaryBrush", FontWeights.SemiBold);
+        var title = Ui.Lead(command.Label.Length > 0 ? command.Label : "(untitled)");
         title.TextTrimming = TextTrimming.CharacterEllipsis;
         title.VerticalAlignment = VerticalAlignment.Center;
         header.Children.Add(title);
 
         TextBlock Link(string text, int column, Action onClick, bool enabled = true)
         {
-            var link = Ui.Text(text, 11, enabled ? "AccentBrush" : "TextSecondaryBrush", FontWeights.SemiBold);
-            link.Margin = new Thickness(10, 0, 0, 0);
+            var link = Ui.Text(text, Font.Small, enabled ? "AccentBrush" : "TextSecondaryBrush", FontWeights.SemiBold);
+            link.Margin = Ui.Left(Space.Row);
             link.VerticalAlignment = VerticalAlignment.Center;
             if (enabled)
             {
@@ -117,30 +116,29 @@ partial class FlyoutWindow
 
         if (_editingCommand == index)
         {
-            var nameHint = Ui.Text("Name (what you'd say)", 10, "TextSecondaryBrush");
-            nameHint.Margin = new Thickness(0, 8, 0, 0);
+            var nameHint = Ui.Caption("Name (what you'd say)");
+            nameHint.Margin = Ui.Top(Space.Row);
             stack.Children.Add(nameHint);
             var labelBox = Ui.TextBox(command.Label);
             labelBox.MaxLength = CommandStore.MaxLabelLength;
-            labelBox.Margin = new Thickness(0, 4, 0, 0);
+            labelBox.Margin = Ui.Top(Space.Tight);
             stack.Children.Add(labelBox);
 
-            var targetHint = Ui.Text("Link, app path or folder", 10, "TextSecondaryBrush");
-            targetHint.Margin = new Thickness(0, 8, 0, 0);
+            var targetHint = Ui.Caption("Link, app path or folder");
+            targetHint.Margin = Ui.Top(Space.Row);
             stack.Children.Add(targetHint);
             var targetBox = Ui.TextBox(command.Target);
             targetBox.MaxLength = CommandStore.MaxTargetLength;
-            targetBox.Margin = new Thickness(0, 4, 0, 0);
+            targetBox.Margin = Ui.Top(Space.Tight);
             stack.Children.Add(targetBox);
 
-            var buttons = new Grid { Margin = new Thickness(0, 8, 0, 0) };
+            var buttons = new Grid { Margin = Ui.Top(Space.Row) };
             buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            var delete = Ui.Text("Delete", 11, "TextSecondaryBrush", FontWeights.SemiBold);
-            delete.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x45, 0x3A));
+            var delete = Ui.Text("Delete", Font.Small, "DangerBrush", FontWeights.SemiBold);
             delete.Cursor = Cursors.Hand;
             delete.MouseLeftButtonUp += (_, _) =>
             {
@@ -150,9 +148,9 @@ partial class FlyoutWindow
             };
             buttons.Children.Add(delete);
 
-            var cancel = Ui.Text("Cancel", 11, "TextSecondaryBrush", FontWeights.SemiBold);
+            var cancel = Ui.Text("Cancel", Font.Small, "TextSecondaryBrush", FontWeights.SemiBold);
             cancel.Cursor = Cursors.Hand;
-            cancel.Margin = new Thickness(0, 0, 12, 0);
+            cancel.Margin = new Thickness(0, 0, Space.Section, 0);
             Grid.SetColumn(cancel, 2);
             cancel.MouseLeftButtonUp += (_, _) =>
             {
@@ -162,7 +160,7 @@ partial class FlyoutWindow
             };
             buttons.Children.Add(cancel);
 
-            var save = Ui.Text("Save", 11, "AccentBrush", FontWeights.SemiBold);
+            var save = Ui.Text("Save", Font.Small, "AccentBrush", FontWeights.SemiBold);
             save.Cursor = Cursors.Hand;
             Grid.SetColumn(save, 3);
             save.MouseLeftButtonUp += (_, _) =>
@@ -178,9 +176,9 @@ partial class FlyoutWindow
 
         var card = new Border
         {
-            CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(10, 8, 10, 8),
-            Margin = new Thickness(0, 8, 0, 0),
+            CornerRadius = new CornerRadius(Radius.Card),
+            Padding = Pad.Card,
+            Margin = Ui.Top(Space.Row),
             Child = stack,
         };
         card.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");

@@ -19,17 +19,17 @@ partial class FlyoutWindow
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
         panel.Children.Add(BackLink());
-        panel.Children.Add(Ui.Text("Call stats", 15, "TextPrimaryBrush", FontWeights.SemiBold));
-        var subtitle = Ui.Text("Answered calls only; talk time is time on the line.", 11.5, "TextSecondaryBrush");
+        panel.Children.Add(Ui.Title("Call stats"));
+        var subtitle = Ui.Small("Answered calls only; talk time is time on the line.");
         subtitle.TextWrapping = TextWrapping.Wrap;
-        subtitle.Margin = new Thickness(0, 6, 0, 0);
+        subtitle.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(subtitle);
 
         _statsList = new StackPanel();
         panel.Children.Add(_statsList);
 
-        _recapLink = Ui.Link("✨ Recap my day", 11);
-        _recapLink.Margin = new Thickness(2, 14, 2, 0);
+        _recapLink = Ui.Link("✨ Recap my day", Font.Small);
+        _recapLink.Margin = new Thickness(2, Space.Section, 2, 0);
         _recapLink.MouseLeftButtonUp += async (_, _) => await RunRecapAsync();
         panel.Children.Add(_recapLink);
 
@@ -37,7 +37,7 @@ partial class FlyoutWindow
         panel.Children.Add(_recapHost);
 
         var done = Ui.PrimaryButton("Done");
-        done.Margin = new Thickness(0, 14, 0, 0);
+        done.Margin = Ui.Top(Space.Section);
         done.MouseLeftButtonUp += (_, _) => ShowPanel(_mainPanel);
         panel.Children.Add(done);
 
@@ -78,13 +78,13 @@ partial class FlyoutWindow
 
     void AddStatSection(string caption, List<CallRecord> calls)
     {
-        var cap = Ui.Text(caption, 10, "TextSecondaryBrush", FontWeights.SemiBold);
-        cap.Margin = new Thickness(0, 14, 0, 0);
+        var cap = Ui.Caption(caption);
+        cap.Margin = Ui.Top(Space.Section);
         _statsList.Children.Add(cap);
         if (calls.Count == 0)
         {
-            var empty = Ui.Text("No calls yet.", 11, "TextSecondaryBrush");
-            empty.Margin = new Thickness(0, 6, 0, 0);
+            var empty = Ui.Small("No calls yet.");
+            empty.Margin = Ui.Top(Space.Tight);
             _statsList.Children.Add(empty);
             return;
         }
@@ -96,11 +96,11 @@ partial class FlyoutWindow
 
     void AddStatRow(string label, string value)
     {
-        var row = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        var row = new Grid { Margin = Ui.Top(Space.Tight) };
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        row.Children.Add(Ui.Text(label, 11.5, "TextSecondaryBrush"));
-        var value_ = Ui.Text(value, 11.5, "TextPrimaryBrush", FontWeights.SemiBold);
+        row.Children.Add(Ui.Small(label));
+        var value_ = Ui.Text(value, Font.Body, "TextPrimaryBrush", FontWeights.SemiBold);
         Grid.SetColumn(value_, 1);
         row.Children.Add(value_);
         _statsList.Children.Add(row);
@@ -146,11 +146,11 @@ partial class FlyoutWindow
     {
         _recapHost.Children.Clear();
         var stack = new StackPanel();
-        var body = Ui.Text(text, 11, "TextPrimaryBrush");
+        var body = Ui.Small(text, "TextPrimaryBrush");
         body.TextWrapping = TextWrapping.Wrap;
         stack.Children.Add(body);
-        var copy = Ui.Link("Copy", 10.5);
-        copy.Margin = new Thickness(0, 6, 0, 0);
+        var copy = Ui.Link("Copy", Font.Caption);
+        copy.Margin = Ui.Top(Space.Tight);
         copy.MouseLeftButtonUp += (_, _) =>
         {
             if (SnippetPaster.TrySetClipboard(text)) Ui.Flash(copy, "Copied ✓", "Copy");
@@ -158,9 +158,9 @@ partial class FlyoutWindow
         stack.Children.Add(copy);
         var card = new Border
         {
-            CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(10, 8, 10, 8),
-            Margin = new Thickness(0, 8, 0, 0),
+            CornerRadius = new CornerRadius(Radius.Card),
+            Padding = Pad.Card,
+            Margin = Ui.Top(Space.Row),
             Child = stack,
         };
         card.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");

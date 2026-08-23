@@ -133,7 +133,7 @@ sealed class DockWindow : Window
         WindowStartupLocation = WindowStartupLocation.Manual;
         Left = -10000;
         Top = -10000;
-        FontFamily = new FontFamily("Segoe UI Variable Display, Segoe UI, sans-serif");
+        FontFamily = Font.Family;
 
         _collapsedDot = new Ellipse { Width = 6, Height = 6 };
         _collapsedDot.SetResourceReference(Shape.FillProperty, "StatusGoodBrush");
@@ -153,7 +153,7 @@ sealed class DockWindow : Window
 
         _statusDot = new Ellipse { Width = 8, Height = 8, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
         _statusDot.SetResourceReference(Shape.FillProperty, "StatusGoodBrush");
-        _statusText = new TextBlock { Text = "Listening for calls", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
+        _statusText = new TextBlock { Text = "Listening for calls", FontSize = Font.Body, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
         _statusText.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
 
         var divider = new Border { Width = 1, Height = 16, Margin = new Thickness(12, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center };
@@ -171,7 +171,9 @@ sealed class DockWindow : Window
         // -- toast content ----------------------------------------------------
         _toastIcon = new ShapePath { Width = 10, Height = 11, VerticalAlignment = VerticalAlignment.Center };
         _toastIcon.SetResourceReference(Shape.FillProperty, "TextPrimaryBrush");
-        _toastText = new TextBlock { FontSize = 12.5, FontWeight = FontWeights.Medium, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+        // Medium, not SemiBold: the sanctioned exception — on the compact pill
+        // Medium at Lead size reads better (see AUDIT.md).
+        _toastText = new TextBlock { FontSize = Font.Lead, FontWeight = FontWeights.Medium, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
         _toastText.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
         _toastContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 16, 0) };
         _toastContent.Children.Add(_toastIcon);
@@ -186,10 +188,10 @@ sealed class DockWindow : Window
         };
 
         // -- reminder content ---------------------------------------------
-        var phone = new TextBlock { Text = "📞", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+        var phone = new TextBlock { Text = "📞", FontSize = Font.Body, VerticalAlignment = VerticalAlignment.Center };
         _reminderLabel = new TextBlock
         {
-            FontSize = 12.5,
+            FontSize = Font.Lead,
             FontWeight = FontWeights.Medium,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(8, 0, 0, 0),
@@ -197,7 +199,7 @@ sealed class DockWindow : Window
             TextTrimming = TextTrimming.CharacterEllipsis,
         };
         _reminderLabel.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
-        _reminderCount = new TextBlock { FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
+        _reminderCount = new TextBlock { FontSize = Font.Small, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
         _reminderCount.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
 
         var openButton = ReminderButton("Open", primary: true);
@@ -223,13 +225,13 @@ sealed class DockWindow : Window
         _assistantGlyph = new TextBlock
         {
             Text = "💬",
-            FontSize = 12,
+            FontSize = Font.Body,
             VerticalAlignment = VerticalAlignment.Center,
             Visibility = Visibility.Collapsed,
         };
         _dictationText = new TextBlock
         {
-            FontSize = 12.5,
+            FontSize = Font.Lead,
             FontWeight = FontWeights.Medium,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(8, 0, 0, 0),
@@ -660,7 +662,7 @@ sealed class DockWindow : Window
         if (_state == DockState.Toast)
         {
             // Toast replacing a toast: resize the pill for the new text.
-            AnimatePillTo(MeasureWidth(_toastContent), ToastHeight, 150, Motion.Out);
+            AnimatePillTo(MeasureWidth(_toastContent), ToastHeight, Motion.Fast, Motion.Out);
             return;
         }
         SetState(DockState.Toast);
@@ -732,7 +734,7 @@ sealed class DockWindow : Window
     }
 
     void StartDictationPulse() => _dictationDot.BeginAnimation(OpacityProperty,
-        new DoubleAnimation(1, 0.35, TimeSpan.FromMilliseconds(700))
+        new DoubleAnimation(1, 0.35, TimeSpan.FromMilliseconds(Motion.PulseFast))
         {
             AutoReverse = true,
             RepeatBehavior = RepeatBehavior.Forever,
@@ -790,7 +792,7 @@ sealed class DockWindow : Window
         {
             _currentReminder = _reminderQueue.Dequeue();
             UpdateReminderContent();
-            AnimatePillTo(MeasureWidth(_reminderContent), ExpandedHeight, 150, Motion.Out);
+            AnimatePillTo(MeasureWidth(_reminderContent), ExpandedHeight, Motion.Fast, Motion.Out);
             return;
         }
         SetState(RestState());
@@ -803,7 +805,7 @@ sealed class DockWindow : Window
         _reminderLabel.Text = (current.Missed ? "Missed · " : "") + current.Reminder.DisplayLabel;
         _reminderCount.Text = _reminderQueue.Count > 0 ? $"+{_reminderQueue.Count}" : "";
         if (_state == DockState.Reminder)
-            AnimatePillTo(MeasureWidth(_reminderContent), ExpandedHeight, 150, Motion.Out);
+            AnimatePillTo(MeasureWidth(_reminderContent), ExpandedHeight, Motion.Fast, Motion.Out);
     }
 
     Border ReminderButton(string text, bool primary)
@@ -811,7 +813,7 @@ sealed class DockWindow : Window
         var label = new TextBlock
         {
             Text = text,
-            FontSize = 11.5,
+            FontSize = Font.Body,
             FontWeight = FontWeights.SemiBold,
             VerticalAlignment = VerticalAlignment.Center,
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -819,8 +821,8 @@ sealed class DockWindow : Window
         label.SetResourceReference(TextBlock.ForegroundProperty, primary ? "OnAccentBrush" : "TextPrimaryBrush");
         var button = new Border
         {
-            CornerRadius = new CornerRadius(11),
-            Padding = new Thickness(10, 4, 10, 5),
+            CornerRadius = new CornerRadius(Radius.Card),
+            Padding = Pad.Chip,
             Margin = new Thickness(6, 0, 0, 0),
             Cursor = Cursors.Hand,
             VerticalAlignment = VerticalAlignment.Center,
@@ -829,7 +831,7 @@ sealed class DockWindow : Window
         if (primary)
         {
             button.SetResourceReference(Border.BackgroundProperty, "AccentBrush");
-            button.MouseEnter += (_, _) => button.Opacity = 0.9;
+            button.MouseEnter += (_, _) => button.Opacity = Ui.HoverDim;
             button.MouseLeave += (_, _) => button.Opacity = 1.0;
         }
         else
@@ -884,7 +886,7 @@ sealed class DockWindow : Window
         more.MouseLeftButtonUp += (_, _) => OpenFlyoutRequested?.Invoke();
         _chipsPanel.Children.Add(more);
 
-        if (_state == DockState.Expanded) AnimatePillTo(MeasureExpandedWidth(), ExpandedHeight, 150, Motion.Out);
+        if (_state == DockState.Expanded) AnimatePillTo(MeasureExpandedWidth(), ExpandedHeight, Motion.Fast, Motion.Out);
     }
 
     Border MakeChip(Snippet snippet)
@@ -916,7 +918,7 @@ sealed class DockWindow : Window
         var label = new TextBlock
         {
             Text = text,
-            FontSize = 11.5,
+            FontSize = Font.Body,
             MaxWidth = 90, // five glyph chips now share the pill's width budget
             TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center,
@@ -925,8 +927,8 @@ sealed class DockWindow : Window
         label.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
         var chip = new Border
         {
-            CornerRadius = new CornerRadius(11),
-            Padding = new Thickness(10, 4, 10, 5),
+            CornerRadius = new CornerRadius(Radius.Card),
+            Padding = Pad.Chip,
             Margin = new Thickness(6, 0, 0, 0),
             Cursor = Cursors.Hand,
             VerticalAlignment = VerticalAlignment.Center,
@@ -944,7 +946,7 @@ sealed class DockWindow : Window
     {
         chip.MinWidth = chip.ActualWidth; // keep the pill from jumping while the text swaps
         label.Text = message;
-        var revert = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
+        var revert = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Motion.Revert) };
         revert.Tick += (_, _) =>
         {
             revert.Stop();

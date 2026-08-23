@@ -46,10 +46,10 @@ partial class FlyoutWindow
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
         panel.Children.Add(BackLink());
-        panel.Children.Add(Ui.Text("Notes & dictation", 15, "TextPrimaryBrush", FontWeights.SemiBold));
-        var subtitle = Ui.Text("Records your calls, types them up, and writes 3 bullets + a next step. Recording is off until you turn it on; audio is deleted right after transcription.", 11.5, "TextSecondaryBrush");
+        panel.Children.Add(Ui.Title("Notes & dictation"));
+        var subtitle = Ui.Small("Records your calls, types them up, and writes 3 bullets + a next step. Recording is off until you turn it on; audio is deleted right after transcription.");
         subtitle.TextWrapping = TextWrapping.Wrap;
-        subtitle.Margin = new Thickness(0, 6, 0, 0);
+        subtitle.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(subtitle);
 
         _notesSwitch = new PillSwitch(Settings.NotesEnabled);
@@ -65,27 +65,27 @@ partial class FlyoutWindow
             UpdateModelRow();
         };
         var toggleRow = Ui.ToggleRow("Take notes on my calls", _notesSwitch);
-        toggleRow.Margin = new Thickness(0, 12, 0, 0);
+        toggleRow.Margin = Ui.Top(Space.Section);
         panel.Children.Add(toggleRow);
 
         // The health line turns "notes stopped working" into a named cause.
-        _notesHealth = Ui.Text("", 10.5, "TextSecondaryBrush");
+        _notesHealth = Ui.Small("");
         _notesHealth.TextWrapping = TextWrapping.Wrap;
-        _notesHealth.Margin = new Thickness(0, 8, 0, 0);
+        _notesHealth.Margin = Ui.Top(Space.Row);
         panel.Children.Add(_notesHealth);
 
-        _notesHealthLink = Ui.Link("No recent calls seen — check the handlers point at Palon.exe →", 10.5);
+        _notesHealthLink = Ui.Link("No recent calls seen — check the handlers point at Palon.exe →", Font.Caption);
         _notesHealthLink.TextWrapping = TextWrapping.Wrap;
-        _notesHealthLink.Margin = new Thickness(0, 4, 0, 0);
+        _notesHealthLink.Margin = Ui.Top(Space.Tight);
         _notesHealthLink.Visibility = Visibility.Collapsed;
         _notesHealthLink.MouseLeftButtonUp += (_, _) => ShowSoftphoneSetup();
         panel.Children.Add(_notesHealthLink);
 
-        panel.Children.Add(Ui.Divider(12, 10));
+        panel.Children.Add(Ui.Divider(Space.Section, Space.Row));
 
         // The notes themselves come first — they're what this panel is for;
         // transcription/key plumbing lives below.
-        panel.Children.Add(Ui.Text("RECENT NOTES", 10, "TextSecondaryBrush", FontWeights.SemiBold));
+        panel.Children.Add(Ui.Caption("RECENT NOTES"));
         _notesList = new StackPanel();
         var scroll = new ScrollViewer
         {
@@ -96,8 +96,8 @@ partial class FlyoutWindow
         };
         panel.Children.Add(scroll);
 
-        var openFolder = Ui.Link("Open notes folder", 11);
-        openFolder.Margin = new Thickness(2, 10, 2, 0);
+        var openFolder = Ui.Link("Open notes folder", Font.Small);
+        openFolder.Margin = new Thickness(2, Space.Row, 2, 0);
         openFolder.MouseLeftButtonUp += (_, _) =>
         {
             try
@@ -112,16 +112,16 @@ partial class FlyoutWindow
         };
         panel.Children.Add(openFolder);
 
-        panel.Children.Add(Ui.Divider(12, 10));
+        panel.Children.Add(Ui.Divider(Space.Section, Space.Row));
 
-        panel.Children.Add(Ui.Text("FAST TRANSCRIPTION (GROQ)", 10, "TextSecondaryBrush", FontWeights.SemiBold));
-        var groqRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        panel.Children.Add(Ui.Caption("FAST TRANSCRIPTION (GROQ)"));
+        var groqRow = new Grid { Margin = Ui.Top(Space.Tight) };
         groqRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         groqRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _groqKeyBox = Ui.PasswordBox();
         groqRow.Children.Add(_groqKeyBox);
-        var saveGroq = Ui.Link("Save", 11);
-        saveGroq.Margin = new Thickness(10, 0, 0, 0);
+        var saveGroq = Ui.Link("Save", Font.Small);
+        saveGroq.Margin = Ui.Left(Space.Row);
         saveGroq.VerticalAlignment = VerticalAlignment.Center;
         saveGroq.MouseLeftButtonUp += (_, _) =>
         {
@@ -135,14 +135,14 @@ partial class FlyoutWindow
         groqRow.Children.Add(saveGroq);
         panel.Children.Add(groqRow);
 
-        var groqStatusRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        var groqStatusRow = new Grid { Margin = Ui.Top(Space.Tight) };
         groqStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         groqStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _groqKeyStatus = Ui.Text("", 10.5, "TextSecondaryBrush");
+        _groqKeyStatus = Ui.Small("");
         _groqKeyStatus.TextWrapping = TextWrapping.Wrap;
         groqStatusRow.Children.Add(_groqKeyStatus);
-        var removeGroq = Ui.Link("Remove", 10.5);
-        removeGroq.Margin = new Thickness(10, 0, 0, 0);
+        var removeGroq = Ui.Link("Remove", Font.Small);
+        removeGroq.Margin = Ui.Left(Space.Row);
         removeGroq.MouseLeftButtonUp += (_, _) =>
         {
             Settings.GroqKey = null;
@@ -153,32 +153,32 @@ partial class FlyoutWindow
         groqStatusRow.Children.Add(removeGroq);
         panel.Children.Add(groqStatusRow);
 
-        panel.Children.Add(Ui.Divider(12, 2));
+        panel.Children.Add(Ui.Divider(Space.Section, 2));
 
-        var backupCaption = Ui.Text("OFFLINE BACKUP (ON-DEVICE MODEL)", 10, "TextSecondaryBrush", FontWeights.SemiBold);
-        backupCaption.Margin = new Thickness(0, 8, 0, 0);
+        var backupCaption = Ui.Caption("OFFLINE BACKUP (ON-DEVICE MODEL)");
+        backupCaption.Margin = Ui.Top(Space.Row);
         panel.Children.Add(backupCaption);
 
-        _modelStatus = Ui.Text("", 11, "TextSecondaryBrush");
+        _modelStatus = Ui.Small("");
         _modelStatus.TextWrapping = TextWrapping.Wrap;
-        _modelStatus.Margin = new Thickness(0, 6, 0, 0);
+        _modelStatus.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(_modelStatus);
 
-        _modelProgressFill = new Border { CornerRadius = new CornerRadius(3), HorizontalAlignment = HorizontalAlignment.Left, Width = 0 };
+        _modelProgressFill = new Border { CornerRadius = new CornerRadius(Radius.Hairline), HorizontalAlignment = HorizontalAlignment.Left, Width = 0 };
         _modelProgressFill.SetResourceReference(Border.BackgroundProperty, "AccentBrush");
         _modelProgressTrack = new Border
         {
             Height = 6,
-            CornerRadius = new CornerRadius(3),
-            Margin = new Thickness(0, 6, 0, 0),
+            CornerRadius = new CornerRadius(Radius.Hairline),
+            Margin = Ui.Top(Space.Tight),
             Visibility = Visibility.Collapsed,
             Child = _modelProgressFill,
         };
         _modelProgressTrack.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
         panel.Children.Add(_modelProgressTrack);
 
-        _modelAction = Ui.Link("Download model", 11);
-        _modelAction.Margin = new Thickness(0, 6, 0, 0);
+        _modelAction = Ui.Link("Download model", Font.Small);
+        _modelAction.Margin = Ui.Top(Space.Tight);
         _modelAction.MouseLeftButtonUp += (_, _) =>
         {
             if (ModelStore.IsDownloading) ModelStore.CancelDownload();
@@ -187,17 +187,17 @@ partial class FlyoutWindow
         };
         panel.Children.Add(_modelAction);
 
-        panel.Children.Add(Ui.Divider(12, 10));
+        panel.Children.Add(Ui.Divider(Space.Section, Space.Row));
 
-        panel.Children.Add(Ui.Text("AI BRAIN (GEMINI / DEEPSEEK)", 10, "TextSecondaryBrush", FontWeights.SemiBold));
+        panel.Children.Add(Ui.Caption("AI BRAIN (GEMINI / DEEPSEEK)"));
 
-        var geminiRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        var geminiRow = new Grid { Margin = Ui.Top(Space.Tight) };
         geminiRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         geminiRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _geminiKeyBox = Ui.PasswordBox();
         geminiRow.Children.Add(_geminiKeyBox);
-        var saveGemini = Ui.Link("Save", 11);
-        saveGemini.Margin = new Thickness(10, 0, 0, 0);
+        var saveGemini = Ui.Link("Save", Font.Small);
+        saveGemini.Margin = Ui.Left(Space.Row);
         saveGemini.VerticalAlignment = VerticalAlignment.Center;
         saveGemini.MouseLeftButtonUp += (_, _) =>
         {
@@ -210,14 +210,14 @@ partial class FlyoutWindow
         geminiRow.Children.Add(saveGemini);
         panel.Children.Add(geminiRow);
 
-        var geminiStatusRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        var geminiStatusRow = new Grid { Margin = Ui.Top(Space.Tight) };
         geminiStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         geminiStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _geminiKeyStatus = Ui.Text("", 10.5, "TextSecondaryBrush");
+        _geminiKeyStatus = Ui.Small("");
         _geminiKeyStatus.TextWrapping = TextWrapping.Wrap;
         geminiStatusRow.Children.Add(_geminiKeyStatus);
-        var removeGemini = Ui.Link("Remove", 10.5);
-        removeGemini.Margin = new Thickness(10, 0, 0, 0);
+        var removeGemini = Ui.Link("Remove", Font.Small);
+        removeGemini.Margin = Ui.Left(Space.Row);
         removeGemini.MouseLeftButtonUp += (_, _) =>
         {
             Settings.GeminiKey = null;
@@ -227,16 +227,16 @@ partial class FlyoutWindow
         geminiStatusRow.Children.Add(removeGemini);
         panel.Children.Add(geminiStatusRow);
 
-        var deepSeekCaption = Ui.Text("DeepSeek (fallback)", 10, "TextSecondaryBrush");
-        deepSeekCaption.Margin = new Thickness(0, 10, 0, 0);
+        var deepSeekCaption = Ui.Caption("DeepSeek (fallback)");
+        deepSeekCaption.Margin = Ui.Top(Space.Row);
         panel.Children.Add(deepSeekCaption);
-        var keyRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        var keyRow = new Grid { Margin = Ui.Top(Space.Tight) };
         keyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         keyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _keyBox = Ui.PasswordBox();
         keyRow.Children.Add(_keyBox);
-        var saveKey = Ui.Link("Save", 11);
-        saveKey.Margin = new Thickness(10, 0, 0, 0);
+        var saveKey = Ui.Link("Save", Font.Small);
+        saveKey.Margin = Ui.Left(Space.Row);
         saveKey.VerticalAlignment = VerticalAlignment.Center;
         saveKey.MouseLeftButtonUp += (_, _) =>
         {
@@ -249,14 +249,14 @@ partial class FlyoutWindow
         keyRow.Children.Add(saveKey);
         panel.Children.Add(keyRow);
 
-        var keyStatusRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        var keyStatusRow = new Grid { Margin = Ui.Top(Space.Tight) };
         keyStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         keyStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _keyStatus = Ui.Text("", 10.5, "TextSecondaryBrush");
+        _keyStatus = Ui.Small("");
         _keyStatus.TextWrapping = TextWrapping.Wrap;
         keyStatusRow.Children.Add(_keyStatus);
-        var removeKey = Ui.Link("Remove", 10.5);
-        removeKey.Margin = new Thickness(10, 0, 0, 0);
+        var removeKey = Ui.Link("Remove", Font.Small);
+        removeKey.Margin = Ui.Left(Space.Row);
         removeKey.MouseLeftButtonUp += (_, _) =>
         {
             Settings.DeepSeekKey = null;
@@ -266,31 +266,31 @@ partial class FlyoutWindow
         keyStatusRow.Children.Add(removeKey);
         panel.Children.Add(keyStatusRow);
 
-        panel.Children.Add(Ui.Divider(12, 10));
+        panel.Children.Add(Ui.Divider(Space.Section, Space.Row));
 
-        panel.Children.Add(Ui.Text("CALL LANGUAGE", 10, "TextSecondaryBrush", FontWeights.SemiBold));
+        panel.Children.Add(Ui.Caption("CALL LANGUAGE"));
         var lang = new Segmented("Hebrew", "Auto detect", Settings.NotesLanguage == "auto" ? 1 : 0)
         {
-            Margin = new Thickness(0, 6, 0, 0),
+            Margin = Ui.Top(Space.Tight),
         };
         lang.SelectionChanged += index => Settings.NotesLanguage = index == 1 ? "auto" : "he";
         panel.Children.Add(lang);
 
-        panel.Children.Add(Ui.Divider(12, 10));
+        panel.Children.Add(Ui.Divider(Space.Section, Space.Row));
 
-        panel.Children.Add(Ui.Text("DICTATION", 10, "TextSecondaryBrush", FontWeights.SemiBold));
+        panel.Children.Add(Ui.Caption("DICTATION"));
 
-        var hotkeyRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        var hotkeyRow = new Grid { Margin = Ui.Top(Space.Tight) };
         hotkeyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         hotkeyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         hotkeyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        _hotkeyLabel = Ui.Text("", 11.5, "TextPrimaryBrush", FontWeights.SemiBold);
+        _hotkeyLabel = Ui.Text("", Font.Body, "TextPrimaryBrush", FontWeights.SemiBold);
         _hotkeyLabel.HorizontalAlignment = HorizontalAlignment.Center;
         _hotkeyBox = new Border
         {
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(10, 6, 10, 7),
+            CornerRadius = new CornerRadius(Radius.Control),
+            Padding = new Thickness(10, 6, 10, 6),
             Cursor = Cursors.Hand,
             Focusable = true,
             Child = _hotkeyLabel,
@@ -314,24 +314,24 @@ partial class FlyoutWindow
         _hotkeyBox.PreviewKeyDown += OnHotkeyCapture;
         hotkeyRow.Children.Add(_hotkeyBox);
 
-        var resetHotkey = Ui.Link("Reset", 10.5);
-        resetHotkey.Margin = new Thickness(10, 0, 0, 0);
+        var resetHotkey = Ui.Link("Reset", Font.Caption);
+        resetHotkey.Margin = Ui.Left(Space.Row);
         resetHotkey.VerticalAlignment = VerticalAlignment.Center;
         resetHotkey.MouseLeftButtonUp += (_, _) => SaveHotkey(Hotkey.Default);
         Grid.SetColumn(resetHotkey, 1);
         hotkeyRow.Children.Add(resetHotkey);
 
-        var offHotkey = Ui.Link("Turn off", 10.5);
-        offHotkey.Margin = new Thickness(10, 0, 0, 0);
+        var offHotkey = Ui.Link("Turn off", Font.Caption);
+        offHotkey.Margin = Ui.Left(Space.Row);
         offHotkey.VerticalAlignment = VerticalAlignment.Center;
         offHotkey.MouseLeftButtonUp += (_, _) => SaveHotkey(Hotkey.Off);
         Grid.SetColumn(offHotkey, 2);
         hotkeyRow.Children.Add(offHotkey);
         panel.Children.Add(hotkeyRow);
 
-        _hotkeyStatus = Ui.Text("Click the box, then press the combo you want for dictation.", 10.5, "TextSecondaryBrush");
+        _hotkeyStatus = Ui.Small("Click the box, then press the combo you want for dictation.");
         _hotkeyStatus.TextWrapping = TextWrapping.Wrap;
-        _hotkeyStatus.Margin = new Thickness(0, 6, 0, 0);
+        _hotkeyStatus.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(_hotkeyStatus);
 
         _polishSwitch = new PillSwitch(Settings.DictationPolish);
@@ -341,22 +341,22 @@ partial class FlyoutWindow
             UpdatePolishRows();
         };
         var polishRow = Ui.ToggleRow("Polish dictation with AI", _polishSwitch);
-        polishRow.Margin = new Thickness(0, 12, 0, 0);
+        polishRow.Margin = Ui.Top(Space.Section);
         panel.Children.Add(polishRow);
 
         var toneSwitch = new PillSwitch(Settings.DictationProfessional);
         toneSwitch.Toggled += on => Settings.DictationProfessional = on;
         _toneRow = Ui.ToggleRow("Professional tone", toneSwitch);
-        _toneRow.Margin = new Thickness(14, 8, 0, 0); // indented under the polish toggle
+        _toneRow.Margin = new Thickness(Space.Block, Space.Row, 0, 0); // indented under the polish toggle
         panel.Children.Add(_toneRow);
 
-        _polishHint = Ui.Text("", 10.5, "TextSecondaryBrush");
+        _polishHint = Ui.Small("");
         _polishHint.TextWrapping = TextWrapping.Wrap;
-        _polishHint.Margin = new Thickness(0, 6, 0, 0);
+        _polishHint.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(_polishHint);
 
         var done = Ui.PrimaryButton("Done");
-        done.Margin = new Thickness(0, 12, 0, 0);
+        done.Margin = Ui.Top(Space.Section);
         done.MouseLeftButtonUp += (_, _) => ShowPanel(_mainPanel);
         panel.Children.Add(done);
 
@@ -535,9 +535,9 @@ partial class FlyoutWindow
         var notes = NotesStore.Load().OrderByDescending(n => n.StartedUtc).Take(10).ToList();
         if (notes.Count == 0)
         {
-            var empty = Ui.Text("No notes yet — they'll appear here after your next call.", 11, "TextSecondaryBrush");
+            var empty = Ui.Small("No notes yet — they'll appear here after your next call.");
             empty.TextWrapping = TextWrapping.Wrap;
-            empty.Margin = new Thickness(2, 8, 0, 0);
+            empty.Margin = new Thickness(2, Space.Row, 0, 0);
             _notesList.Children.Add(empty);
             return;
         }
@@ -546,21 +546,20 @@ partial class FlyoutWindow
         {
             var stack = new StackPanel();
             var local = note.StartedUtc.ToLocalTime();
-            var header = Ui.Text(
+            var header = Ui.Caption(
                 $"{local:HH:mm} · {Math.Max(1, note.DurationSec / 60)} min" +
                 (note.Number is { } number ? $" · {number}" : "") +
-                (note.State == "transcript-only" ? " · no summary" : note.State == "recovered" ? " · recovered" : ""),
-                10.5, "TextSecondaryBrush", FontWeights.SemiBold);
+                (note.State == "transcript-only" ? " · no summary" : note.State == "recovered" ? " · recovered" : ""));
             stack.Children.Add(header);
 
             var body = note.Summary ?? note.Transcript;
-            var preview = Ui.Text(body.Length > 220 ? body[..220] + "…" : body, 11, "TextPrimaryBrush");
+            var preview = Ui.Small(body.Length > 220 ? body[..220] + "…" : body, "TextPrimaryBrush");
             preview.TextWrapping = TextWrapping.Wrap;
-            preview.Margin = new Thickness(0, 4, 0, 0);
+            preview.Margin = Ui.Top(Space.Tight);
             stack.Children.Add(preview);
 
-            var links = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
-            var copy = Ui.Link("Copy", 10.5);
+            var links = new StackPanel { Orientation = Orientation.Horizontal, Margin = Ui.Top(Space.Tight) };
+            var copy = Ui.Link("Copy", Font.Caption);
             copy.MouseLeftButtonUp += (_, _) =>
             {
                 if (SnippetPaster.TrySetClipboard(note.Summary ?? note.Transcript)) Ui.Flash(copy, "Copied ✓", "Copy");
@@ -570,8 +569,8 @@ partial class FlyoutWindow
             var followHost = new StackPanel();
             if (AiChat.HasKey)
             {
-                var follow = Ui.Link("✨ Follow-up", 10.5);
-                follow.Margin = new Thickness(14, 0, 0, 0);
+                var follow = Ui.Link("✨ Follow-up", Font.Caption);
+                follow.Margin = Ui.Left(Space.Section);
                 var busy = false;
                 follow.MouseLeftButtonUp += async (_, _) =>
                 {
@@ -597,9 +596,9 @@ partial class FlyoutWindow
 
             var card = new Border
             {
-                CornerRadius = new CornerRadius(10),
-                Padding = new Thickness(10, 8, 10, 8),
-                Margin = new Thickness(0, 8, 0, 0),
+                CornerRadius = new CornerRadius(Radius.Card),
+                Padding = Pad.Card,
+                Margin = Ui.Top(Space.Row),
                 Child = stack,
             };
             card.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
@@ -611,11 +610,11 @@ partial class FlyoutWindow
     {
         host.Children.Clear();
         var inner = new StackPanel();
-        var body = Ui.Text(text, 11, "TextPrimaryBrush");
+        var body = Ui.Small(text, "TextPrimaryBrush");
         body.TextWrapping = TextWrapping.Wrap;
         inner.Children.Add(body);
-        var links = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
-        var copy = Ui.Link("Copy", 10.5);
+        var links = new StackPanel { Orientation = Orientation.Horizontal, Margin = Ui.Top(Space.Tight) };
+        var copy = Ui.Link("Copy", Font.Caption);
         copy.MouseLeftButtonUp += (_, _) =>
         {
             if (SnippetPaster.TrySetClipboard(text)) Ui.Flash(copy, "Copied ✓", "Copy");
@@ -625,8 +624,8 @@ partial class FlyoutWindow
         // draft where it belongs.
         if (Phones.WaMeUrl(number, text) is { } waMe)
         {
-            var whatsApp = Ui.Link("Open in WhatsApp", 10.5);
-            whatsApp.Margin = new Thickness(14, 0, 0, 0);
+            var whatsApp = Ui.Link("Open in WhatsApp", Font.Caption);
+            whatsApp.Margin = Ui.Left(Space.Section);
             whatsApp.MouseLeftButtonUp += (_, _) =>
             {
                 try
@@ -643,9 +642,9 @@ partial class FlyoutWindow
         inner.Children.Add(links);
         var box = new Border
         {
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(8, 6, 8, 7),
-            Margin = new Thickness(0, 8, 0, 0),
+            CornerRadius = new CornerRadius(Radius.Control),
+            Padding = new Thickness(8, 6, 8, 6),
+            Margin = Ui.Top(Space.Row),
             BorderThickness = new Thickness(1),
             Child = inner,
         };

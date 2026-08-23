@@ -33,32 +33,32 @@ partial class FlyoutWindow
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
         panel.Children.Add(BackLink());
-        panel.Children.Add(Ui.Text("Ask Palon", 15, "TextPrimaryBrush", FontWeights.SemiBold));
-        var subtitle = Ui.Text("Press the hotkey (or the 💬 chip), ask out loud — Palon answers back, opens your commands, sets reminders, and digs through your call notes.", 11.5, "TextSecondaryBrush");
+        panel.Children.Add(Ui.Title("Ask Palon"));
+        var subtitle = Ui.Small("Press the hotkey (or the 💬 chip), ask out loud — Palon answers back, opens your commands, sets reminders, and digs through your call notes.");
         subtitle.TextWrapping = TextWrapping.Wrap;
-        subtitle.Margin = new Thickness(0, 6, 0, 0);
+        subtitle.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(subtitle);
 
-        _palonKeyHint = Ui.Text("Needs a Gemini or DeepSeek key — paste one under Notes & dictation.", 10.5, "AmberBrush", FontWeights.SemiBold);
+        _palonKeyHint = Ui.Caption("Needs a Gemini or DeepSeek key — paste one under Notes & dictation.", "AmberBrush");
         _palonKeyHint.TextWrapping = TextWrapping.Wrap;
-        _palonKeyHint.Margin = new Thickness(0, 8, 0, 0);
+        _palonKeyHint.Margin = Ui.Top(Space.Row);
         panel.Children.Add(_palonKeyHint);
 
-        panel.Children.Add(Ui.Divider(12, 10));
+        panel.Children.Add(Ui.Divider(Space.Section, Space.Row));
 
-        panel.Children.Add(Ui.Text("ASSISTANT HOTKEY", 10, "TextSecondaryBrush", FontWeights.SemiBold));
+        panel.Children.Add(Ui.Caption("ASSISTANT HOTKEY"));
 
-        var hotkeyRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        var hotkeyRow = new Grid { Margin = Ui.Top(Space.Tight) };
         hotkeyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         hotkeyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         hotkeyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        _asstHotkeyLabel = Ui.Text("", 11.5, "TextPrimaryBrush", FontWeights.SemiBold);
+        _asstHotkeyLabel = Ui.Text("", Font.Body, "TextPrimaryBrush", FontWeights.SemiBold);
         _asstHotkeyLabel.HorizontalAlignment = HorizontalAlignment.Center;
         _asstHotkeyBox = new Border
         {
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(10, 6, 10, 7),
+            CornerRadius = new CornerRadius(Radius.Control),
+            Padding = new Thickness(10, 6, 10, 6),
             Cursor = Cursors.Hand,
             Focusable = true,
             Child = _asstHotkeyLabel,
@@ -80,60 +80,60 @@ partial class FlyoutWindow
         _asstHotkeyBox.PreviewKeyDown += OnAssistantHotkeyCapture;
         hotkeyRow.Children.Add(_asstHotkeyBox);
 
-        var reset = Ui.Link("Reset", 10.5);
-        reset.Margin = new Thickness(10, 0, 0, 0);
+        var reset = Ui.Link("Reset", Font.Caption);
+        reset.Margin = Ui.Left(Space.Row);
         reset.VerticalAlignment = VerticalAlignment.Center;
         reset.MouseLeftButtonUp += (_, _) => SaveAssistantHotkey(Hotkey.AssistantDefault);
         Grid.SetColumn(reset, 1);
         hotkeyRow.Children.Add(reset);
 
-        var off = Ui.Link("Turn off", 10.5);
-        off.Margin = new Thickness(10, 0, 0, 0);
+        var off = Ui.Link("Turn off", Font.Caption);
+        off.Margin = Ui.Left(Space.Row);
         off.VerticalAlignment = VerticalAlignment.Center;
         off.MouseLeftButtonUp += (_, _) => SaveAssistantHotkey(Hotkey.Off);
         Grid.SetColumn(off, 2);
         hotkeyRow.Children.Add(off);
         panel.Children.Add(hotkeyRow);
 
-        _asstHotkeyStatus = Ui.Text("Click the box, then press the combo you want.", 10.5, "TextSecondaryBrush");
+        _asstHotkeyStatus = Ui.Small("Click the box, then press the combo you want.");
         _asstHotkeyStatus.TextWrapping = TextWrapping.Wrap;
-        _asstHotkeyStatus.Margin = new Thickness(0, 6, 0, 0);
+        _asstHotkeyStatus.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(_asstHotkeyStatus);
 
-        panel.Children.Add(Ui.Divider(12, 10));
+        panel.Children.Add(Ui.Divider(Space.Section, Space.Row));
 
-        panel.Children.Add(Ui.Text("LISTENING", 10, "TextSecondaryBrush", FontWeights.SemiBold));
+        panel.Children.Add(Ui.Caption("LISTENING"));
 
         var autoStopSwitch = new PillSwitch(Settings.AssistantAutoStop);
         autoStopSwitch.Toggled += on => Settings.AssistantAutoStop = on;
         var autoStopRow = Ui.ToggleRow("Stop when you go quiet", autoStopSwitch);
-        autoStopRow.Margin = new Thickness(0, 8, 0, 0);
+        autoStopRow.Margin = Ui.Top(Space.Row);
         panel.Children.Add(autoStopRow);
 
         var conversationSwitch = new PillSwitch(Settings.ConversationMode);
         conversationSwitch.Toggled += on => Settings.ConversationMode = on;
         var conversationRow = Ui.ToggleRow("Keep listening after answers", conversationSwitch);
-        conversationRow.Margin = new Thickness(0, 10, 0, 0);
+        conversationRow.Margin = Ui.Top(Space.Row);
         panel.Children.Add(conversationRow);
 
-        var conversationHint = Ui.Text("Palon reopens the mic briefly for a follow-up and it closes itself if you say nothing. Needs “stop when you go quiet” on.", 10.5, "TextSecondaryBrush");
+        var conversationHint = Ui.Small("Palon reopens the mic briefly for a follow-up and it closes itself if you say nothing. Needs “stop when you go quiet” on.");
         conversationHint.TextWrapping = TextWrapping.Wrap;
-        conversationHint.Margin = new Thickness(0, 6, 0, 0);
+        conversationHint.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(conversationHint);
 
-        panel.Children.Add(Ui.Divider(12, 10));
+        panel.Children.Add(Ui.Divider(Space.Section, Space.Row));
 
-        panel.Children.Add(Ui.Text("VOICE", 10, "TextSecondaryBrush", FontWeights.SemiBold));
+        panel.Children.Add(Ui.Caption("VOICE"));
 
         var voiceSwitch = new PillSwitch(Settings.VoiceEnabled);
         voiceSwitch.Toggled += on => Settings.VoiceEnabled = on;
         var voiceToggleRow = Ui.ToggleRow("Speak answers out loud", voiceSwitch);
-        voiceToggleRow.Margin = new Thickness(0, 8, 0, 0);
+        voiceToggleRow.Margin = Ui.Top(Space.Row);
         panel.Children.Add(voiceToggleRow);
 
         var voiceMode = new Segmented("Neural (online)", "Windows only", Settings.VoicePreference == "windows" ? 1 : 0)
         {
-            Margin = new Thickness(0, 10, 0, 0),
+            Margin = Ui.Top(Space.Row),
         };
         voiceMode.SelectionChanged += index =>
         {
@@ -142,27 +142,27 @@ partial class FlyoutWindow
         };
         panel.Children.Add(voiceMode);
 
-        var preview = Ui.Link("▶ Preview voice", 11);
-        preview.Margin = new Thickness(2, 8, 2, 0);
+        var preview = Ui.Link("▶ Preview voice", Font.Small);
+        preview.Margin = new Thickness(2, Space.Row, 2, 0);
         preview.MouseLeftButtonUp += (_, _) => _ = PreviewVoice?.Invoke();
         panel.Children.Add(preview);
 
-        _voiceStatus = Ui.Text("", 10.5, "TextSecondaryBrush");
+        _voiceStatus = Ui.Small("");
         _voiceStatus.TextWrapping = TextWrapping.Wrap;
-        _voiceStatus.Margin = new Thickness(0, 6, 0, 0);
+        _voiceStatus.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(_voiceStatus);
 
-        var elevenCaption = Ui.Text("ELEVENLABS (OPTIONAL PREMIUM VOICE)", 10, "TextSecondaryBrush", FontWeights.SemiBold);
-        elevenCaption.Margin = new Thickness(0, 12, 0, 0);
+        var elevenCaption = Ui.Caption("ELEVENLABS (OPTIONAL PREMIUM VOICE)");
+        elevenCaption.Margin = Ui.Top(Space.Section);
         panel.Children.Add(elevenCaption);
 
-        var elevenRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        var elevenRow = new Grid { Margin = Ui.Top(Space.Tight) };
         elevenRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         elevenRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _elevenKeyBox = Ui.PasswordBox();
         elevenRow.Children.Add(_elevenKeyBox);
-        var saveEleven = Ui.Link("Save", 11);
-        saveEleven.Margin = new Thickness(10, 0, 0, 0);
+        var saveEleven = Ui.Link("Save", Font.Small);
+        saveEleven.Margin = Ui.Left(Space.Row);
         saveEleven.VerticalAlignment = VerticalAlignment.Center;
         saveEleven.MouseLeftButtonUp += (_, _) =>
         {
@@ -175,14 +175,14 @@ partial class FlyoutWindow
         elevenRow.Children.Add(saveEleven);
         panel.Children.Add(elevenRow);
 
-        var elevenStatusRow = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+        var elevenStatusRow = new Grid { Margin = Ui.Top(Space.Tight) };
         elevenStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         elevenStatusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _elevenKeyStatus = Ui.Text("", 10.5, "TextSecondaryBrush");
+        _elevenKeyStatus = Ui.Small("");
         _elevenKeyStatus.TextWrapping = TextWrapping.Wrap;
         elevenStatusRow.Children.Add(_elevenKeyStatus);
-        var removeEleven = Ui.Link("Remove", 10.5);
-        removeEleven.Margin = new Thickness(10, 0, 0, 0);
+        var removeEleven = Ui.Link("Remove", Font.Small);
+        removeEleven.Margin = Ui.Left(Space.Row);
         removeEleven.MouseLeftButtonUp += (_, _) =>
         {
             Settings.ElevenLabsKey = null;
@@ -192,34 +192,34 @@ partial class FlyoutWindow
         elevenStatusRow.Children.Add(removeEleven);
         panel.Children.Add(elevenStatusRow);
 
-        var voiceIdHint = Ui.Text("Voice ID (optional — blank = Daniel)", 10, "TextSecondaryBrush");
-        voiceIdHint.Margin = new Thickness(0, 8, 0, 0);
+        var voiceIdHint = Ui.Caption("Voice ID (optional — blank = Daniel)");
+        voiceIdHint.Margin = Ui.Top(Space.Row);
         panel.Children.Add(voiceIdHint);
         var voiceIdBox = Ui.TextBox(Settings.ElevenLabsVoiceId);
-        voiceIdBox.Margin = new Thickness(0, 4, 0, 0);
+        voiceIdBox.Margin = Ui.Top(Space.Tight);
         // Committed per keystroke — the neighboring links are TextBlocks that
         // never take focus, so LostFocus would silently drop the value.
         voiceIdBox.TextChanged += (_, _) => Settings.ElevenLabsVoiceId = voiceIdBox.Text;
         panel.Children.Add(voiceIdBox);
 
-        panel.Children.Add(Ui.Divider(12, 10));
+        panel.Children.Add(Ui.Divider(Space.Section, Space.Row));
 
-        panel.Children.Add(Ui.Text("LAST ANSWER", 10, "TextSecondaryBrush", FontWeights.SemiBold));
+        panel.Children.Add(Ui.Caption("LAST ANSWER"));
 
-        _exchangeEmpty = Ui.Text("Ask something and it'll show up here.", 11, "TextSecondaryBrush");
-        _exchangeEmpty.Margin = new Thickness(2, 8, 0, 0);
+        _exchangeEmpty = Ui.Small("Ask something and it'll show up here.");
+        _exchangeEmpty.Margin = new Thickness(2, Space.Row, 0, 0);
         panel.Children.Add(_exchangeEmpty);
 
         var exchangeStack = new StackPanel();
-        _lastQuestion = Ui.Text("", 10.5, "TextSecondaryBrush", FontWeights.SemiBold);
+        _lastQuestion = Ui.Caption("");
         _lastQuestion.TextWrapping = TextWrapping.Wrap;
         exchangeStack.Children.Add(_lastQuestion);
-        _lastAnswer = Ui.Text("", 11, "TextPrimaryBrush");
+        _lastAnswer = Ui.Small("", "TextPrimaryBrush");
         _lastAnswer.TextWrapping = TextWrapping.Wrap;
-        _lastAnswer.Margin = new Thickness(0, 4, 0, 0);
+        _lastAnswer.Margin = Ui.Top(Space.Tight);
         exchangeStack.Children.Add(_lastAnswer);
-        _copyAnswerLink = Ui.Link("Copy", 10.5);
-        _copyAnswerLink.Margin = new Thickness(0, 6, 0, 0);
+        _copyAnswerLink = Ui.Link("Copy", Font.Caption);
+        _copyAnswerLink.Margin = Ui.Top(Space.Tight);
         _copyAnswerLink.MouseLeftButtonUp += (_, _) =>
         {
             if (SnippetPaster.TrySetClipboard(_lastAnswer.Text)) Ui.Flash(_copyAnswerLink, "Copied ✓", "Copy");
@@ -227,22 +227,22 @@ partial class FlyoutWindow
         exchangeStack.Children.Add(_copyAnswerLink);
         _exchangeCard = new Border
         {
-            CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(10, 8, 10, 8),
-            Margin = new Thickness(0, 8, 0, 0),
+            CornerRadius = new CornerRadius(Radius.Card),
+            Padding = Pad.Card,
+            Margin = Ui.Top(Space.Row),
             Visibility = Visibility.Collapsed,
             Child = exchangeStack,
         };
         _exchangeCard.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
         panel.Children.Add(_exchangeCard);
 
-        var commandsLink = Ui.Link("Manage commands…", 11);
-        commandsLink.Margin = new Thickness(2, 12, 2, 0);
+        var commandsLink = Ui.Link("Manage commands…", Font.Small);
+        commandsLink.Margin = new Thickness(2, Space.Section, 2, 0);
         commandsLink.MouseLeftButtonUp += (_, _) => ShowCommands();
         panel.Children.Add(commandsLink);
 
         var done = Ui.PrimaryButton("Done");
-        done.Margin = new Thickness(0, 12, 0, 0);
+        done.Margin = Ui.Top(Space.Section);
         done.MouseLeftButtonUp += (_, _) => ShowPanel(_mainPanel);
         panel.Children.Add(done);
 
