@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -208,6 +209,44 @@ static class Ui
     public static Thickness Left(double l) => new(l, 0, 0, 0);
     public static Thickness TopBottom(double t, double b) => new(0, t, 0, b);
 
+    // The stock Aero2 input template hard-codes Windows-blue hover/focus
+    // borders on its named child, discarding our BorderBrush — replacing the
+    // template (built in code, cached per target type) is the only way out.
+    // Rounded corners come along for free.
+    static readonly Dictionary<Type, ControlTemplate> InputTemplates = new();
+
+    static ControlTemplate InputTemplate(Type targetType)
+    {
+        if (InputTemplates.TryGetValue(targetType, out var cached)) return cached;
+
+        var border = new FrameworkElementFactory(typeof(Border), "border");
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(Radius.Control));
+        border.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
+        border.SetValue(Border.BorderBrushProperty, new TemplateBindingExtension(Control.BorderBrushProperty));
+        border.SetValue(Border.BorderThicknessProperty, new TemplateBindingExtension(Control.BorderThicknessProperty));
+
+        // PART_ContentHost must be a ScrollViewer (or Decorator) for the text
+        // editor to attach; the control's scrollbar settings are forwarded to
+        // it by TextBoxBase itself.
+        var host = new FrameworkElementFactory(typeof(ScrollViewer), "PART_ContentHost");
+        host.SetValue(FrameworkElement.MarginProperty, new TemplateBindingExtension(Control.PaddingProperty));
+        host.SetValue(UIElement.FocusableProperty, false);
+        border.AppendChild(host);
+
+        var template = new ControlTemplate(targetType) { VisualTree = border };
+        var hover = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+        hover.Setters.Add(new Setter(Border.BorderBrushProperty,
+            new DynamicResourceExtension("ControlFillHoverBrush"), "border"));
+        var focus = new Trigger { Property = UIElement.IsKeyboardFocusWithinProperty, Value = true };
+        focus.Setters.Add(new Setter(Border.BorderBrushProperty,
+            new DynamicResourceExtension("AccentBrush"), "border"));
+        template.Triggers.Add(hover);
+        template.Triggers.Add(focus); // after hover — a focused box stays accent under the cursor
+        template.Seal();
+        InputTemplates[targetType] = template;
+        return template;
+    }
+
     public static TextBox TextBox(string text, bool multiline = false)
     {
         var box = new TextBox
@@ -216,11 +255,13 @@ static class Ui
             FontSize = Font.Body,
             Padding = Pad.Input,
             BorderThickness = new Thickness(1),
+            Template = InputTemplate(typeof(TextBoxBase)),
         };
         box.SetResourceReference(Control.BackgroundProperty, "ControlFillBrush");
         box.SetResourceReference(Control.ForegroundProperty, "TextPrimaryBrush");
         box.SetResourceReference(Control.BorderBrushProperty, "DividerBrush");
         box.SetResourceReference(System.Windows.Controls.TextBox.CaretBrushProperty, "TextPrimaryBrush");
+        box.SetResourceReference(TextBoxBase.SelectionBrushProperty, "AccentBrush");
         if (multiline)
         {
             box.AcceptsReturn = true;
@@ -238,11 +279,13 @@ static class Ui
             FontSize = Font.Body,
             Padding = Pad.Input,
             BorderThickness = new Thickness(1),
+            Template = InputTemplate(typeof(PasswordBox)),
         };
         box.SetResourceReference(Control.BackgroundProperty, "ControlFillBrush");
         box.SetResourceReference(Control.ForegroundProperty, "TextPrimaryBrush");
         box.SetResourceReference(Control.BorderBrushProperty, "DividerBrush");
         box.SetResourceReference(System.Windows.Controls.PasswordBox.CaretBrushProperty, "TextPrimaryBrush");
+        box.SetResourceReference(System.Windows.Controls.PasswordBox.SelectionBrushProperty, "AccentBrush");
         return box;
     }
 
