@@ -135,12 +135,12 @@ sealed partial class FlyoutWindow : Window
         host.Children.Add(_statsPanel);
         host.Children.Add(_commandsPanel);
         host.Children.Add(_palonPanel);
-        var scrollHost = new ScrollViewer
+        var scrollHost = Ui.ThinScroll(new ScrollViewer
         {
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             Content = host,
-        };
+        });
 
         // Light hitting the top of the glass; over the content, never clickable,
         // capped so it doesn't wash the title text on tall panels.
@@ -499,14 +499,14 @@ sealed partial class FlyoutWindow : Window
         panel.Children.Add(hotkeyHint);
 
         _snippetList = new StackPanel();
-        var scroll = new ScrollViewer
+        var scroll = Ui.ThinScroll(new ScrollViewer
         {
             MaxHeight = 300,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             Content = _snippetList,
             Margin = new Thickness(0, 2, 0, 0),
-        };
+        });
         panel.Children.Add(scroll);
 
         _addSnippetLink = Ui.Link("+ Add snippet", Font.Body);

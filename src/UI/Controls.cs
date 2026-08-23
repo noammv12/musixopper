@@ -268,6 +268,7 @@ static class Ui
             box.TextWrapping = TextWrapping.Wrap;
             box.Height = 64;
             box.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+            box.Resources.Add(typeof(ScrollBar), ThinScrollBarStyle());
         }
         return box;
     }
@@ -287,6 +288,73 @@ static class Ui
         box.SetResourceReference(System.Windows.Controls.PasswordBox.CaretBrushProperty, "TextPrimaryBrush");
         box.SetResourceReference(System.Windows.Controls.PasswordBox.SelectionBrushProperty, "AccentBrush");
         return box;
+    }
+
+    // ---- thin scrollbars -------------------------------------------------
+    // The stock ~17px Windows scrollbar doesn't belong on the glass. This is
+    // an 8px overlay bar: a bare Track plus a rounded thumb, dark and quiet.
+    // Track exposes no content property, so the Thumb is attached in code
+    // when each bar loads (a FrameworkElementFactory can't parent it).
+    static Style? _thinScrollBarStyle;
+    static ControlTemplate? _thinThumbTemplate;
+
+    /// <summary>Swaps a ScrollViewer's bars for the thin overlay style. The
+    /// control stays a stock ScrollBar, so the flyout's drag exemption keeps
+    /// matching it by type.</summary>
+    public static ScrollViewer ThinScroll(ScrollViewer viewer)
+    {
+        viewer.Resources.Add(typeof(ScrollBar), ThinScrollBarStyle());
+        return viewer;
+    }
+
+    static Style ThinScrollBarStyle()
+    {
+        if (_thinScrollBarStyle is not null) return _thinScrollBarStyle;
+
+        static System.Windows.Data.Binding FromBar(string path) =>
+            new(path) { RelativeSource = System.Windows.Data.RelativeSource.TemplatedParent };
+
+        var track = new FrameworkElementFactory(typeof(Track), "PART_Track");
+        track.SetValue(Track.IsDirectionReversedProperty, true); // vertical bars only in this app
+        track.SetValue(FrameworkElement.MarginProperty, new Thickness(1, 2, 1, 2));
+        track.SetBinding(Track.MinimumProperty, FromBar(nameof(ScrollBar.Minimum)));
+        track.SetBinding(Track.MaximumProperty, FromBar(nameof(ScrollBar.Maximum)));
+        track.SetBinding(Track.ValueProperty, FromBar(nameof(ScrollBar.Value)));
+        track.SetBinding(Track.ViewportSizeProperty, FromBar(nameof(ScrollBar.ViewportSize)));
+        track.SetBinding(Track.OrientationProperty, FromBar(nameof(ScrollBar.Orientation)));
+
+        var template = new ControlTemplate(typeof(ScrollBar)) { VisualTree = track };
+        template.Seal();
+
+        var style = new Style(typeof(ScrollBar));
+        style.Setters.Add(new Setter(FrameworkElement.WidthProperty, 8.0));
+        style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
+        style.Setters.Add(new Setter(Control.TemplateProperty, template));
+        style.Setters.Add(new EventSetter(FrameworkElement.LoadedEvent, new RoutedEventHandler(OnThinScrollBarLoaded)));
+        style.Seal();
+        return _thinScrollBarStyle = style;
+    }
+
+    static void OnThinScrollBarLoaded(object sender, RoutedEventArgs e)
+    {
+        var bar = (ScrollBar)sender;
+        if (bar.Template?.FindName("PART_Track", bar) is not Track track || track.Thumb is not null) return;
+        track.Thumb = new Thumb
+        {
+            MinHeight = 24, // a graspable handle even on very long lists
+            Template = ThinThumbTemplate(),
+        };
+    }
+
+    static ControlTemplate ThinThumbTemplate()
+    {
+        if (_thinThumbTemplate is not null) return _thinThumbTemplate;
+        var body = new FrameworkElementFactory(typeof(Border));
+        body.SetValue(Border.CornerRadiusProperty, new CornerRadius(Radius.Hairline));
+        body.SetResourceReference(Border.BackgroundProperty, "ControlFillHoverBrush");
+        var template = new ControlTemplate(typeof(Thumb)) { VisualTree = body };
+        template.Seal();
+        return _thinThumbTemplate = template;
     }
 
     /// <summary>A silver text link that brightens to white on hover.</summary>

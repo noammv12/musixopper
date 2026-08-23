@@ -25,14 +25,14 @@ partial class FlyoutWindow
         panel.Children.Add(subtitle);
 
         _commandList = new StackPanel();
-        var scroll = new ScrollViewer
+        var scroll = Ui.ThinScroll(new ScrollViewer
         {
             MaxHeight = 300,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             Content = _commandList,
             Margin = new Thickness(0, 2, 0, 0),
-        };
+        });
         panel.Children.Add(scroll);
 
         _addCommandLink = Ui.Link("+ Add command", Font.Body);

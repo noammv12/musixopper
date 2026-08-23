@@ -83,13 +83,13 @@ partial class FlyoutWindow
         panel.Children.Add(Ui.Divider(12, 4));
 
         _reminderList = new StackPanel();
-        var scroll = new ScrollViewer
+        var scroll = Ui.ThinScroll(new ScrollViewer
         {
             MaxHeight = 200,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             Content = _reminderList,
-        };
+        });
         panel.Children.Add(scroll);
 
         var done = Ui.PrimaryButton("Done");
