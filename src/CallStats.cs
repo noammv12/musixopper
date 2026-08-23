@@ -1,12 +1,12 @@
 using System.IO;
 using System.Text.Json;
 
-namespace Bridget;
+namespace Palon;
 
 sealed record CallRecord(DateTime StartedUtc, int DurationSec, string? Number = null);
 
 /// <summary>
-/// Daily call stats: %LOCALAPPDATA%\Bridget\calls.json, same atomic store
+/// Daily call stats: %LOCALAPPDATA%\Palon\calls.json, same atomic store
 /// pattern as reminders. One record per finished call, kept for 90 days.
 /// </summary>
 static class CallStatsStore
@@ -20,7 +20,7 @@ static class CallStatsStore
     };
 
     static string Dir => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Bridget");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Palon");
     static string FilePath => Path.Combine(Dir, "calls.json");
 
     public static event Action? Changed;

@@ -6,7 +6,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 
-namespace Bridget.UI;
+namespace Palon.UI;
 
 /// <summary>iOS-style animated toggle switch.</summary>
 sealed class PillSwitch : Grid

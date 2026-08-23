@@ -1,6 +1,6 @@
 using System.Windows.Media.Animation;
 
-namespace Bridget.UI;
+namespace Palon.UI;
 
 /// <summary>
 /// The app's motion vocabulary: three durations, three curves. Everything

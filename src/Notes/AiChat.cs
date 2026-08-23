@@ -4,17 +4,23 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
-namespace Bridget.Notes;
+namespace Palon.Notes;
 
-/// <summary>Ask-Bridget outcome: Action is "open" (CommandId set), "open_url"
+/// <summary>Ask-Palon outcome: Action is "open" (CommandId set), "open_url"
 /// (Url set), or "answer" (Text set).</summary>
 sealed record AssistResult(string Action, string? CommandId, string? Text, string? Url = null);
 
+/// <summary>One function call the model asked for (OpenAI tools format).</summary>
+sealed record ToolCallRequest(string Id, string Name, string ArgumentsJson);
+
+/// <summary>One model turn: plain content, tool calls, or both.</summary>
+sealed record ChatTurn(string? Content, IReadOnlyList<ToolCallRequest> ToolCalls);
+
 /// <summary>
-/// Bridget's AI brain: an OpenAI-compatible chat client behind a provider
+/// Palon's AI brain: an OpenAI-compatible chat client behind a provider
 /// chain — Gemini first when its key exists (free tier, 1,500 calls/day),
 /// DeepSeek as the second. Call summaries, dictation polish, follow-up
-/// drafts and Ask-Bridget intent all route through here. Every failure
+/// drafts and Ask-Palon intent all route through here. Every failure
 /// returns null and records LastError — AI output is never worth losing
 /// the underlying text over.
 /// </summary>
@@ -80,15 +86,15 @@ static class AiChat
     }
 
     /// <summary>
-    /// Ask-Bridget intent: run a saved command, open a well-known URL, or
+    /// Ask-Palon intent: run a saved command, open a well-known URL, or
     /// answer. Null only when every provider failed; malformed model output
     /// degrades to treating plain-prose replies as the answer.
     /// </summary>
     public static async Task<AssistResult?> AssistAsync(
-        string question, IReadOnlyList<BridgetCommand> commands, CancellationToken ct)
+        string question, IReadOnlyList<PalonCommand> commands, CancellationToken ct)
     {
         var prompt = new StringBuilder(
-            "You are Bridget, a decisive personal assistant for a busy salesperson. The input is a " +
+            "You are Palon, a decisive personal assistant for a busy salesperson. The input is a " +
             "voice transcript. Decide ONE action and reply with PURE JSON only, no markdown fences:\n" +
             "1. {\"action\":\"open\",\"id\":\"<command id>\"} — the request matches one of the user's " +
             "saved commands (match generously across languages and phrasings: Hebrew " +
@@ -98,8 +104,8 @@ static class AiChat
             "WhatsApp Web…), or to search ('חפש X' / 'search for X' → " +
             "https://www.google.com/search?q=X, URL-encoded).\n" +
             "3. {\"action\":\"answer\",\"text\":\"...\"} — anything else: answer in the user's " +
-            "language, at most 2 short sentences unless they clearly asked for more, plain text, " +
-            "no emoji.\n" +
+            "language (Hebrew → male grammatical forms for yourself), at most 2 short sentences " +
+            "unless they clearly asked for more, plain text, no emoji.\n" +
             "HARD RULES: never ask a clarifying question, never reply with a generic 'how can I " +
             "help'. If asked to open something you can't resolve to a command or a URL, the answer " +
             "is one short sentence telling the user to add it under Commands. If the transcript is " +
@@ -196,28 +202,80 @@ static class AiChat
         Provider provider, string systemPrompt, string userContent,
         double temperature, int maxTokens, CancellationToken ct, bool rejectTruncated)
     {
+        var messages = new object[]
+        {
+            new { role = "system", content = systemPrompt },
+            new { role = "user", content = userContent },
+        };
+        var (turn, error) = await RequestChatAsync(
+            provider, BuildBody(provider, messages, temperature, maxTokens, tools: null), rejectTruncated, ct);
+        return string.IsNullOrWhiteSpace(turn?.Content) ? (null, error.Length > 0 ? error : "empty reply") : (turn!.Content!.Trim(), "");
+    }
+
+    // ---- tool calling -----------------------------------------------------
+
+    /// <summary>
+    /// One model turn of the agent loop: full message list (system, history,
+    /// tool results) + the tools spec, through the same provider chain.
+    /// Null when every provider failed (LastError says why) — the caller
+    /// falls back to the legacy single-shot intent.
+    /// </summary>
+    public static async Task<ChatTurn?> ToolChatAsync(
+        IReadOnlyList<object> messages, object[] tools, double temperature, int maxTokens, CancellationToken ct)
+    {
+        var errors = new List<string>(2);
+        foreach (var provider in Providers())
+        {
+            // rejectTruncated: half a tool call is unusable, half an answer
+            // would be displayed — and spoken — verbatim.
+            var (turn, error) = await RequestChatAsync(
+                provider, BuildBody(provider, messages, temperature, maxTokens, tools), rejectTruncated: true, ct);
+            if (turn is not null)
+            {
+                LastError = null;
+                return turn;
+            }
+            errors.Add($"{provider.Name}: {error}");
+            if (ct.IsCancellationRequested) break;
+        }
+        var reason = errors.Count > 0 ? string.Join(" → ", errors) : "no AI key";
+        LastError = reason;
+        if (errors.Count > 0) Log.Write($"AI tool chain failed: {reason}");
+        return null;
+    }
+
+    static Dictionary<string, object> BuildBody(
+        Provider provider, object messages, double temperature, int maxTokens, object[]? tools)
+    {
+        var body = new Dictionary<string, object>
+        {
+            ["model"] = provider.Model,
+            ["messages"] = messages,
+            ["temperature"] = temperature,
+            ["stream"] = false,
+            // Gemini Flash thinks by default and thinking tokens count
+            // against max_tokens — the caps sized for deepseek-chat
+            // would be eaten by reasoning and return empty replies.
+            ["max_tokens"] = provider.IsGemini ? Math.Max(maxTokens * 4, 2048) : maxTokens,
+        };
+        if (provider.IsGemini) body["reasoning_effort"] = "low";
+        if (tools is { Length: > 0 })
+        {
+            body["tools"] = tools;
+            body["tool_choice"] = "auto";
+        }
+        return body;
+    }
+
+    static async Task<(ChatTurn? Turn, string Error)> RequestChatAsync(
+        Provider provider, Dictionary<string, object> body, bool rejectTruncated, CancellationToken ct)
+    {
         for (var attempt = 0; attempt < 2; attempt++)
         {
             try
             {
                 using var request = new HttpRequestMessage(HttpMethod.Post, provider.Url);
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", provider.Key);
-                var body = new Dictionary<string, object>
-                {
-                    ["model"] = provider.Model,
-                    ["messages"] = new object[]
-                    {
-                        new { role = "system", content = systemPrompt },
-                        new { role = "user", content = userContent },
-                    },
-                    ["temperature"] = temperature,
-                    ["stream"] = false,
-                    // Gemini Flash thinks by default and thinking tokens count
-                    // against max_tokens — the caps sized for deepseek-chat
-                    // would be eaten by reasoning and return empty replies.
-                    ["max_tokens"] = provider.IsGemini ? Math.Max(maxTokens * 4, 2048) : maxTokens,
-                };
-                if (provider.IsGemini) body["reasoning_effort"] = "low";
                 request.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
 
                 using var response = await Http.SendAsync(request, ct);
@@ -238,8 +296,32 @@ static class AiChat
                     && choice.TryGetProperty("finish_reason", out var finish)
                     && finish.GetString() == "length")
                     return (null, "hit the token cap");
-                var content = choice.GetProperty("message").GetProperty("content").GetString();
-                return string.IsNullOrWhiteSpace(content) ? (null, "empty reply") : (content.Trim(), "");
+
+                var message = choice.GetProperty("message");
+                var content = message.TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.String
+                    ? c.GetString()
+                    : null;
+                var calls = new List<ToolCallRequest>();
+                if (message.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var call in toolCalls.EnumerateArray())
+                    {
+                        if (!call.TryGetProperty("function", out var function)
+                            || !function.TryGetProperty("name", out var nameEl)
+                            || nameEl.GetString() is not { Length: > 0 } name)
+                            continue;
+                        var argumentsJson =
+                            function.TryGetProperty("arguments", out var argsEl) && argsEl.ValueKind == JsonValueKind.String
+                                ? argsEl.GetString() ?? "{}"
+                                : "{}";
+                        var id = call.TryGetProperty("id", out var idEl) && idEl.GetString() is { Length: > 0 } rawId
+                            ? rawId
+                            : Guid.NewGuid().ToString("n");
+                        calls.Add(new ToolCallRequest(id, name, argumentsJson));
+                    }
+                }
+                if (calls.Count == 0 && string.IsNullOrWhiteSpace(content)) return (null, "empty reply");
+                return (new ChatTurn(content, calls), "");
             }
             catch (Exception ex) when (attempt == 0 && ex is not OperationCanceledException)
             {

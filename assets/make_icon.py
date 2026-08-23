@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Generates src/Assets/Bridget.ico — the app icon (exe, Explorer, alt-tab).
+"""Generates src/Assets/Palon.ico — the app icon (exe, Explorer, alt-tab).
 
 Rounded graphite square (the app's black→silver brand) with a bold
-round-capped silver-white "B" built from a stem and two equal right-side
-bowls, drawn at 1024px and downsampled. The tray icon is rendered at
+round-capped silver-white "P" built from a stem and one right-side
+bowl, drawn at 1024px and downsampled. The tray icon is rendered at
 runtime instead (it must adapt to the taskbar theme) with the same
 geometry — keep the two in sync.
 
@@ -32,10 +32,10 @@ def draw_base():
     ImageDraw.Draw(mask).rounded_rectangle([0, 0, S - 1, S - 1], radius=int(S * 0.22), fill=255)
     img.paste(grad, (0, 0), mask)
 
-    # "B" mark on a 16-unit design grid: stem at x=6.6 from y=3.3 to 12.7,
-    # two equal bowls r=2.35 centered (6.6, 5.65) and (6.6, 10.35); stroke
-    # 2.0u, round caps. Angles are GDI+ convention (0deg = +x, positive =
-    # clockwise with y-down) — the C# tray renderer uses the same numbers.
+    # "P" mark on a 16-unit design grid: stem at x=6.6 from y=3.3 to 12.7,
+    # one bowl r=2.6 centered (6.6, 5.9); stroke 2.0u, round caps. Angles
+    # are GDI+ convention (0deg = +x, positive = clockwise with y-down) —
+    # the C# tray renderer uses the same numbers.
     d = ImageDraw.Draw(img)
     u = S * 0.055
     ox = S * 0.5 - 8 * u
@@ -61,13 +61,12 @@ def draw_base():
             stamp(x0 + (x1 - x0) * f, y0 + (y1 - y0) * f)
 
     line(6.6, 3.3, 6.6, 12.7)          # stem
-    arc(6.6, 5.65, 2.35, -90, 180)     # top bowl (right half)
-    arc(6.6, 10.35, 2.35, -90, 180)    # bottom bowl (right half)
+    arc(6.6, 5.9, 2.6, -90, 180)       # bowl (right half)
     return img
 
 
 def main():
-    out = sys.argv[1] if len(sys.argv) > 1 else "src/Assets/Bridget.ico"
+    out = sys.argv[1] if len(sys.argv) > 1 else "src/Assets/Palon.ico"
     base = draw_base()
     sizes = [16, 24, 32, 48, 64, 128, 256]
     frames = [base.resize((s, s), Image.LANCZOS) for s in sizes]

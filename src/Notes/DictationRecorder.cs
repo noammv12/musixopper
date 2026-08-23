@@ -2,7 +2,7 @@ using System.IO;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
 
-namespace Bridget.Notes;
+namespace Palon.Notes;
 
 /// <summary>Microphone-only recorder for dictation (same pattern as CallRecorder).</summary>
 sealed class DictationRecorder : IDisposable

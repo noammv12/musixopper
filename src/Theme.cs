@@ -2,10 +2,10 @@ using Microsoft.Win32;
 using System.Windows;
 using System.Windows.Media;
 
-namespace Bridget;
+namespace Palon;
 
 /// <summary>
-/// Bridget's signature look: one black/silver palette, always — near-black
+/// Palon's signature look: one black/silver palette, always — near-black
 /// graphite surfaces with a machined silver hairline, silver chrome for
 /// interactive elements, and semantic status colors. All colors are
 /// consumed via SetResourceReference so a future palette swap stays a

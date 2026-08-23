@@ -1,8 +1,8 @@
 using System.IO;
 using System.Windows.Threading;
-using Bridget.Notes;
+using Palon.Notes;
 
-namespace Bridget;
+namespace Palon;
 
 /// <summary>
 /// Wispr-Flow-style dictation: toggle (hotkey or dock chip) → record the

@@ -7,10 +7,10 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using System.Windows.Threading;
-using Bridget.Interop;
+using Palon.Interop;
 using WinF = System.Windows.Forms;
 
-namespace Bridget.UI;
+namespace Palon.UI;
 
 /// <summary>
 /// The single window of the app: status, trigger mode, toggles — plus the
@@ -115,7 +115,7 @@ sealed partial class FlyoutWindow : Window
         _notesPanel = BuildNotesPanel();
         _statsPanel = BuildStatsPanel();
         _commandsPanel = BuildCommandsPanel();
-        _bridgetPanel = BuildBridgetPanel();
+        _palonPanel = BuildPalonPanel();
         // The outer scroll host is what keeps a clamped-height flyout usable:
         // when a panel is taller than the screen the content scrolls.
         var host = new Grid();
@@ -128,7 +128,7 @@ sealed partial class FlyoutWindow : Window
         host.Children.Add(_notesPanel);
         host.Children.Add(_statsPanel);
         host.Children.Add(_commandsPanel);
-        host.Children.Add(_bridgetPanel);
+        host.Children.Add(_palonPanel);
         var scrollHost = new ScrollViewer
         {
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -201,7 +201,7 @@ sealed partial class FlyoutWindow : Window
             ?? (Hotkey.LoadAssistant() is { IsOff: false } a ? a.ToString() : null,
                 Hotkey.LoadDictation() is { IsOff: false } d ? d.ToString() : null);
         var parts = new List<string>(2);
-        if (ask is not null) parts.Add($"{ask} — ask Bridget");
+        if (ask is not null) parts.Add($"{ask} — ask Palon");
         if (dictate is not null) parts.Add($"{dictate} — dictate");
         _hotkeyCaption.Text = string.Join("   ·   ", parts);
         _hotkeyCaption.Visibility = parts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -309,7 +309,7 @@ sealed partial class FlyoutWindow : Window
             linkGrid.Children.Add(link);
         }
 
-        AddLink("Ask Bridget…", 0, 0, ShowBridget);
+        AddLink("Ask Palon…", 0, 0, ShowPalon);
         AddLink("Commands…", 0, 1, ShowCommands);
         AddLink("Snippets…", 1, 0, ShowSnippets);
         AddLink("Reminders…", 1, 1, ShowReminders);
@@ -325,7 +325,7 @@ sealed partial class FlyoutWindow : Window
         panel.Children.Add(Ui.Divider(12, 10));
 
         var footer = new Grid();
-        var appName = Ui.Text($"Bridget {Program.Version}", 10.5, "TextSecondaryBrush");
+        var appName = Ui.Text($"Palon {Program.Version}", 10.5, "TextSecondaryBrush");
         appName.VerticalAlignment = VerticalAlignment.Center;
         var quit = Ui.Text("Quit", 11, "TextSecondaryBrush");
         quit.Cursor = Cursors.Hand;
@@ -345,8 +345,8 @@ sealed partial class FlyoutWindow : Window
     {
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
-        panel.Children.Add(Ui.Text("Welcome to Bridget", 15, "TextPrimaryBrush", FontWeights.SemiBold));
-        var subtitle = Ui.Text("Your music pauses when a call starts and comes back when it ends — and once you're set up, press Ctrl+Alt+B and just ask.", 11.5, "TextSecondaryBrush");
+        panel.Children.Add(Ui.Text("Welcome to Palon", 15, "TextPrimaryBrush", FontWeights.SemiBold));
+        var subtitle = Ui.Text("Your music pauses when a call starts and comes back when it ends — and once you're set up, press Ctrl+Alt+P and just ask.", 11.5, "TextSecondaryBrush");
         subtitle.TextWrapping = TextWrapping.Wrap;
         subtitle.Margin = new Thickness(0, 6, 0, 0);
         panel.Children.Add(subtitle);
@@ -393,7 +393,7 @@ sealed partial class FlyoutWindow : Window
 
         // Softphone.Pro launches the string as "path + arguments" without
         // shell-style quote stripping, so quote only when unavoidable.
-        var exe = Environment.ProcessPath ?? "Bridget.exe";
+        var exe = Environment.ProcessPath ?? "Palon.exe";
         var hasSpaces = exe.Contains(' ');
         if (hasSpaces) exe = $"\"{exe}\"";
         var rows = new (string Caption, string Command)[]
@@ -414,13 +414,13 @@ sealed partial class FlyoutWindow : Window
         }
         if (hasSpaces)
         {
-            var spaceHint = Ui.Text("If a handler doesn't fire, move Bridget.exe to a folder without spaces (e.g. C:\\Tools) — some softphones don't handle quoted paths.", 10.5, "TextSecondaryBrush");
+            var spaceHint = Ui.Text("If a handler doesn't fire, move Palon.exe to a folder without spaces (e.g. C:\\Tools) — some softphones don't handle quoted paths.", 10.5, "TextSecondaryBrush");
             spaceHint.TextWrapping = TextWrapping.Wrap;
             spaceHint.Margin = new Thickness(0, 8, 0, 0);
             panel.Children.Add(spaceHint);
         }
 
-        var hint = Ui.Text("Tip: run “Bridget test” in a terminal — your music pauses for 8 seconds, then resumes.", 11, "TextSecondaryBrush");
+        var hint = Ui.Text("Tip: run “Palon test” in a terminal — your music pauses for 8 seconds, then resumes.", 11, "TextSecondaryBrush");
         hint.TextWrapping = TextWrapping.Wrap;
         hint.Margin = new Thickness(0, 12, 0, 0);
         panel.Children.Add(hint);

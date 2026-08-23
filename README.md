@@ -1,13 +1,13 @@
-# Bridget ⚫
+# Palon.AI ⚫
 
-**Your personal sales assistant.** Bridget pauses your music when a call starts and brings it back after, writes your call notes, reminds you who to call back, types what you dictate into any app — and when you ask her something out loud, she answers back or opens whatever you asked for.
+**Your personal sales aide.** Palon pauses your music when a call starts and brings it back after, writes your call notes, reminds you who to call back, types what you dictate into any app — and when you ask him something out loud, he answers back in a composed British-butler register, or just does it: opens your CRM, sets the reminder, digs the answer out of your call notes.
 
 Built for people who live between calls: sales, support, recruiting. One black-and-silver dock pill above the taskbar; everything happens there.
 
 ## Install
 
-1. Download `Bridget.exe` from the artifacts of the latest [build](../../actions) (or the [latest release](../../releases)).
-2. Run it. A **B** appears in the tray, the dock pill appears above the taskbar, and a 30-second welcome walks you through setup.
+1. Download `Palon.exe` from the artifacts of the latest [build](../../actions) (or the [latest release](../../releases)).
+2. Run it. A **P** appears in the tray, the dock pill appears above the taskbar, and a 30-second welcome walks you through setup.
 3. In the flyout (left-click the tray icon), turn on **Start with Windows**.
 
 One self-contained exe — nothing to install. First launch takes a couple of seconds while Windows unpacks it.
@@ -21,26 +21,32 @@ Requires Windows 10 version 1903 or later (Windows 11 works).
 A small capsule floats just above the taskbar (drag it left/right — the spot is remembered):
 
 - **Resting**: a quiet sliver with a status dot — green (listening), amber (on a call).
-- **Hover**: expands into a pill with your status, snippet chips, and the 🎙 💬 ⏰ 📝 chips — dictate, ask Bridget, reminders, notes. **…** opens settings.
+- **Hover**: expands into a pill with your status, snippet chips, and the 🎙 💬 ⏰ 📝 chips — dictate, ask Palon, reminders, notes. **…** opens settings.
 - **Call events**: briefly shows "Paused for your call" / "Music resumed", then tucks away.
 - Auto-hides during presentations and fullscreen apps; never steals focus from what you're typing.
 
 The settings card (flyout) is draggable too — grab any empty spot on it. It never grows taller than your screen; long panels scroll.
 
-## Ask Bridget 💬
+## Ask Palon 💬
 
-Press **Ctrl+Alt+B** (or the 💬 chip), ask out loud, press again — Bridget either **answers back, out loud**, or **runs one of your commands**:
+Press **Ctrl+Alt+P** (or the 💬 chip), ask out loud, press again. Palon is a real agent now — he decides what the request needs, uses his tools, and either **answers out loud** or **does the thing**:
 
-- "מה שעון בניו יורק?" → she answers, in your language, briefly.
-- "תפתחי סיילספורס" → your Salesforce opens (see Commands below).
+- "מה שעון בניו יורק?" → he answers, in your language, briefly.
+- "תפתח סיילספורס" → your Salesforce opens (see Commands below).
+- "תזכיר לי לחזור לדני בשלוש" → a reminder appears at 15:00 — no link, no form.
+- "מה סיכמתי עם 050-1234567?" → he reads it out of your call notes.
+- "כמה שיחות עשיתי היום?" → your stats, spoken.
+- "עצור את המוזיקה" → the music pauses.
 
-She can also open **well-known sites with no setup at all** — "תפתחי יוטיוב" just opens YouTube, and "search for aircon suppliers" runs the Google search. Answers land as a clickable toast and in the *Ask Bridget* panel with a Copy button. The hotkey is configurable there, and **Speak answers out loud** can be turned off. Needs a Gemini or DeepSeek key (same as notes) and a Groq key or the offline voice model for hearing you. Every exchange (what she heard → what she decided) is logged, so a bad answer is diagnosable.
+He can also open **well-known sites with no setup at all** — "תפתח יוטיוב" just opens YouTube, and "search for aircon suppliers" runs the Google search. **Follow-ups work**: for a few minutes Palon remembers the exchange, so "ומה מחר?" continues the conversation. **Mid-call he knows who you're talking to** — when your softphone passes the caller's number, your last note about that caller is already in his head.
 
-**Voice:** Bridget speaks with **Hila** — Microsoft's natural female Hebrew neural voice (Aria for English), free, via the Edge speech service. It needs internet; offline she falls back to the Windows voice (male for Hebrew — Windows ships nothing better offline). Want the truly premium sound? Paste an **ElevenLabs** key in the VOICE section and she uses it first. A ▶ Preview button lets you hear the current voice, and "Windows only" mode keeps speech fully offline. Bridget deliberately stays silent while a call is being recorded — her voice would end up in your transcript.
+Answers land as a clickable toast and in the *Ask Palon* panel with a Copy button. The hotkey is configurable there, and **Speak answers out loud** can be turned off. Needs a Gemini or DeepSeek key (same as notes) and a Groq key or the offline voice model for hearing you. Every exchange (what he heard → which tools he used) is logged, so a bad answer is diagnosable.
+
+**Voice:** Palon speaks with **Avri** — Microsoft's natural male Hebrew neural voice (**Ryan**, a composed British male, for English), free, via the Edge speech service. It needs internet; offline he falls back to the Windows voice. Want the truly premium sound? Paste an **ElevenLabs** key in the VOICE section and he uses it first (default voice: their British "Daniel"). A ▶ Preview button lets you hear the current voice, and "Windows only" mode keeps speech fully offline. Palon deliberately stays silent while a call is being recorded — his voice would end up in your transcript.
 
 ## Commands
 
-Flyout → *Commands…*: name + target rows — a URL, an app path, a folder, anything Windows can open. Run them in one click, or just ask Bridget in your own words ("open WhatsApp", "תפתח את הסי-אר-אם"). Up to 20, stored locally in `commands.json`.
+Flyout → *Commands…*: name + target rows — a URL, an app path, a folder, anything Windows can open. Run them in one click, or just ask Palon in your own words ("open WhatsApp", "תפתח את הסי-אר-אם"). Up to 20, stored locally in `commands.json`.
 
 ## Music pausing — two trigger modes
 
@@ -49,30 +55,30 @@ Flyout → **Detect calls by**:
 - **Microphone** *(zero config)* — pauses when any app opens your mic, resumes ~2 s after it's released. Only ever resumes what it paused. Caveat: outbound dialing opens the mic, so ringing pauses music too.
 - **Call events** *(recommended for outbound)* — pauses **only when your softphone reports the call was answered**. In Softphone.Pro add three handlers under *Settings → Integration → Third-party systems* (SIP account: *All*, Action: *Launch a program*):
 
-  | Event                  | URL/Program                              |
-  |------------------------|------------------------------------------|
-  | `Outgoing call answer` | `C:\path\to\Bridget.exe pause %NUMBER%`  |
-  | `Incoming call answer` | `C:\path\to\Bridget.exe pause %NUMBER%`  |
-  | `Call end`             | `C:\path\to\Bridget.exe resume`          |
+  | Event                  | URL/Program                            |
+  |------------------------|----------------------------------------|
+  | `Outgoing call answer` | `C:\path\to\Palon.exe pause %NUMBER%`  |
+  | `Incoming call answer` | `C:\path\to\Palon.exe pause %NUMBER%`  |
+  | `Call end`             | `C:\path\to\Palon.exe resume`          |
 
-  The `%NUMBER%` part is optional — Softphone.Pro replaces it with the caller's number, which tags your call notes with who the call was with.
+  The `%NUMBER%` part is optional — Softphone.Pro replaces it with the caller's number, which tags your call notes with who the call was with (and is what lets Palon brief you mid-call).
 
-  **Don't quote the path** (move the exe to a space-free folder like `C:\Tools` if needed). Pick the "answer" events, not "ring". The app shows these commands with copy buttons. Test with the handler dialog's **Test** button or `Bridget.exe test`; received commands are logged to `%LOCALAPPDATA%\Bridget\log.txt`.
+  **Don't quote the path** (move the exe to a space-free folder like `C:\Tools` if needed). Pick the "answer" events, not "ring". The app shows these commands with copy buttons. Test with the handler dialog's **Test** button or `Palon.exe test`; received commands are logged to `%LOCALAPPDATA%\Palon\log.txt`.
 
 ## Call notes (opt-in)
 
 📝 chip (or flyout → *Notes & dictation…*) → **Take notes on my calls**. From then on:
 
-1. During a call, Bridget records your mic + the caller's audio.
-2. When you hang up, she transcribes the call. **With a Groq API key** (free at console.groq.com) transcription runs on Groq's whisper-large-v3-turbo — excellent Hebrew, done in seconds. **Without a key** it runs locally with the offline Whisper model (~466 MB one-time download). With both, Groq is first and local is the automatic fallback.
-3. With an AI key she writes **3 bullets + the next step**; without one you get the transcript only. Best free option: a **Gemini** key (aistudio.google.com — free Flash tier, ~1,500 calls/day); a **DeepSeek** key works as the paid fallback. If a summary fails, the toast names the reason instead of failing silently.
-4. The note pops up in the dock, lands at the top of the notes panel with a Copy button, and is appended to a daily Markdown file (`%LOCALAPPDATA%\Bridget\notes\`). With `%NUMBER%` handlers, notes are tagged with the caller's number.
+1. During a call, Palon records your mic + the caller's audio.
+2. When you hang up, he transcribes the call. **With a Groq API key** (free at console.groq.com) transcription runs on Groq's whisper-large-v3-turbo — excellent Hebrew, done in seconds. **Without a key** it runs locally with the offline Whisper model (~466 MB one-time download). With both, Groq is first and local is the automatic fallback.
+3. With an AI key he writes **3 bullets + the next step**; without one you get the transcript only. Best free option: a **Gemini** key (aistudio.google.com — free Flash tier, ~1,500 calls/day); a **DeepSeek** key works as the paid fallback. If a summary fails, the toast names the reason instead of failing silently.
+4. The note pops up in the dock, lands at the top of the notes panel with a Copy button, and is appended to a daily Markdown file (`%LOCALAPPDATA%\Palon\notes\`). With `%NUMBER%` handlers, notes are tagged with the caller's number.
 5. **✨ Follow-up** on each note card drafts a short WhatsApp-style follow-up message from the call, ready to copy.
-6. The panel's health line — "Last note … · Last call Bridget saw …" — turns "notes stopped working" into a named cause: if Bridget isn't seeing calls at all, your softphone handlers are pointing at the wrong exe, and the line links straight to the setup.
+6. The panel's health line — "Last note … · Last call Palon saw …" — turns "notes stopped working" into a named cause: if Palon isn't seeing calls at all, your softphone handlers are pointing at the wrong exe, and the line links straight to the setup.
 
-**Privacy:** recording is OFF by default. Audio is deleted right after processing — only text is kept, on your PC. Keys are stored encrypted (Windows DPAPI, bound to your Windows account). With a Groq key, call audio is uploaded to Groq for transcription; only text goes to your AI provider (Gemini/DeepSeek — note Gemini's free tier may use prompts to improve Google's products). **Recording calls may require consent where you are — check your local law and company policy before enabling.**
+**Privacy:** recording is OFF by default. Audio is deleted right after processing — only text is kept, on your PC. Keys are stored encrypted (Windows DPAPI, bound to your Windows account). With a Groq key, call audio is uploaded to Groq for transcription; only text goes to your AI provider (Gemini/DeepSeek — note Gemini's free tier may use prompts to improve Google's products). When you ask Palon something that needs your notes or stats, the matching snippets go to the AI provider as tool results — same consent as summaries. **Recording calls may require consent where you are — check your local law and company policy before enabling.**
 
-The log at `%LOCALAPPDATA%\Bridget\log.txt` narrates every step — if a note doesn't appear, the reason is in there.
+The log at `%LOCALAPPDATA%\Palon\log.txt` narrates every step — if a note doesn't appear, the reason is in there.
 
 ## Dictation
 
@@ -87,30 +93,34 @@ Your repeat texts as chips in the dock. **Click** pastes into the app you're wor
 
 ## Reminders
 
-⏰ chip: paste the lead's link, pick a time — `30m / 1h / 3h / Tomorrow 9:00 / Custom`. When due, the dock expands with **Open / 10m / ✕**. Missed reminders fire on next launch, marked "Missed".
+⏰ chip: type what to do — a link is optional now — and pick a time: `30m / 1h / 3h / Tomorrow 9:00 / Custom`. Or just tell Palon ("תזכיר לי לחזור לדני בשלוש"). When due, the dock expands with **Open / 10m / ✕** (text-only reminders show **Done** instead of Open). Missed reminders fire on next launch, marked "Missed".
 
 ## Call stats
 
-The flyout shows "Today: 14 calls · 1h 12m" under the status; **Stats…** opens today / last-7-days totals with average call length. Local only (`calls.json`, 90 days), never uploaded.
+The flyout shows "Today: 14 calls · 1h 12m" under the status; **Stats…** opens today / last-7-days totals with average call length — or ask Palon out loud. Local only (`calls.json`, 90 days), never uploaded.
 
 ## Network use
 
-Bridget talks to the network only when *you* opt in: the one-time voice-model download from `huggingface.co`, transcription requests to `api.groq.com` (Groq key), AI requests to `generativelanguage.googleapis.com` (Gemini key) and/or `api.deepseek.com` (DeepSeek key) — call summaries, follow-up drafts, dictation polish when enabled, and Ask-Bridget questions, and — for her speaking voice — the text of her replies goes to Microsoft's Edge speech service (or to `api.elevenlabs.io` with an ElevenLabs key). Switch the voice to "Windows only" and speech never leaves your PC. Nothing else, ever.
+Palon talks to the network only when *you* opt in: the one-time voice-model download from `huggingface.co`, transcription requests to `api.groq.com` (Groq key), AI requests to `generativelanguage.googleapis.com` (Gemini key) and/or `api.deepseek.com` (DeepSeek key) — call summaries, follow-up drafts, dictation polish when enabled, and Ask-Palon questions with their tool results — and, for his speaking voice, the text of his replies goes to Microsoft's Edge speech service (or to `api.elevenlabs.io` with an ElevenLabs key). Switch the voice to "Windows only" and speech never leaves your PC. Nothing else, ever.
 
-## Upgrading from Saley
+## Upgrading from Bridget (or Saley)
 
-**Quit the old Saley first** (tray icon → Quit) — Bridget warns you if it's still running. On first launch everything migrates automatically: settings, API keys, autostart, and your whole data folder (notes, snippets, reminders, stats, and the offline voice model). Then delete `Saley.exe` and re-point the three Softphone.Pro handlers to `Bridget.exe` — the app reminds you and shows the new commands.
+**Quit the old app first** (tray icon → Quit) — Palon warns you if it's still running. On first launch everything migrates automatically: settings, API keys, autostart, and your whole data folder (notes, snippets, reminders, stats, and the offline voice model). Then delete the old exe and re-point the three Softphone.Pro handlers to `Palon.exe` — the app reminds you and shows the new commands. (The Ask hotkey default moved to **Ctrl+Alt+P**; a custom combo you set before carries over.)
 
 ## Good to know
 
 - Only media on the same Windows PC can be controlled — not a phone or another device.
 - Turning "Pause music during calls" off mid-call deliberately does *not* resume the music into your call.
-- Troubleshooting transcription: if it fails to start, install the Microsoft VC++ 2022 x64 redistributable; check `%LOCALAPPDATA%\Bridget\log.txt`.
+- Troubleshooting transcription: if it fails to start, install the Microsoft VC++ 2022 x64 redistributable; check `%LOCALAPPDATA%\Palon\log.txt`.
 
 ## Building from source
 
 ```
-dotnet publish src/Bridget.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish
+dotnet publish src/Palon.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish
 ```
 
-Requires the .NET 8 SDK on Windows. CI does exactly this on every push and verifies the output stays a single exe (`.github/workflows/build.yml`); tagging `v*` attaches the exe to a GitHub release. The app icon is generated by `assets/make_icon.py`; the whisper.cpp natives ship embedded in the exe and extract to `%LOCALAPPDATA%\Bridget\whisper-runtime\` on first use.
+Requires the .NET 8 SDK on Windows (the project also compiles on Linux for CI-style checks — no XAML, so WPF is only a framework reference there). Tests live in `tests/Palon.Tests` (`dotnet test`, Windows). CI publishes on every push, runs the tests, and verifies the output stays a single exe (`.github/workflows/build.yml`); tagging `v*` attaches the exe to a GitHub release. The app icon is generated by `assets/make_icon.py`; the whisper.cpp natives ship embedded in the exe and extract to `%LOCALAPPDATA%\Palon\whisper-runtime\` on first use.
+
+### How Ask Palon works (v8 architecture)
+
+Ask Palon is a tool-calling agent, not an intent router. `src/Agent/` holds the pieces: each capability is one `AgentTool` (name + JSON-Schema parameters + code) registered in `ToolRegistry`; `AgentLoop` sends the persona, a short session memory, and live context (time, call state, the current caller's last note, today's stats) to the model with the tool specs, executes the calls it makes, and feeds results back until an answer emerges — terminal tools like "open" end the turn immediately, because the window opening is its own feedback. Gemini and DeepSeek both speak the OpenAI function-calling format; if the tool path fails, Palon degrades to the v7 single-shot JSON intent rather than to silence. Adding a capability = adding one tool class.

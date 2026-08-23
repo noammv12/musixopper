@@ -7,11 +7,11 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using System.Windows.Threading;
-using Bridget.Interop;
+using Palon.Interop;
 using ShapePath = System.Windows.Shapes.Path;
 using WinF = System.Windows.Forms;
 
-namespace Bridget.UI;
+namespace Palon.UI;
 
 enum DockState
 {
@@ -23,7 +23,7 @@ enum DockState
 }
 
 /// <summary>
-/// The Bridget dock: a small always-on-top capsule that lives just above the
+/// The Palon dock: a small always-on-top capsule that lives just above the
 /// taskbar. Collapsed it's a quiet sliver with a status dot; on hover it
 /// expands to show status and snippet chips (click = paste into the focused
 /// app); on call events it self-expands as a toast for two seconds.
@@ -46,8 +46,8 @@ sealed class DockWindow : Window
 
     static readonly Geometry PauseGlyph = Geometry.Parse("M0,0 H3.6 V11 H0 Z M6.4,0 H10 V11 H6.4 Z");
     static readonly Geometry PlayGlyph = Geometry.Parse("M0,0 L10,5.5 L0,11 Z");
-    // The Bridget B at 14 px — stem + two right bowls, same geometry as the app icon.
-    static readonly Geometry BMark = Geometry.Parse("M5.78,2.89 L5.78,11.11 M5.78,2.89 A2.06,2.06 0 0 1 5.78,7 A2.06,2.06 0 0 1 5.78,11.11");
+    // The Palon P at 14 px — stem + one right bowl, same geometry as the app icon.
+    static readonly Geometry PMark = Geometry.Parse("M5.78,2.89 L5.78,11.11 M5.78,2.89 A2.28,2.28 0 0 1 5.78,7.44");
 
     readonly Border _pill;
     readonly Border _glassSheen;
@@ -63,6 +63,7 @@ sealed class DockWindow : Window
     readonly StackPanel _reminderContent;
     readonly TextBlock _reminderLabel;
     readonly TextBlock _reminderCount;
+    TextBlock _reminderOpenLabel = null!;
     readonly StackPanel _dictationContent;
     readonly Ellipse _dictationDot;
     readonly TextBlock _assistantGlyph;
@@ -138,9 +139,9 @@ sealed class DockWindow : Window
         _collapsedDot.SetResourceReference(Shape.FillProperty, "StatusGoodBrush");
 
         // -- expanded content ------------------------------------------------
-        var bMark = new ShapePath
+        var pMark = new ShapePath
         {
-            Data = BMark,
+            Data = PMark,
             StrokeThickness = 1.75,
             StrokeStartLineCap = PenLineCap.Round,
             StrokeEndLineCap = PenLineCap.Round,
@@ -148,7 +149,7 @@ sealed class DockWindow : Window
             Height = 14,
             VerticalAlignment = VerticalAlignment.Center,
         };
-        bMark.SetResourceReference(Shape.StrokeProperty, "AccentBrush");
+        pMark.SetResourceReference(Shape.StrokeProperty, "AccentBrush");
 
         _statusDot = new Ellipse { Width = 8, Height = 8, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
         _statusDot.SetResourceReference(Shape.FillProperty, "StatusGoodBrush");
@@ -161,7 +162,7 @@ sealed class DockWindow : Window
         _chipsPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
 
         _expandedContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 12, 0) };
-        _expandedContent.Children.Add(bMark);
+        _expandedContent.Children.Add(pMark);
         _expandedContent.Children.Add(_statusDot);
         _expandedContent.Children.Add(_statusText);
         _expandedContent.Children.Add(divider);
@@ -200,6 +201,7 @@ sealed class DockWindow : Window
         _reminderCount.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
 
         var openButton = ReminderButton("Open", primary: true);
+        _reminderOpenLabel = (TextBlock)openButton.Child;
         openButton.Margin = new Thickness(12, 0, 0, 0);
         openButton.MouseLeftButtonUp += (_, _) => ActOnCurrentReminder(r => ReminderOpenRequested?.Invoke(r));
         var snoozeButton = ReminderButton("10m", primary: false);
@@ -357,7 +359,7 @@ sealed class DockWindow : Window
     }
 
     /// <summary>
-    /// (Re)binds the global Ask-Bridget hotkey from Settings. Returns false
+    /// (Re)binds the global Ask-Palon hotkey from Settings. Returns false
     /// when Windows refused the combo (already taken by another app).
     /// </summary>
     public bool ApplyAssistantHotkey()
@@ -484,11 +486,11 @@ sealed class DockWindow : Window
 
     void UpdateListeningText()
     {
-        // 💬 marks Bridget listening; the pulsing dot marks dictation.
+        // 💬 marks Palon listening; the pulsing dot marks dictation.
         _assistantGlyph.Visibility = _assistantActive ? Visibility.Visible : Visibility.Collapsed;
         _dictationDot.Visibility = _assistantActive ? Visibility.Collapsed : Visibility.Visible;
         _dictationText.Text =
-            _assistantActive ? "Bridget is listening — ask away"
+            _assistantActive ? "Palon is listening — ask away"
             : DictationHotkeyLive ? $"Listening — {_dictationHotkey} to finish"
             : "Listening — click Finish when done";
     }
@@ -703,7 +705,7 @@ sealed class DockWindow : Window
         SyncListeningState(active);
     }
 
-    /// <summary>Ask-Bridget listening shares the dictation pill (dot + Finish
+    /// <summary>Ask-Palon listening shares the dictation pill (dot + Finish
     /// + ✕) with its own text; the buttons route by which mode is active.</summary>
     public void SetAssistant(bool active)
     {
@@ -797,6 +799,7 @@ sealed class DockWindow : Window
     void UpdateReminderContent()
     {
         if (_currentReminder is not { } current) return;
+        _reminderOpenLabel.Text = current.Reminder.HasUrl ? "Open" : "Done";
         _reminderLabel.Text = (current.Missed ? "Missed · " : "") + current.Reminder.DisplayLabel;
         _reminderCount.Text = _reminderQueue.Count > 0 ? $"+{_reminderQueue.Count}" : "";
         if (_state == DockState.Reminder)
@@ -862,8 +865,8 @@ sealed class DockWindow : Window
 
         var ask = MakeChipShell("💬");
         ask.ToolTip = AssistantHotkeyLive
-            ? $"Ask Bridget ({_assistantHotkey}) — she answers back, or opens one of your commands"
-            : "Ask Bridget — she answers back, or opens one of your commands";
+            ? $"Ask Palon ({_assistantHotkey}) — he answers, opens things, sets reminders, searches your notes"
+            : "Ask Palon — he answers, opens things, sets reminders, searches your notes";
         ask.MouseLeftButtonUp += (_, _) => AssistantToggleRequested?.Invoke();
         _chipsPanel.Children.Add(ask);
 

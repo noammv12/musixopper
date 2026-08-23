@@ -2,7 +2,7 @@ using System.IO;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
 
-namespace Bridget.Notes;
+namespace Palon.Notes;
 
 sealed class RecordingSession
 {

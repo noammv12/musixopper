@@ -1,15 +1,15 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using Bridget.Notes;
+using Palon.Notes;
 
-namespace Bridget.UI;
+namespace Palon.UI;
 
-/// <summary>The flyout's Ask Bridget panel: hotkey, voice toggle, last answer.</summary>
+/// <summary>The flyout's Ask Palon panel: hotkey, voice toggle, last answer.</summary>
 partial class FlyoutWindow
 {
-    readonly StackPanel _bridgetPanel;
-    TextBlock _bridgetKeyHint = null!;
+    readonly StackPanel _palonPanel;
+    TextBlock _palonKeyHint = null!;
     Border _asstHotkeyBox = null!;
     TextBlock _asstHotkeyLabel = null!;
     TextBlock _asstHotkeyStatus = null!;
@@ -22,27 +22,27 @@ partial class FlyoutWindow
     Border _exchangeCard = null!;
     TextBlock _exchangeEmpty = null!;
 
-    /// <summary>Set by Shell: re-registers the dock's Ask-Bridget hotkey.</summary>
+    /// <summary>Set by Shell: re-registers the dock's Ask-Palon hotkey.</summary>
     public Func<bool>? ApplyAssistantHotkey { get; set; }
 
     /// <summary>Set by Shell: speaks a short sample line with the current voice.</summary>
     public Func<Task>? PreviewVoice { get; set; }
 
-    StackPanel BuildBridgetPanel()
+    StackPanel BuildPalonPanel()
     {
         var panel = new StackPanel { Visibility = Visibility.Collapsed };
 
         panel.Children.Add(BackLink());
-        panel.Children.Add(Ui.Text("Ask Bridget", 15, "TextPrimaryBrush", FontWeights.SemiBold));
-        var subtitle = Ui.Text("Press the hotkey (or the 💬 chip), ask out loud — Bridget answers back, or opens one of your commands.", 11.5, "TextSecondaryBrush");
+        panel.Children.Add(Ui.Text("Ask Palon", 15, "TextPrimaryBrush", FontWeights.SemiBold));
+        var subtitle = Ui.Text("Press the hotkey (or the 💬 chip), ask out loud — Palon answers back, opens your commands, sets reminders, and digs through your call notes.", 11.5, "TextSecondaryBrush");
         subtitle.TextWrapping = TextWrapping.Wrap;
         subtitle.Margin = new Thickness(0, 6, 0, 0);
         panel.Children.Add(subtitle);
 
-        _bridgetKeyHint = Ui.Text("Needs a Gemini or DeepSeek key — paste one under Notes & dictation.", 10.5, "AmberBrush", FontWeights.SemiBold);
-        _bridgetKeyHint.TextWrapping = TextWrapping.Wrap;
-        _bridgetKeyHint.Margin = new Thickness(0, 8, 0, 0);
-        panel.Children.Add(_bridgetKeyHint);
+        _palonKeyHint = Ui.Text("Needs a Gemini or DeepSeek key — paste one under Notes & dictation.", 10.5, "AmberBrush", FontWeights.SemiBold);
+        _palonKeyHint.TextWrapping = TextWrapping.Wrap;
+        _palonKeyHint.Margin = new Thickness(0, 8, 0, 0);
+        panel.Children.Add(_palonKeyHint);
 
         panel.Children.Add(Ui.Divider(12, 10));
 
@@ -171,7 +171,7 @@ partial class FlyoutWindow
         elevenStatusRow.Children.Add(removeEleven);
         panel.Children.Add(elevenStatusRow);
 
-        var voiceIdHint = Ui.Text("Voice ID (optional — blank = Rachel)", 10, "TextSecondaryBrush");
+        var voiceIdHint = Ui.Text("Voice ID (optional — blank = Daniel)", 10, "TextSecondaryBrush");
         voiceIdHint.Margin = new Thickness(0, 8, 0, 0);
         panel.Children.Add(voiceIdHint);
         var voiceIdBox = Ui.TextBox(Settings.ElevenLabsVoiceId);
@@ -234,14 +234,14 @@ partial class FlyoutWindow
     {
         if (Settings.VoicePreference == "windows")
         {
-            _voiceStatus.Text = "Offline Windows voice only — nothing leaves your PC for speech (no female Hebrew voice exists offline).";
+            _voiceStatus.Text = "Offline Windows voice only — nothing leaves your PC for speech.";
             _elevenKeyStatus.Text = Settings.ElevenLabsKey is null
                 ? "No key."
                 : "Key saved ✓ — unused while Windows-only is selected.";
             return;
         }
         _voiceStatus.Text = Settings.ElevenLabsKey is null
-            ? "Free neural voice — Hila (female) for Hebrew, Aria for English. Falls back to the Windows voice when offline."
+            ? "Free neural voice — Avri for Hebrew, Ryan (British) for English. Falls back to the Windows voice when offline."
             : "Premium ElevenLabs voice first, then the free neural voice, then offline.";
         _elevenKeyStatus.Text = Settings.ElevenLabsKey is null
             ? "No key — the free neural voice is used. elevenlabs.io for the premium tier."
@@ -320,17 +320,17 @@ partial class FlyoutWindow
         _exchangeCard.Visibility = Visibility.Visible;
     }
 
-    public void ShowBridget()
+    public void ShowPalon()
     {
         if (!CheckAccess())
         {
-            Dispatcher.InvokeAsync(ShowBridget);
+            Dispatcher.InvokeAsync(ShowPalon);
             return;
         }
-        _bridgetKeyHint.Visibility = AiChat.HasKey ? Visibility.Collapsed : Visibility.Visible;
+        _palonKeyHint.Visibility = AiChat.HasKey ? Visibility.Collapsed : Visibility.Visible;
         RefreshAssistantHotkeyRow();
         UpdateVoiceStatus();
         ShowFlyoutCore(onboarding: false, force: true);
-        ShowPanel(_bridgetPanel);
+        ShowPanel(_palonPanel);
     }
 }

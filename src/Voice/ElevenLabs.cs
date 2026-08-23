@@ -3,7 +3,7 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 
-namespace Bridget.Voice;
+namespace Palon.Voice;
 
 /// <summary>
 /// Optional premium voice: ElevenLabs TTS, activated by pasting an API key.
@@ -12,8 +12,9 @@ namespace Bridget.Voice;
 /// </summary>
 static class ElevenLabs
 {
-    /// <summary>"Rachel", ElevenLabs' well-known premade female voice.</summary>
-    public const string DefaultVoiceId = "21m00Tcm4TlvDq8ikWAM";
+    /// <summary>"Daniel", ElevenLabs' premade British male voice — the
+    /// closest premade match to Palon's composed-aide register.</summary>
+    public const string DefaultVoiceId = "onwK4e9ZLuTAKqWW03F9";
 
     static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
 

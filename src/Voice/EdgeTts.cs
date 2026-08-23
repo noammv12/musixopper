@@ -3,11 +3,12 @@ using System.Net.WebSockets;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace Bridget.Voice;
+namespace Palon.Voice;
 
 /// <summary>
-/// Microsoft's free Edge Read-Aloud neural TTS — the source of "Hila", the
-/// natural female Hebrew voice Windows itself doesn't ship. This is the
+/// Microsoft's free Edge Read-Aloud neural TTS — the source of "Avri", the
+/// natural male Hebrew voice Windows itself doesn't ship (English gets
+/// "Ryan", a composed British male — the aide register). This is the
 /// browser's own endpoint, not an official API: each connection is signed
 /// the way Edge signs it (Sec-MS-GEC), and the classic host is tried first
 /// with the newer one Microsoft is migrating to as backup. Any failure
@@ -28,8 +29,8 @@ static class EdgeTts
         "api.msedgeservices.com/tts/cognitiveservices/websocket/v1",
     };
 
-    public const string HebrewVoice = "he-IL-HilaNeural";
-    public const string DefaultVoice = "en-US-AriaNeural";
+    public const string HebrewVoice = "he-IL-AvriNeural";
+    public const string DefaultVoice = "en-GB-RyanNeural";
 
     /// <summary>MP3 bytes for the utterance, or null on any failure (logged).</summary>
     public static async Task<byte[]?> SynthesizeAsync(string text, string voice, CancellationToken ct)

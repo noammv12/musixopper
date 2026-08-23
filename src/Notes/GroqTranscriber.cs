@@ -4,7 +4,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using NAudio.Wave;
 
-namespace Bridget.Notes;
+namespace Palon.Notes;
 
 /// <summary>
 /// Cloud transcription via Groq's OpenAI-compatible Whisper endpoint —

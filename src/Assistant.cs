@@ -1,15 +1,19 @@
 using System.IO;
 using System.Windows.Threading;
-using Bridget.Notes;
-using Bridget.Voice;
+using Palon.Agent;
+using Palon.Notes;
+using Palon.Voice;
 
-namespace Bridget;
+namespace Palon;
 
 /// <summary>
-/// Ask Bridget, push-to-talk: toggle (hotkey or dock chip) → record the
-/// mic → transcribe (Groq first, local fallback) → DeepSeek decides —
-/// run one of the user's saved commands, or answer, spoken out loud
-/// (unless a call is being recorded or voice is off). Single-turn only.
+/// Ask Palon, push-to-talk: toggle (hotkey or dock chip) → record the
+/// mic → transcribe (Groq first, local fallback) → the agent loop decides —
+/// call tools (open things, set reminders, search notes, report stats,
+/// control music) and answer, spoken out loud (unless a call is being
+/// recorded or voice is off). A short session memory makes follow-up
+/// questions work; the v7 single-shot JSON intent stays as the fallback
+/// when the tool-calling path is unavailable.
 /// </summary>
 sealed class Assistant : IDisposable
 {
@@ -19,6 +23,7 @@ sealed class Assistant : IDisposable
     readonly DictationRecorder _recorder = new();
     readonly Speaker _speaker = new();
     readonly Func<CallState> _callState;
+    readonly AssistantSession _session;
     readonly DispatcherTimer _cap;
     bool _busy;
 
@@ -30,9 +35,10 @@ sealed class Assistant : IDisposable
     public event Action<string>? ToastRequested;
     public event Action<string, string>? Answered; // question, answer
 
-    public Assistant(Func<CallState> callState)
+    public Assistant(Func<CallState> callState, Func<string?> currentNumber)
     {
         _callState = callState;
+        _session = new AssistantSession(callState, currentNumber);
         _cap = new DispatcherTimer { Interval = MaxLength };
         _cap.Tick += (_, _) =>
         {
@@ -45,7 +51,7 @@ sealed class Assistant : IDisposable
 
     public void Toggle()
     {
-        // Barge-in: the hotkey mid-utterance cuts Bridget off and listens.
+        // Barge-in: the hotkey mid-utterance cuts Palon off and listens.
         if (_speaker.IsSpeaking) _speaker.Stop();
         if (_busy) return;
         if (IsListening) _ = StopAndActAsync();
@@ -57,10 +63,10 @@ sealed class Assistant : IDisposable
     {
         if (_callState() == CallState.OnCall)
         {
-            ToastRequested?.Invoke("Preview after the call — Bridget stays quiet while recording");
+            ToastRequested?.Invoke("Preview after the call — Palon stays quiet while recording");
             return Task.CompletedTask;
         }
-        return _speaker.SpeakAsync("שלום, אני ברידג'ט — העוזרת האישית שלך.");
+        return _speaker.SpeakAsync("שלום, אני פאלון — העוזר האישי שלך. לשירותך.");
     }
 
     public void Cancel()
@@ -77,12 +83,12 @@ sealed class Assistant : IDisposable
     {
         if (!AiChat.HasKey)
         {
-            ToastRequested?.Invoke("Ask Bridget needs a Gemini or DeepSeek key — paste one under Notes & dictation");
+            ToastRequested?.Invoke("Ask Palon needs a Gemini or DeepSeek key — paste one under Notes & dictation");
             return;
         }
         if (!ChainTranscriber.Ready)
         {
-            ToastRequested?.Invoke("Ask Bridget needs a Groq key or the offline voice model");
+            ToastRequested?.Invoke("Ask Palon needs a Groq key or the offline voice model");
             return;
         }
         if (_recorder.Start(NotesStore.TmpDir) is null)
@@ -119,66 +125,40 @@ sealed class Assistant : IDisposable
 
             if (question is null)
             {
-                ToastRequested?.Invoke("Bridget couldn't hear that — see log");
+                ToastRequested?.Invoke("Palon couldn't hear that — see log");
                 return;
             }
             if (question.Length == 0)
             {
-                Log.Write("Bridget heard nothing usable");
+                Log.Write("Palon heard nothing usable");
                 ToastRequested?.Invoke("Didn't catch that");
                 return;
             }
-            Log.Write($"Bridget heard: \"{question}\"");
+            Log.Write($"Palon heard: \"{question}\"");
 
             if (!AiChat.HasKey) return; // removed mid-flight
-            var commands = CommandStore.Load();
-            var result = await AiChat.AssistAsync(question, commands, CancellationToken.None);
-            if (result is null)
-            {
-                Log.Write("Bridget intent: unusable model reply");
-                ToastRequested?.Invoke("Bridget couldn't work that one out — try again");
-                return;
-            }
-            Log.Write($"Bridget intent: {result.Action}"
-                + (result.CommandId is { } cid ? $" id={cid}" : "")
-                + (result.Url is { } u ? $" url={u}" : ""));
 
-            if (result.Action == "open" && commands.FirstOrDefault(c => c.Id == result.CommandId) is { } command)
+            var outcome = await AgentLoop.RunAsync(_session, question, CancellationToken.None);
+            if (outcome is null)
             {
-                // The window opening is its own feedback — no TTS on opens.
-                ToastRequested?.Invoke(CommandStore.Execute(command)
-                    ? $"Opening {command.Label}"
-                    : $"Couldn't open {command.Label} — see log");
+                // Tool path unusable (provider down, mangled calls, round cap)
+                // — degrade to the v7 single-shot intent rather than to silence.
+                Log.Write("Palon agent path unavailable — falling back to single-shot intent");
+                await LegacyAssistAsync(question);
                 return;
             }
-
-            if (result.Action == "open_url" && result.Url is { } url)
+            if (outcome.Acted)
             {
-                ToastRequested?.Invoke(OpenUrl(url) ? "Opening it" : "Couldn't open that — see log");
+                // The action (window, music) is its own feedback — no TTS.
+                ToastRequested?.Invoke(outcome.Text);
                 return;
             }
-
-            var answer = (result.Text ?? "").Trim();
-            if (answer.Length == 0)
-            {
-                ToastRequested?.Invoke("Bridget had no answer — try again");
-                return;
-            }
-            Answered?.Invoke(question, answer);
-            if (Settings.VoiceEnabled && _callState() != CallState.OnCall)
-            {
-                // Speaking isn't "busy" — clearing the flag here is what lets
-                // the hotkey barge in (Toggle: stop speech, start listening).
-                _busy = false;
-                // Speaking during a recorded call would leak into the
-                // transcript via loopback capture — screen-only then.
-                await _speaker.SpeakAsync(answer);
-            }
+            await DeliverAnswerAsync(question, outcome.Text);
         }
         catch (Exception ex)
         {
             Log.Write($"Assistant failed: {ex}");
-            ToastRequested?.Invoke("Bridget hit an error — see log");
+            ToastRequested?.Invoke("Palon hit an error — see log");
         }
         finally
         {
@@ -186,6 +166,61 @@ sealed class Assistant : IDisposable
             TryDelete(mixed);
             StatusChanged?.Invoke("");
             _busy = false;
+        }
+    }
+
+    /// <summary>The v7 path: one JSON-intent round-trip, no tools, no memory.
+    /// Kept as the degraded mode so a provider that can't do tool calling
+    /// still leaves Palon able to open things and answer.</summary>
+    async Task LegacyAssistAsync(string question)
+    {
+        var commands = CommandStore.Load();
+        var result = await AiChat.AssistAsync(question, commands, CancellationToken.None);
+        if (result is null)
+        {
+            Log.Write("Palon intent: unusable model reply");
+            ToastRequested?.Invoke("Palon couldn't work that one out — try again");
+            return;
+        }
+        Log.Write($"Palon intent: {result.Action}"
+            + (result.CommandId is { } cid ? $" id={cid}" : "")
+            + (result.Url is { } u ? $" url={u}" : ""));
+
+        if (result.Action == "open" && commands.FirstOrDefault(c => c.Id == result.CommandId) is { } command)
+        {
+            // The window opening is its own feedback — no TTS on opens.
+            ToastRequested?.Invoke(CommandStore.Execute(command)
+                ? $"Opening {command.Label}"
+                : $"Couldn't open {command.Label} — see log");
+            return;
+        }
+
+        if (result.Action == "open_url" && result.Url is { } url)
+        {
+            ToastRequested?.Invoke(OpenUrl(url) ? "Opening it" : "Couldn't open that — see log");
+            return;
+        }
+
+        var answer = (result.Text ?? "").Trim();
+        if (answer.Length == 0)
+        {
+            ToastRequested?.Invoke("Palon had no answer — try again");
+            return;
+        }
+        await DeliverAnswerAsync(question, answer);
+    }
+
+    async Task DeliverAnswerAsync(string question, string answer)
+    {
+        Answered?.Invoke(question, answer);
+        if (Settings.VoiceEnabled && _callState() != CallState.OnCall)
+        {
+            // Speaking isn't "busy" — clearing the flag here is what lets
+            // the hotkey barge in (Toggle: stop speech, start listening).
+            _busy = false;
+            // Speaking during a recorded call would leak into the
+            // transcript via loopback capture — screen-only then.
+            await _speaker.SpeakAsync(answer);
         }
     }
 

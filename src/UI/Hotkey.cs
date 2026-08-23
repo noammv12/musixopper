@@ -1,7 +1,7 @@
 using System.Windows.Input;
-using Bridget.Interop;
+using Palon.Interop;
 
-namespace Bridget.UI;
+namespace Palon.UI;
 
 /// <summary>
 /// A global hotkey combo (RegisterHotKey modifiers + virtual key) with its
@@ -12,7 +12,7 @@ namespace Bridget.UI;
 readonly record struct Hotkey(uint Modifiers, uint Vk)
 {
     public static readonly Hotkey Default = new(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, 0x20 /* Space */);
-    public static readonly Hotkey AssistantDefault = new(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, 0x42 /* B */);
+    public static readonly Hotkey AssistantDefault = new(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, 0x50 /* P */);
     public static readonly Hotkey Off = new(0, 0);
 
     public bool IsOff => Vk == 0;

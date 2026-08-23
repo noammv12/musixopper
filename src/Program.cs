@@ -1,6 +1,6 @@
-using Bridget.Interop;
+using Palon.Interop;
 
-namespace Bridget;
+namespace Palon;
 
 static class Program
 {
@@ -14,7 +14,7 @@ static class Program
             return RunCli(args[0].Trim().Trim('"').ToLowerInvariant(),
                 args.Length > 1 ? string.Join(' ', args[1..]) : null);
 
-        using var mutex = new Mutex(initiallyOwned: true, "Bridget.Tray.SingleInstance", out var isFirstInstance);
+        using var mutex = new Mutex(initiallyOwned: true, "Palon.Tray.SingleInstance", out var isFirstInstance);
         if (!isFirstInstance)
         {
             // Already running — open the existing instance's flyout instead.
@@ -24,8 +24,8 @@ static class Program
         }
 
         Log.Init();
-        Log.Write($"Bridget {Version} starting");
-        Settings.MigrateFromSaley(); // must run before Shell reads Settings
+        Log.Write($"Palon {Version} starting");
+        Settings.MigrateFromPredecessors(); // must run before Shell reads Settings
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Write($"Unhandled: {e.ExceptionObject}");
         TaskScheduler.UnobservedTaskException += (_, e) =>
         {
@@ -108,7 +108,7 @@ static class Program
             return 0;
         }
 
-        TryWriteLine("Bridget isn't running — simulating the call standalone…");
+        TryWriteLine("Palon isn't running — simulating the call standalone…");
         try
         {
             Task.Run(MediaController.CliPauseAsync).GetAwaiter().GetResult();
@@ -128,7 +128,7 @@ static class Program
     {
         Log.Write($"CLI: unknown verb '{verb}'");
         NativeMethods.AttachConsole(NativeMethods.ATTACH_PARENT_PROCESS);
-        TryWriteLine("Usage: Bridget.exe [pause [number] | resume | test]   (no arguments starts the app)");
+        TryWriteLine("Usage: Palon.exe [pause [number] | resume | test]   (no arguments starts the app)");
         return 2;
     }
 

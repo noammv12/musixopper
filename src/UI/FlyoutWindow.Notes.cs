@@ -3,9 +3,9 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using Bridget.Notes;
+using Palon.Notes;
 
-namespace Bridget.UI;
+namespace Palon.UI;
 
 /// <summary>The flyout's Call notes panel: opt-in, model download, key, list.</summary>
 partial class FlyoutWindow
@@ -38,7 +38,7 @@ partial class FlyoutWindow
     public Func<bool>? ApplyDictationHotkey { get; set; }
 
     /// <summary>Set by Shell: releases all of the dock's global hotkeys so
-    /// the capture box can receive combos Bridget itself owns.</summary>
+    /// the capture box can receive combos Palon itself owns.</summary>
     public Action? SuspendGlobalHotkeys { get; set; }
 
     StackPanel BuildNotesPanel()
@@ -74,7 +74,7 @@ partial class FlyoutWindow
         _notesHealth.Margin = new Thickness(0, 8, 0, 0);
         panel.Children.Add(_notesHealth);
 
-        _notesHealthLink = Ui.Link("No recent calls seen — check the handlers point at Bridget.exe →", 10.5);
+        _notesHealthLink = Ui.Link("No recent calls seen — check the handlers point at Palon.exe →", 10.5);
         _notesHealthLink.TextWrapping = TextWrapping.Wrap;
         _notesHealthLink.Margin = new Thickness(0, 4, 0, 0);
         _notesHealthLink.Visibility = Visibility.Collapsed;
@@ -300,7 +300,7 @@ partial class FlyoutWindow
         _hotkeyBox.MouseLeftButtonUp += (_, _) => Keyboard.Focus(_hotkeyBox);
         _hotkeyBox.GotKeyboardFocus += (_, _) =>
         {
-            // Release Bridget's own hotkeys so pressing e.g. the current combo
+            // Release Palon's own hotkeys so pressing e.g. the current combo
             // reaches the capture box instead of starting a dictation.
             SuspendGlobalHotkeys?.Invoke();
             _hotkeyLabel.Text = "Press a key combo…";
@@ -492,9 +492,9 @@ partial class FlyoutWindow
         static string When(DateTime? utc) =>
             utc is { } u ? u.ToLocalTime().ToString("d MMM HH:mm") : "never";
         _notesHealth.Text =
-            $"Last note: {When(lastNote?.StartedUtc)} · Last call Bridget saw: {When(lastCall?.StartedUtc)}";
+            $"Last note: {When(lastNote?.StartedUtc)} · Last call Palon saw: {When(lastCall?.StartedUtc)}";
 
-        // Bridget not seeing calls is the handler-misconfiguration signature —
+        // Palon not seeing calls is the handler-misconfiguration signature —
         // but only once there's history to compare against (calls seen before
         // and gone quiet, or migrated notes with no call ever seen since).
         // A fresh install that simply hasn't had a call yet stays calm.

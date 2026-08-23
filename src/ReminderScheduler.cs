@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Windows.Threading;
 
-namespace Bridget;
+namespace Palon;
 
 /// <summary>
 /// Watches the reminder store and delivers due reminders to the dock.
@@ -61,7 +61,8 @@ sealed class ReminderScheduler : IDisposable
     {
         try
         {
-            if (ReminderStore.IsValidUrl(reminder.Url))
+            // Text-only reminders have nothing to open — "Open" is just "Done".
+            if (reminder.HasUrl && ReminderStore.IsValidUrl(reminder.Url))
                 Process.Start(new ProcessStartInfo(reminder.Url) { UseShellExecute = true });
         }
         catch (Exception ex)

@@ -2,7 +2,7 @@ using System.IO;
 using System.Text;
 using Whisper.net;
 
-namespace Bridget.Notes;
+namespace Palon.Notes;
 
 /// <summary>Local whisper.cpp transcription (multilingual small model).</summary>
 sealed class WhisperTranscriber : ITranscriber

@@ -1,9 +1,9 @@
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
-using Bridget.Interop;
+using Palon.Interop;
 
-namespace Bridget;
+namespace Palon;
 
 enum PasteResult
 {

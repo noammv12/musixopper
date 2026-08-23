@@ -3,15 +3,15 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 
-namespace Bridget.UI;
+namespace Palon.UI;
 
-/// <summary>The flyout's Commands panel: one-click launches Bridget can also run by voice.</summary>
+/// <summary>The flyout's Commands panel: one-click launches Palon can also run by voice.</summary>
 partial class FlyoutWindow
 {
     readonly StackPanel _commandsPanel;
     StackPanel _commandList = null!;
     TextBlock _addCommandLink = null!;
-    List<BridgetCommand> _commands = new();
+    List<PalonCommand> _commands = new();
     int _editingCommand = -1;
 
     StackPanel BuildCommandsPanel()
@@ -20,7 +20,7 @@ partial class FlyoutWindow
 
         panel.Children.Add(BackLink());
         panel.Children.Add(Ui.Text("Commands", 15, "TextPrimaryBrush", FontWeights.SemiBold));
-        var subtitle = Ui.Text("Your one-click launches — a link, an app, a folder. Once Ask Bridget is set up, saying “open Salesforce” runs them too.", 11.5, "TextSecondaryBrush");
+        var subtitle = Ui.Text("Your one-click launches — a link, an app, a folder. Once Ask Palon is set up, saying “open Salesforce” runs them too.", 11.5, "TextSecondaryBrush");
         subtitle.TextWrapping = TextWrapping.Wrap;
         subtitle.Margin = new Thickness(0, 6, 0, 0);
         panel.Children.Add(subtitle);
@@ -41,7 +41,7 @@ partial class FlyoutWindow
         _addCommandLink.MouseLeftButtonUp += (_, _) =>
         {
             if (_commands.Count >= CommandStore.MaxCommands) return;
-            _commands.Add(new BridgetCommand(Guid.NewGuid().ToString("n"), "", ""));
+            _commands.Add(new PalonCommand(Guid.NewGuid().ToString("n"), "", ""));
             _editingCommand = _commands.Count - 1;
             RebuildCommandList();
         };

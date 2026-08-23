@@ -19,9 +19,12 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Run tests
+        run: dotnet test tests/Palon.Tests/Palon.Tests.csproj -c Release
+
       - name: Publish single-file exe
         run: >
-          dotnet publish src/Bridget.csproj
+          dotnet publish src/Palon.csproj
           -c Release -r win-x64 --self-contained
           -p:PublishSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true
@@ -31,16 +34,16 @@ jobs:
       - name: Verify single-file artifact
         shell: pwsh
         run: |
-          $extras = Get-ChildItem publish -Recurse -File | Where-Object { $_.Name -notin @('Bridget.exe','Bridget.pdb') }
+          $extras = Get-ChildItem publish -Recurse -File | Where-Object { $_.Name -notin @('Palon.exe','Palon.pdb') }
           if ($extras) { $extras | ForEach-Object { Write-Host "unexpected publish output: $($_.FullName)" }; exit 1 }
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Bridget-win-x64
-          path: publish/Bridget.exe
+          name: Palon-win-x64
+          path: publish/Palon.exe
 
       - name: Attach exe to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: publish/Bridget.exe
+          files: publish/Palon.exe

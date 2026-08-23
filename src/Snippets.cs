@@ -1,13 +1,13 @@
 using System.IO;
 using System.Text.Json;
 
-namespace Bridget;
+namespace Palon;
 
 sealed record Snippet(string Label, string Text);
 
 /// <summary>
 /// The user's snippet library: a small ordered list stored at
-/// %LOCALAPPDATA%\Bridget\snippets.json. Saves are user-initiated only and
+/// %LOCALAPPDATA%\Palon\snippets.json. Saves are user-initiated only and
 /// written atomically; a corrupt file is never overwritten with defaults.
 /// </summary>
 static class SnippetStore
@@ -23,7 +23,7 @@ static class SnippetStore
     };
 
     static string Dir => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Bridget");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Palon");
     static string FilePath => Path.Combine(Dir, "snippets.json");
 
     public static event Action? Changed;

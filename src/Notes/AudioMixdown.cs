@@ -2,7 +2,7 @@ using System.IO;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 
-namespace Bridget.Notes;
+namespace Palon.Notes;
 
 /// <summary>
 /// Offline mixdown of the recorded tracks into the 16 kHz mono PCM16 WAV

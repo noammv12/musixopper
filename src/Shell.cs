@@ -1,9 +1,9 @@
 using System.Windows;
 using System.Windows.Threading;
-using Bridget.Notes;
-using Bridget.UI;
+using Palon.Notes;
+using Palon.UI;
 
-namespace Bridget;
+namespace Palon;
 
 /// <summary>
 /// Wires everything together for tray mode: engine ticks, tray icon,
@@ -79,7 +79,7 @@ sealed class Shell : IDisposable
         _flyout.ApplySnippetHotkeys = _dock.ApplySnippetHotkeys;
         _flyout.SuspendGlobalHotkeys = _dock.SuspendHotkeys;
 
-        _assistant = new Assistant(() => _engine.State);
+        _assistant = new Assistant(() => _engine.State, () => _engine.CurrentNumber);
         _assistant.Started += () => _dock.SetAssistant(true);
         _assistant.Stopped += () => _dock.SetAssistant(false);
         _assistant.StatusChanged += status => _dock.SetAssistantStatus(status);
@@ -87,8 +87,8 @@ sealed class Shell : IDisposable
         _assistant.Answered += (question, answer) =>
         {
             _flyout.SetLastExchange(question, answer);
-            _dock.ShowToast("Bridget answered — click to read", paused: false,
-                onClick: () => _flyout.ShowBridget(), showIcon: false, important: true);
+            _dock.ShowToast("Palon answered — click to read", paused: false,
+                onClick: () => _flyout.ShowPalon(), showIcon: false, important: true);
         };
         _dock.AssistantToggleRequested += () =>
         {
@@ -130,31 +130,37 @@ sealed class Shell : IDisposable
         _dock.ShowDock();
         _dock.SyncState(_engine.State); // StateChanged won't fire until the state moves
 
-        // A still-running Saley build won't collide on the renamed mutex or
-        // events — it would fight over the mic, the media sessions, and the
-        // softphone handlers (which would silently kill Bridget's notes).
-        if (EventWaitHandle.TryOpenExisting(@"Local\Saley.ShowFlyout", out var oldApp))
+        // A still-running predecessor build (Bridget/Saley) won't collide on
+        // the renamed mutex or events — it would fight over the mic, the
+        // media sessions, and the softphone handlers (which would silently
+        // kill Palon's notes).
+        var runningOld = new[] { "Bridget", "Saley" }
+            .FirstOrDefault(name => TryDisposeExisting($@"Local\{name}.ShowFlyout"));
+        if (runningOld is not null)
         {
-            oldApp.Dispose();
-            _dock.ShowToast("The old Saley is still running — quit it from its tray icon",
+            _dock.ShowToast($"The old {runningOld} is still running — quit it from its tray icon",
                 paused: false, showIcon: false, important: true);
         }
-        else if (!Settings.JustMigrated && !Settings.SaleyWarned)
+        else if (!Settings.JustMigrated && !Settings.OldAppWarned)
         {
             // One-shot (the migration launch already shows its own nudge, and
             // the stale log's timestamp never changes, so this would otherwise
             // re-fire on every launch for a day).
             try
             {
-                // Not running now, but has it run recently? A fresh Saley log
-                // means something still launches it (autostart, handlers).
-                var saleyLog = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Saley", "log.txt");
-                if (System.IO.File.Exists(saleyLog) &&
-                    System.IO.File.GetLastWriteTimeUtc(saleyLog) > DateTime.UtcNow.AddDays(-1))
+                // Not running now, but has it run recently? A fresh predecessor
+                // log means something still launches it (autostart, handlers).
+                var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                var recent = new[] { "Bridget", "Saley" }.FirstOrDefault(name =>
                 {
-                    Settings.SaleyWarned = true;
-                    _dock.ShowToast("The old Saley ran recently — delete Saley.exe and point your softphone handlers at Bridget.exe",
+                    var log = System.IO.Path.Combine(local, name, "log.txt");
+                    return System.IO.File.Exists(log) &&
+                        System.IO.File.GetLastWriteTimeUtc(log) > DateTime.UtcNow.AddDays(-1);
+                });
+                if (recent is not null)
+                {
+                    Settings.OldAppWarned = true;
+                    _dock.ShowToast($"The old {recent} ran recently — delete {recent}.exe and point your softphone handlers at Palon.exe",
                         paused: false, showIcon: false, important: true);
                 }
             }
@@ -173,9 +179,16 @@ sealed class Shell : IDisposable
             OpenFlyoutSoon(() =>
             {
                 _flyout.ShowFlyout();
-                _flyout.ShowSoftphoneSetup("Bridget replaces Saley — update your softphone handlers.");
+                _flyout.ShowSoftphoneSetup("Palon replaces Bridget — update your softphone handlers.");
             });
         }
+    }
+
+    static bool TryDisposeExisting(string eventName)
+    {
+        if (!EventWaitHandle.TryOpenExisting(eventName, out var handle)) return false;
+        handle.Dispose();
+        return true;
     }
 
     static void OpenFlyoutSoon(Action open)

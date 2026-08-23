@@ -3,11 +3,11 @@ using NAudio.CoreAudioApi;
 using NAudio.Wave;
 using Windows.Media.SpeechSynthesis;
 
-namespace Bridget.Voice;
+namespace Palon.Voice;
 
 /// <summary>
-/// Bridget's voice. Provider chain: the free Edge neural voice (female
-/// "Hila" for Hebrew — Windows ships no female Hebrew voice at all) when
+/// Palon's voice. Provider chain: the free Edge neural voice (male "Avri"
+/// for Hebrew, British "Ryan" for English — the Jarvis register) when
 /// online, falling back to the offline Windows voice. Playback goes
 /// through WASAPI; a raw WasapiOut is not a GSMTC media session, so
 /// speaking never trips the app's own music-pause logic. One utterance at
@@ -175,7 +175,14 @@ sealed class Speaker : IDisposable
     {
         try
         {
-            if (!IsHebrew(text)) return null; // default voice is fine for Latin text
+            if (!IsHebrew(text))
+            {
+                // Palon is male — prefer a male voice over the (often female)
+                // system default; null keeps the default when none exists.
+                return SpeechSynthesizer.AllVoices
+                    .FirstOrDefault(v => v.Gender == VoiceGender.Male &&
+                        v.Language.StartsWith("en", StringComparison.OrdinalIgnoreCase));
+            }
 
             var hebrew = SpeechSynthesizer.AllVoices
                 .FirstOrDefault(v => v.Language.StartsWith("he", StringComparison.OrdinalIgnoreCase));

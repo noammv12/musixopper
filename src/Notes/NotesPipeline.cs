@@ -1,7 +1,7 @@
 using System.IO;
 using System.Windows.Threading;
 
-namespace Bridget.Notes;
+namespace Palon.Notes;
 
 /// <summary>
 /// Orchestrates call notes: records while the engine is on a call, then

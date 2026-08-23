@@ -1,13 +1,13 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
-using Bridget.Interop;
+using Palon.Interop;
 
-namespace Bridget;
+namespace Palon;
 
 /// <summary>
-/// Renders the tray glyph at runtime — the Bridget "B" drawn as a rounded
-/// stem plus two equal right-side bowls (crisp at 16 px, no font fallback;
+/// Renders the tray glyph at runtime — the Palon "P" drawn as a rounded
+/// stem plus one right-side bowl (crisp at 16 px, no font fallback;
 /// same geometry as assets/make_icon.py), white on a dark taskbar and
 /// near-black on a light one, with an amber dot while on a call.
 /// </summary>
@@ -44,11 +44,10 @@ static class TrayIconRenderer
             float u = size / 16f;
 
             using var pen = new Pen(color, 2.0f * u) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            // B-mark: stem at x=6.6 (y 3.3–12.7) + two equal right bowls
-            // r=2.35 centered (6.6,5.65)/(6.6,10.35) on the 16-grid.
+            // P-mark: stem at x=6.6 (y 3.3–12.7) + one right bowl r=2.6
+            // centered (6.6,5.9) on the 16-grid.
             g.DrawLine(pen, 6.6f * u, 3.3f * u, 6.6f * u, 12.7f * u);
-            g.DrawArc(pen, (6.6f - 2.35f) * u, (5.65f - 2.35f) * u, 4.7f * u, 4.7f * u, -90f, 180f);   // top bowl
-            g.DrawArc(pen, (6.6f - 2.35f) * u, (10.35f - 2.35f) * u, 4.7f * u, 4.7f * u, -90f, 180f);  // bottom bowl
+            g.DrawArc(pen, (6.6f - 2.6f) * u, (5.9f - 2.6f) * u, 5.2f * u, 5.2f * u, -90f, 180f); // bowl
 
             if (state == CallState.OnCall)
             {

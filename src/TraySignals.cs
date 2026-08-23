@@ -1,4 +1,4 @@
-namespace Bridget;
+namespace Palon;
 
 /// <summary>
 /// Named events that let short-lived CLI invocations (wired to softphone
@@ -7,7 +7,7 @@ namespace Bridget;
 /// </summary>
 static class TraySignals
 {
-    public const string CallStartName = @"Local\Bridget.CallStart";
-    public const string CallEndName = @"Local\Bridget.CallEnd";
-    public const string ShowFlyoutName = @"Local\Bridget.ShowFlyout";
+    public const string CallStartName = @"Local\Palon.CallStart";
+    public const string CallEndName = @"Local\Palon.CallEnd";
+    public const string ShowFlyoutName = @"Local\Palon.ShowFlyout";
 }

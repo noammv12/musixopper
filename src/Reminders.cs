@@ -1,7 +1,7 @@
 using System.IO;
 using System.Text.Json;
 
-namespace Bridget;
+namespace Palon;
 
 enum ReminderState
 {
@@ -12,14 +12,18 @@ enum ReminderState
 
 sealed record Reminder(string Id, string Url, string Label, DateTime DueAtUtc, ReminderState State)
 {
+    /// <summary>True when there's a link to open; false for text-only reminders.</summary>
+    public bool HasUrl => Url.Length > 0;
+
     public string DisplayLabel =>
         Label.Length > 0 ? Label
         : Uri.TryCreate(Url, UriKind.Absolute, out var uri) ? uri.Host
-        : Url;
+        : Url.Length > 0 ? Url
+        : "Reminder";
 }
 
 /// <summary>
-/// Call-back reminders: %LOCALAPPDATA%\Bridget\reminders.json, same atomic
+/// Call-back reminders: %LOCALAPPDATA%\Palon\reminders.json, same atomic
 /// store pattern as snippets. Saves are user/scheduler initiated; a corrupt
 /// file is never overwritten with defaults.
 /// </summary>
@@ -35,7 +39,7 @@ static class ReminderStore
     };
 
     static string Dir => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Bridget");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Palon");
     static string FilePath => Path.Combine(Dir, "reminders.json");
 
     public static event Action? Changed;
@@ -59,6 +63,11 @@ static class ReminderStore
         Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
         (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
 
+    /// <summary>A reminder needs a valid link, a label, or both — an empty
+    /// link is fine (text-only reminder), a malformed one never is.</summary>
+    public static bool IsValidReminder(string url, string label) =>
+        url.Length == 0 ? Clamp(label).Length > 0 : IsValidUrl(url);
+
     public static List<Reminder> Load()
     {
         try
@@ -67,7 +76,7 @@ static class ReminderStore
             var envelope = JsonSerializer.Deserialize<Envelope>(File.ReadAllText(FilePath), JsonOptions);
             if (envelope?.Reminders is not { } entries) throw new JsonException("no reminders array");
             return entries
-                .Where(e => IsValidUrl(e.Url))
+                .Where(e => IsValidReminder(e.Url ?? "", e.Label ?? ""))
                 .Select(e => new Reminder(
                     string.IsNullOrEmpty(e.Id) ? Guid.NewGuid().ToString("n") : e.Id,
                     e.Url,
@@ -83,13 +92,15 @@ static class ReminderStore
         }
     }
 
-    /// <summary>Adds a pending reminder; returns null on invalid input or when full.</summary>
+    /// <summary>Adds a pending reminder — with a link, text-only, or both;
+    /// returns null on invalid input or when full.</summary>
     public static Reminder? Add(string url, string label, DateTime dueAtUtc)
     {
-        if (!IsValidUrl(url)) return null;
+        url = url.Trim();
+        if (!IsValidReminder(url, label)) return null;
         var all = Load();
         if (all.Count(r => r.State == ReminderState.Pending) >= MaxPending) return null;
-        var reminder = new Reminder(Guid.NewGuid().ToString("n"), url.Trim(), Clamp(label), dueAtUtc, ReminderState.Pending);
+        var reminder = new Reminder(Guid.NewGuid().ToString("n"), url, Clamp(label), dueAtUtc, ReminderState.Pending);
         all.Add(reminder);
         return Save(all) ? reminder : null;
     }

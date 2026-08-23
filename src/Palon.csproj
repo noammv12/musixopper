@@ -4,22 +4,26 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.18362.0</TargetPlatformMinVersion>
-    <UseWPF>true</UseWPF>
-    <UseWindowsForms>true</UseWindowsForms>
-    <RootNamespace>Bridget</RootNamespace>
-    <AssemblyName>Bridget</AssemblyName>
-    <ApplicationIcon>Assets\Bridget.ico</ApplicationIcon>
+    <!-- The app has no XAML, so WPF is only a framework reference. On
+         non-Windows (compile checks on Linux agents) UseWPF would drag in
+         the WindowsDesktop SDK import that distro dotnet packages don't
+         ship — reference the framework directly there instead. -->
+    <UseWPF Condition="$([MSBuild]::IsOSPlatform('Windows'))">true</UseWPF>
+    <UseWindowsForms Condition="$([MSBuild]::IsOSPlatform('Windows'))">true</UseWindowsForms>
+    <RootNamespace>Palon</RootNamespace>
+    <AssemblyName>Palon</AssemblyName>
+    <ApplicationIcon>Assets\Palon.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <Product>Bridget</Product>
-    <Description>Your personal sales assistant: pauses music on calls, takes your notes, pastes your texts, answers when you ask.</Description>
-    <Company>Bridget</Company>
-    <Copyright>© 2026 Bridget</Copyright>
-    <Version>7.1.0</Version>
-    <FileVersion>7.1.0.0</FileVersion>
-    <AssemblyVersion>7.1.0.0</AssemblyVersion>
+    <Product>Palon.AI</Product>
+    <Description>Palon.AI — your personal sales aide: pauses music on calls, takes your notes, runs your commands, and answers when you ask.</Description>
+    <Company>Palon.AI</Company>
+    <Copyright>© 2026 Palon.AI</Copyright>
+    <Version>8.0.0</Version>
+    <FileVersion>8.0.0.0</FileVersion>
+    <AssemblyVersion>8.0.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,6 +31,14 @@
          usings out so they can't collide with the WPF namespaces. -->
     <Using Remove="System.Windows.Forms" />
     <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup Condition="!$([MSBuild]::IsOSPlatform('Windows'))">
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Palon.Tests" />
   </ItemGroup>
 
   <ItemGroup>
@@ -44,7 +56,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="$(PkgWhisper_net_Runtime)\build\win-x64\*.dll"
-                      LogicalName="Bridget.WhisperNative.%(Filename)%(Extension)" />
+                      LogicalName="Palon.WhisperNative.%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

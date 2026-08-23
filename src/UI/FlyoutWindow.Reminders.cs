@@ -3,7 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 
-namespace Bridget.UI;
+namespace Palon.UI;
 
 /// <summary>The flyout's Reminders panel: quick-add + pending list.</summary>
 partial class FlyoutWindow
@@ -32,19 +32,19 @@ partial class FlyoutWindow
 
         panel.Children.Add(BackLink());
         panel.Children.Add(Ui.Text("Reminders", 15, "TextPrimaryBrush", FontWeights.SemiBold));
-        var subtitle = Ui.Text("Paste the lead's link, pick a time — Bridget pops it above the taskbar when it's time to call.", 11.5, "TextSecondaryBrush");
+        var subtitle = Ui.Text("Type what to do (or paste the lead's link), pick a time — Palon pops it above the taskbar when it's time to call.", 11.5, "TextSecondaryBrush");
         subtitle.TextWrapping = TextWrapping.Wrap;
         subtitle.Margin = new Thickness(0, 6, 0, 0);
         panel.Children.Add(subtitle);
 
-        var urlCaption = Ui.Text("Link (CRM, WhatsApp, anything)", 10.5, "TextSecondaryBrush", FontWeights.SemiBold);
+        var urlCaption = Ui.Text("Link (optional — CRM, WhatsApp, anything)", 10.5, "TextSecondaryBrush", FontWeights.SemiBold);
         urlCaption.Margin = new Thickness(2, 12, 0, 0);
         panel.Children.Add(urlCaption);
         _reminderUrlBox = Ui.TextBox("");
         _reminderUrlBox.Margin = new Thickness(0, 4, 0, 0);
         panel.Children.Add(_reminderUrlBox);
 
-        var labelCaption = Ui.Text("Label (optional)", 10.5, "TextSecondaryBrush", FontWeights.SemiBold);
+        var labelCaption = Ui.Text("Label (what it's about)", 10.5, "TextSecondaryBrush", FontWeights.SemiBold);
         labelCaption.Margin = new Thickness(2, 8, 0, 0);
         panel.Children.Add(labelCaption);
         _reminderLabelBox = Ui.TextBox("");
@@ -144,9 +144,11 @@ partial class FlyoutWindow
     void AddReminder()
     {
         var url = _reminderUrlBox.Text.Trim();
-        if (!ReminderStore.IsValidUrl(url))
+        if (!ReminderStore.IsValidReminder(url, _reminderLabelBox.Text))
         {
-            ShowReminderStatus("That doesn't look like a link — paste a full http(s) address.");
+            ShowReminderStatus(url.Length > 0
+                ? "That doesn't look like a link — paste a full http(s) address."
+                : "Give it a label (or paste a link) so you'll know what it's about.");
             return;
         }
 

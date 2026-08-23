@@ -1,8 +1,8 @@
 using System.Windows;
 using System.Windows.Interop;
-using Bridget.Interop;
+using Palon.Interop;
 
-namespace Bridget.UI;
+namespace Palon.UI;
 
 static class Dpi
 {

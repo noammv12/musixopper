@@ -2,14 +2,14 @@ using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
 
-namespace Bridget;
+namespace Palon;
 
-sealed record BridgetCommand(string Id, string Label, string Target);
+sealed record PalonCommand(string Id, string Label, string Target);
 
 /// <summary>
 /// The user's command presets ("open my Salesforce"): a small ordered list
-/// at %LOCALAPPDATA%\Bridget\commands.json, run by click or by asking
-/// Bridget. Targets are anything the Windows shell can open — URLs, apps,
+/// at %LOCALAPPDATA%\Palon\commands.json, run by click or by asking
+/// Palon. Targets are anything the Windows shell can open — URLs, apps,
 /// folders, protocol links. Same atomic store pattern as snippets.
 /// </summary>
 static class CommandStore
@@ -25,7 +25,7 @@ static class CommandStore
     };
 
     static string Dir => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Bridget");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Palon");
     static string FilePath => Path.Combine(Dir, "commands.json");
 
     public static event Action? Changed;
@@ -43,14 +43,14 @@ static class CommandStore
         public string Target { get; set; } = "";
     }
 
-    public static List<BridgetCommand> Load()
+    public static List<PalonCommand> Load()
     {
         try
         {
-            if (!File.Exists(FilePath)) return new List<BridgetCommand>();
+            if (!File.Exists(FilePath)) return new List<PalonCommand>();
             var envelope = JsonSerializer.Deserialize<Envelope>(File.ReadAllText(FilePath), JsonOptions);
             if (envelope?.Commands is not { } entries) throw new JsonException("no commands array");
-            return Clamp(entries.Select(e => new BridgetCommand(
+            return Clamp(entries.Select(e => new PalonCommand(
                 string.IsNullOrEmpty(e.Id) ? Guid.NewGuid().ToString("n") : e.Id,
                 e.Label, e.Target)));
         }
@@ -58,12 +58,12 @@ static class CommandStore
         {
             // Unreadable file: run empty in memory, never clobber it.
             Log.Write($"Commands load failed: {ex.Message}");
-            return new List<BridgetCommand>();
+            return new List<PalonCommand>();
         }
     }
 
     /// <summary>Persists the list; Changed fires only when the write succeeded.</summary>
-    public static bool Save(IReadOnlyList<BridgetCommand> commands)
+    public static bool Save(IReadOnlyList<PalonCommand> commands)
     {
         try
         {
@@ -87,7 +87,7 @@ static class CommandStore
     }
 
     /// <summary>Opens the target via the shell. False (and a log line) on failure.</summary>
-    public static bool Execute(BridgetCommand command)
+    public static bool Execute(PalonCommand command)
     {
         try
         {
@@ -102,8 +102,8 @@ static class CommandStore
         }
     }
 
-    static List<BridgetCommand> Clamp(IEnumerable<BridgetCommand> commands) => commands
-        .Select(c => new BridgetCommand(
+    static List<PalonCommand> Clamp(IEnumerable<PalonCommand> commands) => commands
+        .Select(c => new PalonCommand(
             c.Id,
             (c.Label ?? "").Trim() is { Length: > MaxLabelLength } l ? l[..MaxLabelLength] : (c.Label ?? "").Trim(),
             (c.Target ?? "").Trim() is { Length: > MaxTargetLength } t ? t[..MaxTargetLength] : (c.Target ?? "").Trim()))

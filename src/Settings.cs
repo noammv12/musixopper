@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Win32;
 
-namespace Bridget;
+namespace Palon;
 
 enum TriggerMode
 {
@@ -11,15 +11,15 @@ enum TriggerMode
     Microphone = 0,
 
     /// <summary>Pause only on explicit call-answered signals from the
-    /// softphone's event handlers (via "Bridget.exe pause/resume").</summary>
+    /// softphone's event handlers (via "Palon.exe pause/resume").</summary>
     SoftphoneEvents = 1,
 }
 
 static class Settings
 {
-    const string KeyPath = @"SOFTWARE\Bridget";
+    const string KeyPath = @"SOFTWARE\Palon";
     const string RunKeyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
-    const string RunValueName = "Bridget";
+    const string RunValueName = "Palon";
 
     public static TriggerMode Trigger
     {
@@ -108,8 +108,8 @@ static class Settings
     }
 
     /// <summary>
-    /// Ask-Bridget hotkey, same format as DictationHotkey; null/unset means
-    /// the default combo (Ctrl+Alt+B).
+    /// Ask-Palon hotkey, same format as DictationHotkey; null/unset means
+    /// the default combo (Ctrl+Alt+P).
     /// </summary>
     public static string? AssistantHotkey
     {
@@ -128,7 +128,7 @@ static class Settings
         set => SetProtectedValue("ElevenLabsKey", value);
     }
 
-    /// <summary>ElevenLabs voice id; empty means their premade "Rachel".</summary>
+    /// <summary>ElevenLabs voice id; empty means their premade "Daniel".</summary>
     public static string ElevenLabsVoiceId
     {
         get => Read("ElevenLabsVoiceId") is { Length: > 0 } id ? id : "";
@@ -147,7 +147,7 @@ static class Settings
         set => WriteValue("VoicePreference", value == "windows" ? "windows" : "auto");
     }
 
-    /// <summary>Bridget speaks her answers out loud (never during a
+    /// <summary>Palon speaks his answers out loud (never during a
     /// recorded call — the TTS would end up in the transcript).</summary>
     public static bool VoiceEnabled
     {
@@ -179,11 +179,11 @@ static class Settings
         set => SetProtectedValue("DeepSeekKey", value);
     }
 
-    /// <summary>One-shot: the stale-Saley warning has already been shown.</summary>
-    public static bool SaleyWarned
+    /// <summary>One-shot: the stale-predecessor warning has already been shown.</summary>
+    public static bool OldAppWarned
     {
-        get => Read("SaleyWarned") == "1";
-        set => WriteValue("SaleyWarned", value ? "1" : "0");
+        get => Read("OldAppWarned") == "1";
+        set => WriteValue("OldAppWarned", value ? "1" : "0");
     }
 
     /// <summary>Gemini API key — the free-tier AI provider, tried first.</summary>
@@ -240,8 +240,12 @@ static class Settings
         WriteValue(name, Convert.ToBase64String(protectedBytes));
     }
 
-    /// <summary>Set when this run inherited settings from a Saley install.</summary>
+    /// <summary>Set when this run inherited settings from a predecessor install.</summary>
     public static bool JustMigrated { get; private set; }
+
+    /// <summary>The app's previous identities, newest first — each rename
+    /// (Musixopper → Saley → Bridget → Palon) migrates the one before it.</summary>
+    static readonly string[] Predecessors = { "Bridget", "Saley", "Musixopper" };
 
     /// <summary>
     /// One-time takeover of the app's previous identity: every registry
@@ -251,7 +255,7 @@ static class Settings
     /// and the 466 MB voice model — moves across. Each step is independent:
     /// one failing must not take the others down.
     /// </summary>
-    public static void MigrateFromSaley()
+    public static void MigrateFromPredecessors()
     {
         try
         {
@@ -259,10 +263,10 @@ static class Settings
             {
                 if (existing is null)
                 {
-                    // Two identities back: a straight Musixopper→Bridget jump
-                    // (never installed Saley) still deserves its settings.
-                    using var old = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Saley")
-                        ?? Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Musixopper");
+                    // Newest predecessor that exists wins — a straight
+                    // Saley→Palon jump (never installed Bridget) still
+                    // deserves its settings.
+                    using var old = OpenNewestPredecessorKey();
                     if (old is null) return; // fresh install — nothing else to migrate either
                     using var dest = Registry.CurrentUser.CreateSubKey(KeyPath);
                     foreach (var name in old.GetValueNames())
@@ -283,7 +287,7 @@ static class Settings
             // at boot and fighting this app; re-point autostart at us.
             using var run = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true);
             var hadOld = false;
-            foreach (var retired in new[] { "Saley", "Musixopper" })
+            foreach (var retired in Predecessors)
             {
                 if (run?.GetValue(retired) is null) continue;
                 run.DeleteValue(retired, throwOnMissingValue: false);
@@ -297,18 +301,19 @@ static class Settings
             Log.Write($"Autostart migration failed: {ex.Message}");
         }
 
-        try
+        foreach (var predecessor in Predecessors)
         {
-            // Log.Init() has already created (and written into) the Bridget
-            // folder by the time this runs, so a whole-folder Directory.Move
-            // would never fire — move the old tree's contents item by item
-            // instead. Idempotent: existing entries win, leftovers retry on
-            // the next launch until the old folder is deleted.
-            var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            var oldDir = System.IO.Path.Combine(local, "Saley");
-            var newDir = System.IO.Path.Combine(local, "Bridget");
-            if (System.IO.Directory.Exists(oldDir))
+            try
             {
+                // Log.Init() has already created (and written into) the Palon
+                // folder by the time this runs, so a whole-folder Directory.Move
+                // would never fire — move the old tree's contents item by item
+                // instead. Idempotent: existing entries win, leftovers retry on
+                // the next launch until the old folder is deleted.
+                var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                var oldDir = System.IO.Path.Combine(local, predecessor);
+                var newDir = System.IO.Path.Combine(local, "Palon");
+                if (!System.IO.Directory.Exists(oldDir)) continue;
                 System.IO.Directory.CreateDirectory(newDir);
                 var moved = 0;
                 foreach (var entry in System.IO.Directory.EnumerateFileSystemEntries(oldDir))
@@ -318,15 +323,25 @@ static class Settings
                     System.IO.Directory.Move(entry, dest); // moves files too
                     moved++;
                 }
-                if (moved > 0) Log.Write($"Moved {moved} data item(s) from Saley to Bridget");
+                if (moved > 0) Log.Write($"Moved {moved} data item(s) from {predecessor} to Palon");
+            }
+            catch (Exception ex)
+            {
+                // Locked (old app still running?) or partial — whatever moved is
+                // in place; the rest stays in the old folder for the next launch.
+                Log.Write($"Data folder migration from {predecessor} failed: {ex.Message}");
             }
         }
-        catch (Exception ex)
+    }
+
+    static RegistryKey? OpenNewestPredecessorKey()
+    {
+        foreach (var predecessor in Predecessors)
         {
-            // Locked (old app still running?) or partial — whatever moved is
-            // in place; the rest stays in the old folder for the next launch.
-            Log.Write($"Data folder migration failed: {ex.Message}");
+            var key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\" + predecessor);
+            if (key is not null) return key;
         }
+        return null;
     }
 
     static string? Read(string name)

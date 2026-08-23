@@ -1,4 +1,4 @@
-namespace Bridget.Notes;
+namespace Palon.Notes;
 
 /// <summary>
 /// Speech-to-text seam: today the local Whisper engine; a cloud option can

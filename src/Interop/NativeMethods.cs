@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace Bridget.Interop;
+namespace Palon.Interop;
 
 static class NativeMethods
 {
