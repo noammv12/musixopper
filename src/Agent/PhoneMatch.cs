@@ -1,8 +1,10 @@
 namespace Palon.Agent;
 
 /// <summary>
-/// Loose phone-number equality: strip everything but digits and compare
-/// suffixes, so "+972 50-123-4567", "0501234567" and "501234567" all match.
+/// Loose phone-number equality: strip everything but digits, drop the
+/// leading trunk zeros (the "0" of 050… that international +972 50… form
+/// omits), and compare suffixes — so "+972 50-123-4567", "0501234567" and
+/// "501234567" all match.
 /// </summary>
 static class PhoneMatch
 {
@@ -10,8 +12,8 @@ static class PhoneMatch
 
     public static bool Same(string? a, string? b)
     {
-        var da = Digits(a);
-        var db = Digits(b);
+        var da = Digits(a).TrimStart('0');
+        var db = Digits(b).TrimStart('0');
         if (da.Length < MinMeaningfulDigits || db.Length < MinMeaningfulDigits) return false;
         return da.Length >= db.Length ? da.EndsWith(db) : db.EndsWith(da);
     }

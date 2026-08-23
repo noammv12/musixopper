@@ -6,7 +6,8 @@ namespace Palon.Tests;
 public class PhoneMatchTests
 {
     [Theory]
-    [InlineData("+972 50-123-4567", "0501234567")]
+    [InlineData("+972 50-123-4567", "0501234567")]   // trunk zero vs country code
+    [InlineData("+972 (0) 50-123-4567", "0501234567")]
     [InlineData("0501234567", "050-123-4567")]
     [InlineData("501234567", "+972501234567")]
     public void Same_matches_loose_formats(string a, string b)
