@@ -542,6 +542,15 @@ static class Ui
     /// <summary>Hover dim for accent-filled surfaces — the one sanctioned opacity hover.</summary>
     public const double HoverDim = 0.92;
 
+    // Marks press-slide-sensitive elements (chips, capture boxes) so the
+    // flyout's drag-from-anywhere never steals their gesture. PillSwitch and
+    // Segmented are exempted by type; anything else opts out with this.
+    public static readonly DependencyProperty NoDragProperty =
+        DependencyProperty.RegisterAttached("NoDrag", typeof(bool), typeof(PillSwitch), new PropertyMetadata(false));
+
+    public static void SetNoDrag(DependencyObject element, bool value) => element.SetValue(NoDragProperty, value);
+    public static bool GetNoDrag(DependencyObject element) => (bool)element.GetValue(NoDragProperty);
+
     /// <summary>The one elevation spec — both windows cast the same shadow.</summary>
     public static DropShadowEffect Shadow() => new()
     {

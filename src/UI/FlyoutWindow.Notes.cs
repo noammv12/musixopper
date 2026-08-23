@@ -236,6 +236,7 @@ partial class FlyoutWindow
             Child = _hotkeyLabel,
         };
         _hotkeyBox.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
+        Ui.SetNoDrag(_hotkeyBox, true); // a shaky click must arm capture, not drag the card
         Ui.HoverFill(_hotkeyBox);
         _hotkeyBox.MouseLeftButtonUp += (_, _) => Keyboard.Focus(_hotkeyBox);
         _hotkeyBox.GotKeyboardFocus += (_, _) =>

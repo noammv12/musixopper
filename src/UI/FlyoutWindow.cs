@@ -994,7 +994,7 @@ sealed partial class FlyoutWindow : Window
 
     void OnRootDragStart(object sender, MouseButtonEventArgs e)
     {
-        if (InsideTextInput(e.OriginalSource as DependencyObject)) return;
+        if (InsideInteractive(e.OriginalSource as DependencyObject)) return;
         NativeMethods.GetCursorPos(out _dragStartPt);
         _dragStartLeft = Left;
         _dragStartTop = Top;
@@ -1035,12 +1035,19 @@ sealed partial class FlyoutWindow : Window
         e.Handled = true; // the release must not click whatever is underneath
     }
 
-    static bool InsideTextInput(DependencyObject? d)
+    // Text inputs and scrollbars own their gestures outright; toggles,
+    // segmented controls, and Ui.SetNoDrag-flagged elements are press-slide
+    // sensitive — a few pixels of slide must flip the switch, not move the
+    // window. Links and buttons stay draggable (a shaky press still clicks
+    // because the drag threshold gates the handoff).
+    static bool InsideInteractive(DependencyObject? d)
     {
         while (d is not null)
         {
             if (d is System.Windows.Controls.Primitives.TextBoxBase or PasswordBox
-                or System.Windows.Controls.Primitives.ScrollBar) return true;
+                or System.Windows.Controls.Primitives.ScrollBar
+                or PillSwitch or Segmented) return true;
+            if (Ui.GetNoDrag(d)) return true;
             d = d is Visual or System.Windows.Media.Media3D.Visual3D
                 ? VisualTreeHelper.GetParent(d)
                 : LogicalTreeHelper.GetParent(d);

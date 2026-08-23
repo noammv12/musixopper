@@ -124,6 +124,7 @@ partial class FlyoutWindow
             Cursor = System.Windows.Input.Cursors.Hand,
             Child = label,
         };
+        Ui.SetNoDrag(chip, true); // press-slide picks the time, not the window position
         return chip;
     }
 
