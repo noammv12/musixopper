@@ -133,20 +133,26 @@ sealed class Segmented : Grid
         Children.Add(overlay);
 
         _selected = initial;
-        SizeChanged += (_, _) => Layout(animate: false);
-        Loaded += (_, _) => Layout(animate: false);
+        SizeChanged += (_, _) => Sync(animate: false);
+        Loaded += (_, _) => Sync(animate: false);
         UpdateLabels();
     }
 
     public void Select(int index, bool animate)
     {
+        // No-op on same value even for animate:false syncs — reapplying
+        // would cancel an in-flight slide and snap the thumb (the same
+        // guard PillSwitch.Set has).
+        if (_selected == index) return;
         _selected = index;
-        Layout(animate);
-        UpdateLabels();
+        Sync(animate);
     }
 
-    void Layout(bool animate)
+    void Sync(bool animate)
     {
+        // Labels and thumb move as one — a zero-width control (built inside
+        // a collapsed panel) defers both to the first real layout pass.
+        UpdateLabels();
         double w = (ActualWidth - 4) / 2;
         if (w <= 0) return;
         _thumb.Width = w;
