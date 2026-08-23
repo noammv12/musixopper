@@ -367,16 +367,26 @@ static class Ui
         return link;
     }
 
+    // One revert timer per TextBlock: a re-flash restarts the countdown
+    // instead of stacking timers, so feedback never reverts early.
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<TextBlock, DispatcherTimer> FlashTimers = new();
+
     /// <summary>Standard action feedback on a link: swap the text, revert after 1.2 s.</summary>
     public static void Flash(TextBlock link, string message, string revertTo)
     {
         link.Text = message;
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Motion.Revert) };
-        timer.Tick += (_, _) =>
+        var timer = FlashTimers.GetValue(link, l =>
         {
-            timer.Stop();
-            link.Text = revertTo;
-        };
+            var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Motion.Revert) };
+            t.Tick += (_, _) =>
+            {
+                t.Stop();
+                l.Text = (string)t.Tag;
+            };
+            return t;
+        });
+        timer.Tag = revertTo;
+        timer.Stop();
         timer.Start();
     }
 
