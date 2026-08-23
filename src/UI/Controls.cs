@@ -449,6 +449,30 @@ static class Ui
         scale.BeginAnimation(ScaleTransform.ScaleYProperty, Motion.FromTo(scale.ScaleY, to, ms, ease));
     }
 
+    /// <summary>The standard list card: rounded, quiet fill, one card rhythm.</summary>
+    public static Border Card(UIElement child)
+    {
+        var card = new Border
+        {
+            CornerRadius = new CornerRadius(Radius.Card),
+            Padding = Pad.Card,
+            Margin = Top(Space.Row),
+            Child = child,
+        };
+        card.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
+        return card;
+    }
+
+    /// <summary>The one quiet empty-state voice: secondary, wrapping, and
+    /// where there's something to do, saying what.</summary>
+    public static TextBlock EmptyState(string text)
+    {
+        var empty = Small(text);
+        empty.TextWrapping = TextWrapping.Wrap;
+        empty.Margin = new Thickness(2, Space.Row, 2, 0);
+        return empty;
+    }
+
     public static Border Divider(double top, double bottom)
     {
         var line = new Border { Height = 1, Margin = new Thickness(0, top, 0, bottom) };

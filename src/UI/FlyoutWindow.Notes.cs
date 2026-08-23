@@ -535,10 +535,7 @@ partial class FlyoutWindow
         var notes = NotesStore.Load().OrderByDescending(n => n.StartedUtc).Take(10).ToList();
         if (notes.Count == 0)
         {
-            var empty = Ui.Small("No notes yet — they'll appear here after your next call.");
-            empty.TextWrapping = TextWrapping.Wrap;
-            empty.Margin = new Thickness(2, Space.Row, 0, 0);
-            _notesList.Children.Add(empty);
+            _notesList.Children.Add(Ui.EmptyState("No notes yet — they'll appear here after your next call."));
             return;
         }
 
@@ -594,15 +591,7 @@ partial class FlyoutWindow
             stack.Children.Add(followHost);
             if (_followUps.TryGetValue(note.Id, out var cached)) RenderFollowUp(followHost, cached, note.Number);
 
-            var card = new Border
-            {
-                CornerRadius = new CornerRadius(Radius.Card),
-                Padding = Pad.Card,
-                Margin = Ui.Top(Space.Row),
-                Child = stack,
-            };
-            card.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
-            _notesList.Children.Add(card);
+            _notesList.Children.Add(Ui.Card(stack));
         }
     }
 

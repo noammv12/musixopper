@@ -83,8 +83,8 @@ partial class FlyoutWindow
         _statsList.Children.Add(cap);
         if (calls.Count == 0)
         {
-            var empty = Ui.Small("No calls yet.");
-            empty.Margin = Ui.Top(Space.Tight);
+            var empty = Ui.EmptyState("No calls yet.");
+            empty.Margin = Ui.Top(Space.Tight); // section-level: tighter than a whole-panel empty
             _statsList.Children.Add(empty);
             return;
         }
@@ -156,15 +156,7 @@ partial class FlyoutWindow
             if (SnippetPaster.TrySetClipboard(text)) Ui.Flash(copy, "Copied ✓", "Copy");
         };
         stack.Children.Add(copy);
-        var card = new Border
-        {
-            CornerRadius = new CornerRadius(Radius.Card),
-            Padding = Pad.Card,
-            Margin = Ui.Top(Space.Row),
-            Child = stack,
-        };
-        card.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
-        _recapHost.Children.Add(card);
+        _recapHost.Children.Add(Ui.Card(stack));
     }
 
     public void ShowStats()

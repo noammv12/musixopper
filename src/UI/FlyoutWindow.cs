@@ -531,6 +531,8 @@ sealed partial class FlyoutWindow : Window
     void RebuildSnippetList()
     {
         _snippetList.Children.Clear();
+        if (_snippets.Count == 0)
+            _snippetList.Children.Add(Ui.EmptyState("No snippets yet — add one and it becomes a paste chip on the dock."));
         for (var i = 0; i < _snippets.Count; i++)
             _snippetList.Children.Add(BuildSnippetCard(i));
         _addSnippetLink.Visibility =
@@ -632,15 +634,7 @@ sealed partial class FlyoutWindow : Window
             stack.Children.Add(buttons);
         }
 
-        var card = new Border
-        {
-            CornerRadius = new CornerRadius(Radius.Card),
-            Padding = Pad.Card,
-            Margin = Ui.Top(Space.Row),
-            Child = stack,
-        };
-        card.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
-        return card;
+        return Ui.Card(stack);
     }
 
     void MoveSnippet(int index, int delta)

@@ -58,12 +58,7 @@ partial class FlyoutWindow
     {
         _commandList.Children.Clear();
         if (_commands.Count == 0)
-        {
-            var empty = Ui.Small("Nothing yet. Add your go-to places — Salesforce, WhatsApp Web, your CRM — and open them in one click (or by asking).");
-            empty.TextWrapping = TextWrapping.Wrap;
-            empty.Margin = new Thickness(2, Space.Row, 0, 0);
-            _commandList.Children.Add(empty);
-        }
+            _commandList.Children.Add(Ui.EmptyState("Nothing yet. Add your go-to places — Salesforce, WhatsApp Web, your CRM — and open them in one click (or by asking)."));
         for (var i = 0; i < _commands.Count; i++)
             _commandList.Children.Add(BuildCommandCard(i));
         _addCommandLink.Visibility =
@@ -174,15 +169,7 @@ partial class FlyoutWindow
             stack.Children.Add(buttons);
         }
 
-        var card = new Border
-        {
-            CornerRadius = new CornerRadius(Radius.Card),
-            Padding = Pad.Card,
-            Margin = Ui.Top(Space.Row),
-            Child = stack,
-        };
-        card.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
-        return card;
+        return Ui.Card(stack);
     }
 
     void MoveCommand(int index, int delta)

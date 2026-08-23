@@ -206,8 +206,7 @@ partial class FlyoutWindow
 
         panel.Children.Add(Ui.Caption("LAST ANSWER"));
 
-        _exchangeEmpty = Ui.Small("Ask something and it'll show up here.");
-        _exchangeEmpty.Margin = new Thickness(2, Space.Row, 0, 0);
+        _exchangeEmpty = Ui.EmptyState("Ask something and it'll show up here.");
         panel.Children.Add(_exchangeEmpty);
 
         var exchangeStack = new StackPanel();
@@ -225,15 +224,8 @@ partial class FlyoutWindow
             if (SnippetPaster.TrySetClipboard(_lastAnswer.Text)) Ui.Flash(_copyAnswerLink, "Copied ✓", "Copy");
         };
         exchangeStack.Children.Add(_copyAnswerLink);
-        _exchangeCard = new Border
-        {
-            CornerRadius = new CornerRadius(Radius.Card),
-            Padding = Pad.Card,
-            Margin = Ui.Top(Space.Row),
-            Visibility = Visibility.Collapsed,
-            Child = exchangeStack,
-        };
-        _exchangeCard.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
+        _exchangeCard = Ui.Card(exchangeStack);
+        _exchangeCard.Visibility = Visibility.Collapsed;
         panel.Children.Add(_exchangeCard);
 
         var commandsLink = Ui.Link("Manage commands…", Font.Small);

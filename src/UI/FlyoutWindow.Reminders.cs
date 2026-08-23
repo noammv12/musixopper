@@ -204,9 +204,7 @@ partial class FlyoutWindow
 
         if (pending.Count == 0)
         {
-            var empty = Ui.Small("Nothing pending.");
-            empty.Margin = new Thickness(2, Space.Row, 0, 0);
-            _reminderList.Children.Add(empty);
+            _reminderList.Children.Add(Ui.EmptyState("Nothing pending — set one and it pops above the taskbar on time."));
             return;
         }
 
