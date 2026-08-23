@@ -175,8 +175,18 @@ sealed class DockWindow : Window
         _toastIcon = new ShapePath { Width = 10, Height = 11, VerticalAlignment = VerticalAlignment.Center };
         _toastIcon.SetResourceReference(Shape.FillProperty, "TextPrimaryBrush");
         // Medium, not SemiBold: the sanctioned exception — on the compact pill
-        // Medium at Lead size reads better (see AUDIT.md).
-        _toastText = new TextBlock { FontSize = Font.Lead, FontWeight = FontWeights.Medium, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+        // Medium at Lead size reads better (see AUDIT.md). MaxWidth sits just
+        // under the pill's 600px clamp so a long line ellipsizes instead of
+        // hard-clipping mid-glyph.
+        _toastText = new TextBlock
+        {
+            FontSize = Font.Lead,
+            FontWeight = FontWeights.Medium,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(8, 0, 0, 0),
+            MaxWidth = 540,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+        };
         _toastText.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
         _toastContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 16, 0) };
         _toastContent.Children.Add(_toastIcon);
@@ -647,20 +657,33 @@ sealed class DockWindow : Window
         // the user hovering the dock is exactly who's waiting for the outcome.
         if (_state == DockState.Expanded && onClick is null && !important) return;
 
-        _toastText.Text = text;
-        _toastIcon.Data = paused ? PauseGlyph : PlayGlyph;
-        _toastIcon.Visibility = showIcon ? Visibility.Visible : Visibility.Collapsed;
-        _toastAction = onClick;
-        _toastContent.Cursor = onClick is null ? Cursors.Arrow : Cursors.Hand;
+        void Apply()
+        {
+            _toastText.Text = text;
+            _toastIcon.Data = paused ? PauseGlyph : PlayGlyph;
+            _toastIcon.Visibility = showIcon ? Visibility.Visible : Visibility.Collapsed;
+            _toastAction = onClick;
+            _toastContent.Cursor = onClick is null ? Cursors.Arrow : Cursors.Hand;
+        }
 
         _toastTimer.Stop();
         _toastTimer.Start();
         if (_state == DockState.Toast)
         {
-            // Toast replacing a toast: resize the pill for the new text.
-            AnimatePillTo(MeasureWidth(_toastContent), ToastHeight, Motion.Fast, Motion.Out);
+            // Toast replacing a toast: dip the old line out, swap, fade the
+            // new one in as the pill resizes — text never teleports mid-morph.
+            // A third toast during the dip simply replaces this animation.
+            var fadeOut = Motion.Fade(0, Motion.Exit);
+            fadeOut.Completed += (_, _) =>
+            {
+                Apply();
+                AnimatePillTo(MeasureWidth(_toastContent), ToastHeight, Motion.Fast, Motion.Out);
+                _toastContent.BeginAnimation(OpacityProperty, Motion.FromTo(0, 1, Motion.Fast));
+            };
+            _toastContent.BeginAnimation(OpacityProperty, fadeOut);
             return;
         }
+        Apply();
         SetState(DockState.Toast);
     }
 
@@ -887,24 +910,43 @@ sealed class DockWindow : Window
 
     Border MakeChip(Snippet snippet)
     {
-        var chip = MakeChipShell(snippet.Label.Length > 0 ? snippet.Label : "(untitled)");
+        var original = snippet.Label.Length > 0 ? snippet.Label : "(untitled)";
+        var chip = MakeChipShell(original);
         var label = (TextBlock)chip.Child;
         chip.ToolTip = snippet.Text.Length > 120 ? snippet.Text[..120] + "…" : snippet.Text;
+
+        // One revert timer per chip: rapid clicks restart it instead of
+        // stacking timers, so the feedback never reverts early and the
+        // MinWidth pin holds until the last flash is done.
+        var revert = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Motion.Revert) };
+        revert.Tick += (_, _) =>
+        {
+            revert.Stop();
+            label.Text = original;
+            chip.MinWidth = 0;
+        };
+        void Feedback(string message)
+        {
+            chip.MinWidth = chip.ActualWidth; // keep the pill from jumping while the text swaps
+            label.Text = message;
+            revert.Stop();
+            revert.Start();
+        }
 
         chip.MouseLeftButtonUp += async (_, _) =>
         {
             var result = await SnippetPaster.PasteAsync(snippet);
-            Feedback(chip, label, result switch
+            Feedback(result switch
             {
                 PasteResult.Pasted => "Pasted ✓",
                 PasteResult.CopiedOnly => "Copied ✓",
                 _ => "Failed",
-            }, snippet.Label);
+            });
         };
         chip.MouseRightButtonUp += (_, _) =>
         {
             var result = SnippetPaster.CopyOnly(snippet);
-            Feedback(chip, label, result == PasteResult.Failed ? "Failed" : "Copied ✓", snippet.Label);
+            Feedback(result == PasteResult.Failed ? "Failed" : "Copied ✓");
         };
         return chip;
     }
@@ -936,20 +978,6 @@ sealed class DockWindow : Window
         // Chips never start a pill drag.
         chip.MouseLeftButtonDown += (_, e) => e.Handled = true;
         return chip;
-    }
-
-    static void Feedback(Border chip, TextBlock label, string message, string original)
-    {
-        chip.MinWidth = chip.ActualWidth; // keep the pill from jumping while the text swaps
-        label.Text = message;
-        var revert = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Motion.Revert) };
-        revert.Tick += (_, _) =>
-        {
-            revert.Stop();
-            label.Text = original.Length > 0 ? original : "(untitled)";
-            chip.MinWidth = 0;
-        };
-        revert.Start();
     }
 
     // ---- state & animation --------------------------------------------------------
