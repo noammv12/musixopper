@@ -486,6 +486,10 @@ static class Ui
 
     static ScaleTransform AttachScale(FrameworkElement element)
     {
+        // Reuse an existing scale so HoverSpring and PressSpring on the same
+        // element share one transform instead of silently detaching each
+        // other's — the second attach used to strand the first's animations.
+        if (element.RenderTransform is ScaleTransform existing) return existing;
         var scale = new ScaleTransform(1, 1);
         element.RenderTransform = scale;
         element.RenderTransformOrigin = new Point(0.5, 0.5);

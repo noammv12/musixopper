@@ -150,6 +150,7 @@ partial class FlyoutWindow
             return;
         }
         RebuildStats();
+        Ui.StaggerIn(_statsList); // every other panel's list arrives this way too
         ShowFlyoutCore(onboarding: false, force: true);
         ShowPanel(_statsPanel);
     }
