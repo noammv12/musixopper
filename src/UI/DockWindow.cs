@@ -134,6 +134,9 @@ sealed class DockWindow : Window
         Left = -10000;
         Top = -10000;
         FontFamily = Font.Family;
+        // Same deal as the flyout: keep the pill's 1px stroke on device pixels.
+        UseLayoutRounding = true;
+        SnapsToDevicePixels = true;
 
         _collapsedDot = new Ellipse { Width = 6, Height = 6 };
         _collapsedDot.SetResourceReference(Shape.FillProperty, "StatusGoodBrush");
@@ -271,14 +274,7 @@ sealed class DockWindow : Window
             Margin = new Thickness(20, 20, 20, BottomGap),
             Cursor = Cursors.Hand,
             BorderThickness = new Thickness(1),
-            Effect = new DropShadowEffect
-            {
-                BlurRadius = 16,
-                ShadowDepth = 2,
-                Direction = 270,
-                Opacity = 0.45,
-                Color = Colors.Black,
-            },
+            Effect = Ui.Shadow(),
             Child = host,
         };
         _pill.SetResourceReference(Border.BackgroundProperty, "SurfaceBrush");

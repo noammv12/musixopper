@@ -95,6 +95,10 @@ sealed partial class FlyoutWindow : Window
         ShowInTaskbar = false;
         Topmost = true;
         SizeToContent = SizeToContent.Height;
+        // 1px hairlines and strokes must land on device pixels — at 125/150%
+        // DPI an unrounded divider blurs into two grey rows and disappears.
+        UseLayoutRounding = true;
+        SnapsToDevicePixels = true;
         Width = 292 + ShadowMargin * 2;
         WindowStartupLocation = WindowStartupLocation.Manual;
         Left = -10000;
@@ -161,14 +165,7 @@ sealed partial class FlyoutWindow : Window
             RenderTransform = new TransformGroup { Children = { _rootScale, _rootSlide } },
             RenderTransformOrigin = new Point(0.5, 1),
             BorderThickness = new Thickness(1),
-            Effect = new DropShadowEffect
-            {
-                BlurRadius = 24,
-                ShadowDepth = 4,
-                Direction = 270,
-                Opacity = 0.45,
-                Color = Colors.Black,
-            },
+            Effect = Ui.Shadow(),
             Child = glassHost,
         };
         _root.SetResourceReference(Border.BackgroundProperty, "SurfaceBrush");

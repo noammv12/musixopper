@@ -393,7 +393,8 @@ static class Ui
         {
             CornerRadius = new CornerRadius(Radius.Card),
             Padding = Pad.CardLoose,
-            BorderThickness = new Thickness(1.5),
+            BorderThickness = new Thickness(1), // whole pixels only — 1.5 blurs at every DPI
+
             BorderBrush = Brushes.Transparent,
             Cursor = Cursors.Hand,
             Child = stack,
