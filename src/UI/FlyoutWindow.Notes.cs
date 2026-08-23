@@ -445,7 +445,7 @@ partial class FlyoutWindow
             stack.Children.Add(header);
 
             var body = note.Summary ?? note.Transcript;
-            var preview = Ui.Small(body.Length > 220 ? body[..220] + "…" : body, "TextPrimaryBrush");
+            var preview = Ui.AlignByScript(Ui.Small(body.Length > 220 ? body[..220] + "…" : body, "TextPrimaryBrush"));
             preview.TextWrapping = TextWrapping.Wrap;
             preview.Margin = Ui.Top(Space.Tight);
             stack.Children.Add(preview);
@@ -493,7 +493,7 @@ partial class FlyoutWindow
     {
         host.Children.Clear();
         var inner = new StackPanel();
-        var body = Ui.Small(text, "TextPrimaryBrush");
+        var body = Ui.AlignByScript(Ui.Small(text, "TextPrimaryBrush"));
         body.TextWrapping = TextWrapping.Wrap;
         inner.Children.Add(body);
         var links = new StackPanel { Orientation = Orientation.Horizontal, Margin = Ui.Top(Space.Tight) };

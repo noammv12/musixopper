@@ -553,7 +553,7 @@ sealed partial class FlyoutWindow : Window
         for (var c = 0; c < 3; c++)
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var titleText = snippet.Label.Length > 0 ? snippet.Label : "(untitled)";
+        var titleText = snippet.Label.Length > 0 ? Bidi.Isolate(snippet.Label) : "(untitled)";
         if (Settings.SnippetHotkeys && index < 9) titleText = $"{index + 1} · {titleText}";
         var title = Ui.Lead(titleText);
         title.TextTrimming = TextTrimming.CharacterEllipsis;

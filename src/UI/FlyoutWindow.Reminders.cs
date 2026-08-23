@@ -216,8 +216,8 @@ partial class FlyoutWindow
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            var label = Ui.Text(reminder.DisplayLabel, Font.Body, "TextPrimaryBrush", FontWeights.SemiBold);
-            label.TextTrimming = TextTrimming.CharacterEllipsis;
+            var label = Ui.AlignByScript(Ui.Text(reminder.DisplayLabel, Font.Body, "TextPrimaryBrush", FontWeights.SemiBold));
+            label.TextTrimming = TextTrimming.CharacterEllipsis; // RTL flow puts the ellipsis at the run's logical end
             label.VerticalAlignment = VerticalAlignment.Center;
             row.Children.Add(label);
 

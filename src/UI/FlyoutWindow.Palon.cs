@@ -261,6 +261,8 @@ partial class FlyoutWindow
         }
         _lastQuestion.Text = question;
         _lastAnswer.Text = answer;
+        Ui.AlignByScript(_lastQuestion);
+        Ui.AlignByScript(_lastAnswer);
         _copyAnswerLink.Text = "Copy";
         _exchangeEmpty.Visibility = Visibility.Collapsed;
         _exchangeCard.Visibility = Visibility.Visible;

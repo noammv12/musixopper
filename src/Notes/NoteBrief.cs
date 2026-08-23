@@ -15,7 +15,9 @@ static class NoteBrief
         var room = Math.Max(20, MaxChars - prefix.Length);
         var line = KeyLine(note.Summary ?? note.Transcript);
         if (line.Length > room) line = line[..room].TrimEnd() + "…";
-        return prefix + line;
+        // Isolate after truncation so the ellipsis travels with the run and
+        // a Hebrew key line can't reorder the prefix's separators.
+        return prefix + Bidi.Isolate(line);
     }
 
     /// <summary>The next-step line when the summary has one, else the first

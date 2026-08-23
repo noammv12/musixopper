@@ -829,7 +829,9 @@ sealed class DockWindow : Window
     {
         if (_currentReminder is not { } current) return;
         _reminderOpenLabel.Text = current.Reminder.HasUrl ? "Open" : "Done";
-        _reminderLabel.Text = (current.Missed ? "Missed · " : "") + current.Reminder.DisplayLabel;
+        // The label is user text (often Hebrew) glued to an LTR prefix —
+        // isolate it so the separators keep their place.
+        _reminderLabel.Text = (current.Missed ? "Missed · " : "") + Bidi.Isolate(current.Reminder.DisplayLabel);
         _reminderCount.Text = _reminderQueue.Count > 0 ? $"+{_reminderQueue.Count}" : "";
         if (_state == DockState.Reminder)
             AnimatePillTo(MeasureWidth(_reminderContent), ExpandedHeight, Motion.Fast, Motion.Out);

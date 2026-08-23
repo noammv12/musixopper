@@ -33,9 +33,19 @@ public class NoteBriefTests
         var note = new CallNote("id", Now.AddDays(-3), 300, null,
             new string('א', 300), "ok", "050-1234567");
         var brief = NoteBrief.Compose(note, Now);
-        Assert.StartsWith("050-1234567 · 3d ago: ", brief);
+        // The Hebrew key line is wrapped in bidi isolates (after truncation,
+        // so the ellipsis travels inside the run).
+        Assert.StartsWith("050-1234567 · 3d ago: \u2068", brief);
         Assert.True(brief.Length <= 95);
-        Assert.EndsWith("…", brief);
+        Assert.EndsWith("…\u2069", brief);
+    }
+
+    [Fact]
+    public void Compose_leaves_ltr_briefs_unwrapped()
+    {
+        var note = new CallNote("id", Now.AddDays(-1), 300, null,
+            "Next step: send the quote", "ok", null);
+        Assert.Equal("yesterday: Next step: send the quote", NoteBrief.Compose(note, Now));
     }
 
     [Theory]

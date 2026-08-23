@@ -639,6 +639,15 @@ static class Ui
         return card;
     }
 
+    /// <summary>Gives a text block the base direction its content wants: a
+    /// Hebrew paragraph flows (and wraps, and ellipsizes) right-to-left
+    /// instead of hanging off a left margin. Safe to re-apply as text changes.</summary>
+    public static TextBlock AlignByScript(TextBlock tb)
+    {
+        tb.FlowDirection = Bidi.HasRtl(tb.Text) ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
+        return tb;
+    }
+
     /// <summary>The one quiet empty-state voice: secondary, wrapping, and
     /// where there's something to do, saying what.</summary>
     public static TextBlock EmptyState(string text)
