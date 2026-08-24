@@ -25,9 +25,12 @@ sealed class Dictation : IDisposable
     public event Action? Stopped;
     public event Action<string>? StatusChanged; // "" = idle
     public event Action<string>? ToastRequested;
+    /// <summary>Mic level in dBFS while recording (capture thread).</summary>
+    public event Action<double>? Level;
 
     public Dictation()
     {
+        _recorder.LevelDb += db => Level?.Invoke(db);
         _cap = new DispatcherTimer { Interval = MaxLength };
         _cap.Tick += (_, _) =>
         {

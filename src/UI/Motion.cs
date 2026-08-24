@@ -23,6 +23,7 @@ static class Motion
     public static readonly IEasingFunction Out = Freeze(new CubicEase { EasingMode = EasingMode.EaseOut });
     public static readonly IEasingFunction InOut = Freeze(new CubicEase { EasingMode = EasingMode.EaseInOut });
     public static readonly IEasingFunction Overshoot = Freeze(new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.3 });
+    public static readonly IEasingFunction Sine = Freeze(new SineEase { EasingMode = EasingMode.EaseInOut }); // breathing — organic, no hard edges
 
     public static DoubleAnimation Fade(double to, int ms, IEasingFunction? ease = null) =>
         new(to, TimeSpan.FromMilliseconds(ms)) { EasingFunction = ease ?? Out };

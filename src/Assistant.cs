@@ -41,6 +41,8 @@ sealed class Assistant : IDisposable
     public event Action<string>? StatusChanged; // "" = idle
     public event Action<string>? ToastRequested;
     public event Action<string, string>? Answered; // question, answer
+    /// <summary>Mic level in dBFS while listening (capture thread).</summary>
+    public event Action<double>? Level;
 
     public Assistant(Func<CallState> callState, Func<string?> currentNumber)
     {
@@ -56,6 +58,7 @@ sealed class Assistant : IDisposable
         _speaker.SpeakingChanged += speaking => StatusChanged?.Invoke(speaking ? "Speaking…" : "");
         // Raised on the capture thread — hop to the UI thread before state.
         _recorder.AutoStopped += hadSpeech => _cap.Dispatcher.InvokeAsync(() => OnAutoStopped(hadSpeech));
+        _recorder.LevelDb += db => Level?.Invoke(db);
     }
 
     void OnAutoStopped(bool hadSpeech)

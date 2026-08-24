@@ -66,8 +66,19 @@ sealed class DockWindow : Window
     TextBlock _reminderOpenLabel = null!;
     readonly StackPanel _dictationContent;
     readonly Ellipse _dictationDot;
+    readonly StackPanel _wavePanel;
+    readonly Border[] _waveBars = new Border[5];
     readonly TextBlock _assistantGlyph;
     readonly TextBlock _dictationText;
+
+    // Waveform: center-weighted bar profile, level smoothed with fast
+    // attack / slow decay so speech snaps up and settles down.
+    static readonly double[] WaveWeights = { 0.6, 0.85, 1, 0.85, 0.6 };
+    const double WaveMinHeight = 4;
+    const double WaveMaxHeight = 18;
+    bool _waveActive;
+    double _voiceLevel;
+    int _waveTick;
 
     readonly DispatcherTimer _hoverIntent;
     readonly DispatcherTimer _collapseDelay;
@@ -245,6 +256,27 @@ sealed class DockWindow : Window
         // -- dictation / assistant content ------------------------------------
         _dictationDot = new Ellipse { Width = 8, Height = 8, VerticalAlignment = VerticalAlignment.Center };
         _dictationDot.SetResourceReference(Shape.FillProperty, "StatusGoodBrush");
+        // Wispr-style waveform — swapped in for the dot once mic levels flow.
+        _wavePanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+            Visibility = Visibility.Collapsed,
+        };
+        for (var i = 0; i < _waveBars.Length; i++)
+        {
+            var bar = new Border
+            {
+                Width = 3,
+                Height = WaveMinHeight,
+                CornerRadius = new CornerRadius(1.5),
+                Margin = new Thickness(i == 0 ? 0 : 2, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            bar.SetResourceReference(Border.BackgroundProperty, "AccentBrush");
+            _waveBars[i] = bar;
+            _wavePanel.Children.Add(bar);
+        }
         _assistantGlyph = new TextBlock
         {
             Text = "💬",
@@ -269,6 +301,7 @@ sealed class DockWindow : Window
             (_assistantActive ? AssistantCancelRequested : DictationCancelRequested)?.Invoke();
         _dictationContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 12, 0) };
         _dictationContent.Children.Add(_dictationDot);
+        _dictationContent.Children.Add(_wavePanel);
         _dictationContent.Children.Add(_assistantGlyph);
         _dictationContent.Children.Add(_dictationText);
         _dictationContent.Children.Add(dictationFinish);
@@ -516,9 +549,10 @@ sealed class DockWindow : Window
 
     void UpdateListeningText()
     {
-        // 💬 marks Palon listening; the pulsing dot marks dictation.
+        // 💬 marks Palon listening; the pulsing dot marks dictation — until
+        // mic levels flow and the waveform takes the dot's place.
         _assistantGlyph.Visibility = _assistantActive ? Visibility.Visible : Visibility.Collapsed;
-        _dictationDot.Visibility = _assistantActive ? Visibility.Collapsed : Visibility.Visible;
+        _dictationDot.Visibility = _assistantActive || _waveActive ? Visibility.Collapsed : Visibility.Visible;
         _dictationText.Text =
             _assistantActive ? "Palon is listening — ask away"
             : DictationHotkeyLive ? $"Listening — {_dictationHotkey} to finish"
@@ -660,7 +694,7 @@ sealed class DockWindow : Window
         _statusDot.SetResourceReference(Shape.FillProperty, dotKey);
         UpdateStatusText();
         if (_state == DockState.Collapsed)
-            _pill.BeginAnimation(OpacityProperty, Motion.Fade(RestingOpacityFor(), Motion.Fast));
+            SettleCollapsedOpacity(Motion.Fast);
     }
 
     /// <summary>Shown in the expanded status line while a note is being processed.</summary>
@@ -839,16 +873,69 @@ sealed class DockWindow : Window
     }
 
     void StartDictationPulse() => _dictationDot.BeginAnimation(OpacityProperty,
-        new DoubleAnimation(1, 0.35, TimeSpan.FromMilliseconds(Motion.PulseFast))
+        new DoubleAnimation(1, 0.45, TimeSpan.FromMilliseconds(Motion.PulseFast))
         {
             AutoReverse = true,
             RepeatBehavior = RepeatBehavior.Forever,
+            EasingFunction = Motion.Sine, // breathe, don't blink
         });
 
     void StopDictationPulse()
     {
         _dictationDot.BeginAnimation(OpacityProperty, null);
         _dictationDot.Opacity = 1;
+    }
+
+    /// <summary>Live mic level (dBFS) while dictating / asking — drives the
+    /// waveform bars. Safe from any thread; ignored outside the listening
+    /// pill. If levels never arrive the pulsing dot simply stays.</summary>
+    public void SetVoiceLevel(double db)
+    {
+        if (!CheckAccess())
+        {
+            Dispatcher.InvokeAsync(() => SetVoiceLevel(db));
+            return;
+        }
+        if (_state != DockState.Dictation) return;
+        if (!_waveActive) StartWave();
+
+        // −55…−20 dBFS → 0…1; fast attack, slow decay.
+        var target = Math.Clamp((db + 55) / 35.0, 0, 1);
+        _voiceLevel += (target - _voiceLevel) * (target > _voiceLevel ? 0.6 : 0.15);
+        _waveTick++;
+        for (var i = 0; i < _waveBars.Length; i++)
+        {
+            // A whisper of per-bar drift so quiet stretches still feel alive.
+            var jitter = 0.08 * Math.Sin(_waveTick * 0.9 + i * 1.7);
+            var span = Math.Clamp(_voiceLevel * WaveWeights[i] + jitter, 0, 1);
+            var height = WaveMinHeight + (WaveMaxHeight - WaveMinHeight) * span;
+            _waveBars[i].BeginAnimation(HeightProperty,
+                Motion.FromTo(_waveBars[i].ActualHeight, height, Motion.Fast, Motion.Out));
+        }
+    }
+
+    void StartWave()
+    {
+        _waveActive = true;
+        _voiceLevel = 0;
+        StopDictationPulse();
+        _wavePanel.Visibility = Visibility.Visible;
+        UpdateListeningText(); // hides the dot
+        // The bars are wider than the dot — let the pill grow to fit.
+        AnimatePillTo(MeasureWidth(_dictationContent), ExpandedHeight, Motion.Fast, Motion.Out);
+    }
+
+    void StopWave()
+    {
+        if (!_waveActive) return;
+        _waveActive = false;
+        _wavePanel.Visibility = Visibility.Collapsed;
+        foreach (var bar in _waveBars)
+        {
+            bar.BeginAnimation(HeightProperty, null);
+            bar.Height = WaveMinHeight;
+        }
+        UpdateListeningText();
     }
 
     /// <summary>Where the dock settles when a transient state ends.</summary>
@@ -1073,9 +1160,14 @@ sealed class DockWindow : Window
     void SetState(DockState state)
     {
         if (_state == state) return;
-        if (_state == DockState.Dictation) StopDictationPulse();
+        if (_state == DockState.Dictation)
+        {
+            StopDictationPulse();
+            StopWave();
+        }
+        var outgoing = ContentFor(_state);
         _state = state;
-        ApplyContentVisibility();
+        TransitionContent(outgoing, ContentFor(state));
         if (state is DockState.Collapsed or DockState.Expanded && _pendingToast is { } held)
         {
             _pendingToast = null;
@@ -1092,13 +1184,14 @@ sealed class DockWindow : Window
         switch (state)
         {
             case DockState.Collapsed:
-                SetPillRadius(5);
+                AnimatePillRadius(5, Motion.Base);
                 AnimatePillTo(CollapsedWidth, CollapsedHeight, Motion.Base, Motion.InOut);
-                _pill.BeginAnimation(OpacityProperty, Motion.Fade(RestingOpacityFor(), Motion.Base, Motion.InOut));
+                SettleCollapsedOpacity(Motion.Base, Motion.InOut);
+                FadeInContent(_collapsedDot); // reclaims opacity from its exit fade
                 break;
             case DockState.Expanded:
                 Reposition();
-                SetPillRadius(20);
+                AnimatePillRadius(20, Motion.Slow);
                 AnimatePillTo(MeasureExpandedWidth(), ExpandedHeight, Motion.Slow, Motion.Overshoot);
                 _pill.BeginAnimation(OpacityProperty, Motion.Fade(1.0, Motion.Fast));
                 FadeInContent(_expandedContent);
@@ -1106,7 +1199,7 @@ sealed class DockWindow : Window
                 PopPill();
                 break;
             case DockState.Toast:
-                SetPillRadius(18);
+                AnimatePillRadius(18, Motion.Base);
                 AnimatePillTo(MeasureWidth(_toastContent), ToastHeight, Motion.Base, Motion.Out);
                 _pill.BeginAnimation(OpacityProperty, Motion.Fade(1.0, Motion.Fast));
                 FadeInContent(_toastContent);
@@ -1115,7 +1208,7 @@ sealed class DockWindow : Window
                 break;
             case DockState.Reminder:
                 Reposition();
-                SetPillRadius(20);
+                AnimatePillRadius(20, Motion.Slow);
                 AnimatePillTo(MeasureWidth(_reminderContent), ExpandedHeight, Motion.Slow, Motion.Overshoot);
                 _pill.BeginAnimation(OpacityProperty, Motion.Fade(1.0, Motion.Fast));
                 FadeInContent(_reminderContent);
@@ -1123,14 +1216,40 @@ sealed class DockWindow : Window
                 break;
             case DockState.Dictation:
                 Reposition();
-                SetPillRadius(20);
+                AnimatePillRadius(20, Motion.Slow);
                 AnimatePillTo(MeasureWidth(_dictationContent), ExpandedHeight, Motion.Slow, Motion.Overshoot);
                 _pill.BeginAnimation(OpacityProperty, Motion.Fade(1.0, Motion.Fast));
                 FadeInContent(_dictationContent);
                 PopPill();
-                StartDictationPulse();
+                if (_waveActive) UpdateListeningText();
+                else StartDictationPulse();
                 break;
         }
+    }
+
+    /// <summary>Fade the pill down to its resting opacity, then hand over to
+    /// the idle breathe — a barely-there slow swell that says "alive" the way
+    /// Wispr Flow's sliver does. Any later opacity animation replaces it.</summary>
+    void SettleCollapsedOpacity(int ms, IEasingFunction? ease = null)
+    {
+        var settle = Motion.Fade(RestingOpacityFor(), ms, ease);
+        settle.Completed += (_, _) =>
+        {
+            if (_state == DockState.Collapsed && _callState == CallState.Idle) StartIdleBreathe();
+        };
+        _pill.BeginAnimation(OpacityProperty, settle);
+    }
+
+    void StartIdleBreathe()
+    {
+        var rest = RestingOpacityFor();
+        _pill.BeginAnimation(OpacityProperty,
+            new DoubleAnimation(rest, rest - 0.12, TimeSpan.FromMilliseconds(Motion.PulseSlow * 2))
+            {
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+                EasingFunction = Motion.Sine,
+            });
     }
 
     void ApplyContentVisibility()
@@ -1140,6 +1259,32 @@ sealed class DockWindow : Window
         _toastContent.Visibility = _state == DockState.Toast ? Visibility.Visible : Visibility.Collapsed;
         _reminderContent.Visibility = _state == DockState.Reminder ? Visibility.Visible : Visibility.Collapsed;
         _dictationContent.Visibility = _state == DockState.Dictation ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    UIElement ContentFor(DockState state) => state switch
+    {
+        DockState.Expanded => _expandedContent,
+        DockState.Toast => _toastContent,
+        DockState.Reminder => _reminderContent,
+        DockState.Dictation => _dictationContent,
+        _ => _collapsedDot,
+    };
+
+    /// <summary>Outgoing content exits with a quick fade instead of blinking
+    /// off; the incoming fade (FadeInContent, delayed a beat) starts as the
+    /// exit lands, so swaps read as a hand-off, not a cut.</summary>
+    void TransitionContent(UIElement outgoing, UIElement incoming)
+    {
+        if (outgoing == incoming) return;
+        incoming.Visibility = Visibility.Visible;
+        var exit = Motion.Fade(0, Motion.Exit);
+        exit.Completed += (_, _) =>
+        {
+            // A rapid flip may have made it the active content again —
+            // FadeInContent already reclaimed its opacity in that case.
+            if (ContentFor(_state) != outgoing) outgoing.Visibility = Visibility.Collapsed;
+        };
+        outgoing.BeginAnimation(OpacityProperty, exit);
     }
 
     double RestingOpacityFor() => _callState == CallState.Disabled ? DisabledOpacity : RestingOpacity;
@@ -1164,6 +1309,24 @@ sealed class DockWindow : Window
         _glassSheen.CornerRadius = new CornerRadius(Math.Max(0, radius - 1));
     }
 
+    /// <summary>Animatable corner radius — CornerRadius can't take a
+    /// DoubleAnimation, so this DP proxies into SetPillRadius and the radius
+    /// morphs with the width instead of snapping ahead of it.</summary>
+    public static readonly DependencyProperty PillRadiusProperty = DependencyProperty.Register(
+        nameof(PillRadius), typeof(double), typeof(DockWindow),
+        new PropertyMetadata(5.0, (d, e) => ((DockWindow)d).SetPillRadius((double)e.NewValue)));
+
+    public double PillRadius
+    {
+        get => (double)GetValue(PillRadiusProperty);
+        set => SetValue(PillRadiusProperty, value);
+    }
+
+    // Motion.Out, not the pill's Overshoot: a radius that overshoots past
+    // height/2 squares off the collapsed sliver for a frame.
+    void AnimatePillRadius(double to, int ms) =>
+        BeginAnimation(PillRadiusProperty, Motion.FromTo(PillRadius, to, ms, Motion.Out));
+
     /// <summary>A tiny spring up from the taskbar edge whenever the pill grows.</summary>
     void PopPill()
     {
@@ -1181,7 +1344,9 @@ sealed class DockWindow : Window
     {
         PrepareFade(content);
         var fadeIn = Motion.FromTo(0, 1, Motion.Fast);
-        fadeIn.BeginTime = TimeSpan.FromMilliseconds(60);
+        // One Exit beat late, so the incoming fade starts as the outgoing
+        // content's exit fade lands (TransitionContent).
+        fadeIn.BeginTime = TimeSpan.FromMilliseconds(Motion.Exit);
         content.BeginAnimation(OpacityProperty, fadeIn);
     }
 
@@ -1190,7 +1355,7 @@ sealed class DockWindow : Window
         var rise = new TranslateTransform(0, 4);
         content.RenderTransform = rise;
         var up = Motion.FromTo(4, 0, Motion.Base, Motion.Out);
-        up.BeginTime = TimeSpan.FromMilliseconds(60);
+        up.BeginTime = TimeSpan.FromMilliseconds(Motion.Exit);
         rise.BeginAnimation(TranslateTransform.YProperty, up);
     }
 

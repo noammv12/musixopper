@@ -80,6 +80,7 @@ sealed class Shell : IDisposable
         _dictation.Started += () => _dock.SetDictation(true);
         _dictation.Stopped += () => _dock.SetDictation(false);
         _dictation.StatusChanged += status => _dock.SetDictationStatus(status);
+        _dictation.Level += _dock.SetVoiceLevel;
         _dictation.ToastRequested += message => _dock.ShowToast(message, paused: false, showIcon: false, important: true);
         // One microphone mode at a time: the other hotkey is inert while a
         // session runs, so the shared pill's buttons always match the mode.
@@ -100,6 +101,7 @@ sealed class Shell : IDisposable
         _assistant.Started += () => _dock.SetAssistant(true);
         _assistant.Stopped += () => _dock.SetAssistant(false);
         _assistant.StatusChanged += status => _dock.SetAssistantStatus(status);
+        _assistant.Level += _dock.SetVoiceLevel;
         _assistant.ToastRequested += message => _dock.ShowToast(message, paused: false, showIcon: false, important: true);
         _assistant.Answered += (question, answer) =>
         {
