@@ -12,8 +12,18 @@ static class NativeMethods
     public const long WS_EX_NOACTIVATE = 0x08000000;
 
     public const uint SWP_NOSIZE = 0x1;
+    public const uint SWP_NOMOVE = 0x2;
     public const uint SWP_NOZORDER = 0x4;
     public const uint SWP_NOACTIVATE = 0x10;
+
+    public static readonly IntPtr HWND_TOPMOST = new(-1);
+
+    // Work-area / display churn the dock repositions on: WM_SETTINGCHANGE
+    // fires for taskbar moves/auto-hide (SystemEvents.DisplaySettingsChanged
+    // does not), WM_DISPLAYCHANGE for resolution, WM_DPICHANGED for scale.
+    public const int WM_SETTINGCHANGE = 0x001A;
+    public const int WM_DISPLAYCHANGE = 0x007E;
+    public const int WM_DPICHANGED = 0x02E0;
 
     public const int ATTACH_PARENT_PROCESS = -1;
 

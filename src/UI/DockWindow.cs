@@ -73,8 +73,10 @@ sealed class DockWindow : Window
     readonly DispatcherTimer _collapseDelay;
     readonly DispatcherTimer _toastTimer;
     readonly DispatcherTimer _fullscreenPoll;
+    readonly DispatcherTimer _repositionDebounce;
     readonly DispatcherTimer _callTicker;
     DateTime _callStartedUtc;
+    int _pollTicks;
 
     DockState _state = DockState.Collapsed;
     CallState _callState = CallState.Idle;
@@ -323,7 +325,19 @@ sealed class DockWindow : Window
             if (_state == DockState.Toast) SetState(RestState());
         };
         _fullscreenPoll = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
-        _fullscreenPoll.Tick += (_, _) => UpdateFullscreenHidden();
+        _fullscreenPoll.Tick += (_, _) =>
+        {
+            UpdateFullscreenHidden();
+            // Cheap insurance against z-order theft: an app leaving
+            // fullscreen (or another topmost tool) can end up above us.
+            if (++_pollTicks % 5 == 0 && IsVisible) ReassertTopmost();
+        };
+        _repositionDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        _repositionDebounce.Tick += (_, _) =>
+        {
+            _repositionDebounce.Stop();
+            Reposition();
+        };
         _callTicker = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _callTicker.Tick += (_, _) => UpdateStatusText();
 
@@ -519,8 +533,19 @@ sealed class DockWindow : Window
     {
         Show();
         Reposition();
+        // Don't wait for the first 2 s poll tick — if the user is already
+        // presenting/fullscreen (or the logon shell still reads busy), hide
+        // now; and if we're hidden wrongly it re-checks on the next tick.
+        UpdateFullscreenHidden();
         _fullscreenPoll.Start();
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplayChanged;
+        Microsoft.Win32.SystemEvents.SessionSwitch += OnSessionSwitch;
+        Microsoft.Win32.SystemEvents.PowerModeChanged += OnPowerModeChanged;
+
+        // At logon the taskbar often hasn't reserved its strip yet, so the
+        // first Reposition pins the pill under it — re-run once things settle.
+        RepositionSoon(TimeSpan.FromSeconds(1.5));
+        RepositionSoon(TimeSpan.FromSeconds(5));
 
         // Anything held before the window existed (e.g. the startup hotkey-
         // conflict warning) replays now — nothing else fires it at launch.
@@ -551,13 +576,59 @@ sealed class DockWindow : Window
         _toastTimer.Stop();
         _fullscreenPoll.Stop();
         _callTicker.Stop();
+        _repositionDebounce.Stop();
         SnippetStore.Changed -= RefreshChips;
         SnippetStore.Changed -= ApplySnippetHotkeys;
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplayChanged;
+        Microsoft.Win32.SystemEvents.SessionSwitch -= OnSessionSwitch;
+        Microsoft.Win32.SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         Hide();
     }
 
     void OnDisplayChanged(object? sender, EventArgs e) => Dispatcher.InvokeAsync(Reposition);
+
+    // SystemEvents raise on a worker thread — always hop to the dispatcher.
+    // Unlock and RDP reconnect commonly change resolution/work area without
+    // a DisplaySettingsChanged, and resume can shuffle the z-order.
+    void OnSessionSwitch(object? sender, Microsoft.Win32.SessionSwitchEventArgs e)
+    {
+        if (e.Reason is Microsoft.Win32.SessionSwitchReason.SessionUnlock
+            or Microsoft.Win32.SessionSwitchReason.ConsoleConnect
+            or Microsoft.Win32.SessionSwitchReason.RemoteConnect)
+            Dispatcher.InvokeAsync(ResyncPresentation);
+    }
+
+    void OnPowerModeChanged(object? sender, Microsoft.Win32.PowerModeChangedEventArgs e)
+    {
+        if (e.Mode == Microsoft.Win32.PowerModes.Resume) Dispatcher.InvokeAsync(ResyncPresentation);
+    }
+
+    void ResyncPresentation()
+    {
+        Reposition();
+        UpdateFullscreenHidden();
+        ReassertTopmost();
+    }
+
+    void RepositionSoon(TimeSpan delay)
+    {
+        var once = new DispatcherTimer { Interval = delay };
+        once.Tick += (_, _) =>
+        {
+            once.Stop();
+            Reposition();
+            UpdateFullscreenHidden();
+        };
+        once.Start();
+    }
+
+    void ReassertTopmost()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) return;
+        NativeMethods.SetWindowPos(hwnd, NativeMethods.HWND_TOPMOST, 0, 0, 0, 0,
+            NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOACTIVATE);
+    }
 
     // ---- engine hooks ----------------------------------------------------------
 
@@ -697,7 +768,14 @@ sealed class DockWindow : Window
 
     IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == NativeMethods.WM_HOTKEY)
+        if (msg is NativeMethods.WM_SETTINGCHANGE or NativeMethods.WM_DISPLAYCHANGE or NativeMethods.WM_DPICHANGED)
+        {
+            // These arrive in bursts (taskbar auto-hide toggles, resolution
+            // switches) — coalesce into one reposition.
+            _repositionDebounce.Stop();
+            _repositionDebounce.Start();
+        }
+        else if (msg == NativeMethods.WM_HOTKEY)
         {
             var id = wParam.ToInt32();
             if (id == DictationHotkeyId)
@@ -1003,7 +1081,14 @@ sealed class DockWindow : Window
             _pendingToast = null;
             Dispatcher.InvokeAsync(() => ShowToast(held.Text, held.Paused, held.OnClick, held.ShowIcon, important: true));
         }
+        ApplyStateVisuals(state);
+    }
 
+    /// <summary>The current state's pill geometry, opacity and content
+    /// motion. Split from SetState so an un-hide can re-assert visuals a
+    /// mid-morph hide may have left stale.</summary>
+    void ApplyStateVisuals(DockState state)
+    {
         switch (state)
         {
             case DockState.Collapsed:
@@ -1152,16 +1237,26 @@ sealed class DockWindow : Window
     void Reposition()
     {
         if (_dragging) return;
-        var wa = (WinF.Screen.PrimaryScreen ?? WinF.Screen.AllScreens[0]).WorkingArea;
-        var scale = Dpi.MoveToAndGetScale(this, wa);
+        // Never throw: an unhandled throw here (headless RDP, no screens)
+        // would be swallowed by the dispatcher handler and leave the window
+        // parked off-screen at -10000 with no retry.
+        try
+        {
+            var wa = (WinF.Screen.PrimaryScreen ?? WinF.Screen.AllScreens[0]).WorkingArea;
+            var scale = Dpi.MoveToAndGetScale(this, wa);
 
-        double windowWidthPx = Width * scale;
-        double windowHeightPx = Height * scale;
-        double centerPx = wa.Left + Settings.DockX * wa.Width;
-        centerPx = Math.Clamp(centerPx, wa.Left + EdgeKeepIn * scale, wa.Right - EdgeKeepIn * scale);
+            double windowWidthPx = Width * scale;
+            double windowHeightPx = Height * scale;
+            double centerPx = wa.Left + Settings.DockX * wa.Width;
+            centerPx = Math.Clamp(centerPx, wa.Left + EdgeKeepIn * scale, wa.Right - EdgeKeepIn * scale);
 
-        Left = (centerPx - windowWidthPx / 2) / scale;
-        Top = (wa.Bottom - windowHeightPx) / scale;
+            Left = (centerPx - windowWidthPx / 2) / scale;
+            Top = (wa.Bottom - windowHeightPx) / scale;
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Dock reposition failed: {ex.Message}");
+        }
     }
 
     double ClampLeft(double left)
@@ -1212,6 +1307,9 @@ sealed class DockWindow : Window
         if (!hide)
         {
             Reposition();
+            // A hide mid-morph froze the pill's animated size/opacity where
+            // they were — re-run the state's visuals so it returns whole.
+            ApplyStateVisuals(_state);
             TryShowReminder();
             if (_state is DockState.Collapsed or DockState.Expanded && _pendingToast is { } held)
             {

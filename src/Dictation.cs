@@ -38,7 +38,12 @@ sealed class Dictation : IDisposable
 
     public void Toggle()
     {
-        if (_busy) return;
+        if (_busy)
+        {
+            // A silent no-op reads as "the hotkey is broken".
+            ToastRequested?.Invoke("Still working on the last one…");
+            return;
+        }
         if (IsActive) _ = StopAndTypeAsync();
         else Start();
     }

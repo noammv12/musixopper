@@ -42,7 +42,20 @@ static class Program
         };
 
         Shell? shell = null;
-        app.Startup += (_, _) => shell = new Shell();
+        app.Startup += (_, _) =>
+        {
+            try
+            {
+                shell = new Shell();
+            }
+            catch (Exception ex)
+            {
+                // The dispatcher handler above swallows this with a generic
+                // line — name the real failure before it does.
+                Log.Write($"Shell init failed: {ex}");
+                throw;
+            }
+        };
         app.Exit += (_, _) => shell?.Dispose();
         app.Run();
         Log.Write("Exited cleanly");

@@ -42,6 +42,11 @@ sealed class Shell : IDisposable
         _dock.OpenRemindersRequested += () => _flyout.ShowReminders();
         _dock.OpenNotesRequested += () => _flyout.ShowNotes();
 
+        // On screen before anything that can fail below — a notes/dictation/
+        // update hiccup must never cost the user the dock.
+        _dock.ShowDock();
+        _dock.SyncState(_engine.State); // StateChanged won't fire until the state moves
+
         _stats = new CallStatsTracker(_engine);
         _reminders = new ReminderScheduler(_engine);
         _reminders.ReminderDue += (reminder, missed) => _dock.ShowReminder(reminder, missed);
@@ -62,7 +67,14 @@ sealed class Shell : IDisposable
                 : note.Number is { } number ? $"Notes ready ({number}) — click to view"
                 : "Notes ready — click to view",
             paused: false, onClick: () => _flyout.ShowNotes(), showIcon: false, important: true);
-        _notes.SweepRecoveredSessions();
+        try
+        {
+            _notes.SweepRecoveredSessions();
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Recovered-session sweep failed: {ex.Message}");
+        }
 
         _dictation = new Dictation();
         _dictation.Started += () => _dock.SetDictation(true);
@@ -74,6 +86,9 @@ sealed class Shell : IDisposable
         _dock.DictationToggleRequested += () =>
         {
             if (!_assistant.IsListening) _dictation.Toggle();
+            // Not important: the listening pill already says which mode holds
+            // the mic — this only lands when a toast can show right now.
+            else _dock.ShowToast("Palon is listening — finish that first", paused: false, showIcon: false);
         };
         _dock.DictationCancelRequested += _dictation.Cancel;
         _flyout.ApplyDictationHotkey = _dock.ApplyDictationHotkey;
@@ -95,6 +110,7 @@ sealed class Shell : IDisposable
         _dock.AssistantToggleRequested += () =>
         {
             if (!_dictation.IsActive) _assistant.Toggle();
+            else _dock.ShowToast("Finish dictating first — one mic mode at a time", paused: false, showIcon: false);
         };
         _dock.AssistantCancelRequested += _assistant.Cancel;
         _flyout.ApplyAssistantHotkey = _dock.ApplyAssistantHotkey;
@@ -132,13 +148,47 @@ sealed class Shell : IDisposable
             (_, _) => Application.Current.Dispatcher.InvokeAsync(() => _flyout.ShowFlyout()),
             null, Timeout.Infinite, executeOnlyOnce: false);
 
-        _dock.ShowDock();
-        _dock.SyncState(_engine.State); // StateChanged won't fire until the state moves
+        // The dock is already up — anything from here down is best-effort
+        // and must not take the Shell (and with it the dock) down.
+        try
+        {
+            WarnAboutPredecessors();
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Predecessor check failed: {ex.Message}");
+        }
 
-        // A still-running predecessor build (Bridget/Saley) won't collide on
-        // the renamed mutex or events — it would fight over the mic, the
-        // media sessions, and the softphone handlers (which would silently
-        // kill Palon's notes).
+        try
+        {
+            UpdateCheck.Run(_flyout.SetUpdateAvailable);
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Update check failed to start: {ex.Message}");
+        }
+
+        if (!Settings.OnboardingDone)
+        {
+            OpenFlyoutSoon(() => _flyout.ShowFlyout(onboarding: true));
+        }
+        else if (Settings.JustMigrated && Settings.Trigger == TriggerMode.SoftphoneEvents)
+        {
+            // The exe changed names — softphone handlers point at the old one.
+            OpenFlyoutSoon(() =>
+            {
+                _flyout.ShowFlyout();
+                _flyout.ShowSoftphoneSetup("Palon replaces Bridget — update your softphone handlers.");
+            });
+        }
+    }
+
+    /// <summary>A still-running predecessor build (Bridget/Saley) won't
+    /// collide on the renamed mutex or events — it would fight over the mic,
+    /// the media sessions, and the softphone handlers (which would silently
+    /// kill Palon's notes). Warn when one is running, or ran recently.</summary>
+    void WarnAboutPredecessors()
+    {
         var runningOld = new[] { "Bridget", "Saley" }
             .FirstOrDefault(name => TryDisposeExisting($@"Local\{name}.ShowFlyout"));
         if (runningOld is not null)
@@ -172,22 +222,6 @@ sealed class Shell : IDisposable
             catch
             {
             }
-        }
-
-        UpdateCheck.Run(_flyout.SetUpdateAvailable);
-
-        if (!Settings.OnboardingDone)
-        {
-            OpenFlyoutSoon(() => _flyout.ShowFlyout(onboarding: true));
-        }
-        else if (Settings.JustMigrated && Settings.Trigger == TriggerMode.SoftphoneEvents)
-        {
-            // The exe changed names — softphone handlers point at the old one.
-            OpenFlyoutSoon(() =>
-            {
-                _flyout.ShowFlyout();
-                _flyout.ShowSoftphoneSetup("Palon replaces Bridget — update your softphone handlers.");
-            });
         }
     }
 

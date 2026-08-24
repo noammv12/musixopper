@@ -77,7 +77,12 @@ sealed class Assistant : IDisposable
     {
         // Barge-in: the hotkey mid-utterance cuts Palon off and listens.
         if (_speaker.IsSpeaking) _speaker.Stop();
-        if (_busy) return;
+        if (_busy)
+        {
+            // A silent no-op reads as "the hotkey is broken".
+            ToastRequested?.Invoke("Still working on the last one…");
+            return;
+        }
         if (IsListening) _ = StopAndActAsync();
         else Start();
     }
