@@ -31,7 +31,7 @@ public class VoiceActivityMeterTests
     public void Short_pauses_inside_speech_do_not_cut_the_user_off()
     {
         var meter = new VoiceActivityMeter();
-        // talk – 800 ms breath – talk: the hold (1400 ms) must survive the breath
+        // talk – 800 ms breath – talk: the hold (1000 ms) must survive the breath
         var verdict = Run(meter, (-25, 800), (-60, 800), (-25, 800), (-60, 800));
         Assert.Equal(VoiceActivityMeter.Verdict.Continue, verdict);
     }

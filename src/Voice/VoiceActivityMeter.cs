@@ -32,7 +32,7 @@ sealed class VoiceActivityMeter
     double _totalMs;
     bool _speechConfirmed;
 
-    public VoiceActivityMeter(double minSpeechMs = 250, double silenceHoldMs = 1400, double noSpeechMs = 8000)
+    public VoiceActivityMeter(double minSpeechMs = 250, double silenceHoldMs = 1000, double noSpeechMs = 8000)
     {
         _minSpeechMs = minSpeechMs;
         _silenceHoldMs = silenceHoldMs;

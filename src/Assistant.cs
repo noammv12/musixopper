@@ -169,13 +169,22 @@ sealed class Assistant : IDisposable
 
             if (!AiChat.HasKey) return; // removed mid-flight
 
-            var outcome = await AgentLoop.RunAsync(_session, question, CancellationToken.None);
-            if (outcome is null)
+            var result = await AgentLoop.RunAsync(_session, question, CancellationToken.None);
+            if (result.Outcome is not { } outcome)
             {
-                // Tool path unusable (provider down, mangled calls, round cap)
-                // — degrade to the v7 single-shot intent rather than to silence.
-                Log.Write("Palon agent path unavailable — falling back to single-shot intent");
-                await LegacyAssistAsync(question);
+                if (result.Failure == AgentFailure.ProviderDown)
+                {
+                    // Tool path unusable — degrade to the v7 single-shot
+                    // intent rather than to silence.
+                    Log.Write("Palon agent path unavailable — falling back to single-shot intent");
+                    await LegacyAssistAsync(question);
+                }
+                else
+                {
+                    // Round cap: the model already had its chances — another
+                    // sequential round-trip would only add latency.
+                    ToastRequested?.Invoke("Palon couldn't work that one out — try again");
+                }
                 return;
             }
             if (outcome.Acted)

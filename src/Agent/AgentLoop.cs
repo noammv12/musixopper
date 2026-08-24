@@ -7,19 +7,32 @@ namespace Palon.Agent;
 /// toast is the whole feedback (a window opened, music paused).</summary>
 sealed record AgentOutcome(bool Acted, string Text);
 
+/// <summary>Why the loop produced no outcome: the provider chain is unusable
+/// (worth retrying on the v7 single-shot path) versus the model burning
+/// through its rounds without an answer (another round-trip won't help).</summary>
+enum AgentFailure
+{
+    None,
+    ProviderDown,
+    RoundCap,
+}
+
+/// <summary>A finished loop: the outcome, or why there is none.</summary>
+sealed record AgentRunResult(AgentOutcome? Outcome, AgentFailure Failure);
+
 /// <summary>
 /// The Ask-Palon agent loop: system context + short history + the question
 /// go to the model with the tool specs; tool calls are executed and their
 /// results fed back until the model produces a final answer (or a terminal
-/// tool ends the turn). Null means the model path is unusable — the caller
-/// degrades to the v7 single-shot JSON intent.
+/// tool ends the turn). A ProviderDown result means the model path is
+/// unusable — the caller degrades to the v7 single-shot JSON intent.
 /// </summary>
 static class AgentLoop
 {
-    const int MaxRounds = 4;
+    const int MaxRounds = 3;
     const int MaxToolCallsPerRound = 4;
 
-    public static async Task<AgentOutcome?> RunAsync(
+    public static async Task<AgentRunResult> RunAsync(
         AssistantSession session, string question, CancellationToken ct,
         IReadOnlyList<AgentTool>? tools = null,
         Func<IReadOnlyList<object>, object[], Task<ChatTurn?>>? chat = null)
@@ -42,14 +55,14 @@ static class AgentLoop
         for (var round = 0; round < MaxRounds; round++)
         {
             var turn = await chat(messages, toolsSpec);
-            if (turn is null) return null;
+            if (turn is null) return new AgentRunResult(null, AgentFailure.ProviderDown);
 
             if (turn.ToolCalls.Count == 0)
             {
                 var answer = (turn.Content ?? "").Trim();
-                if (answer.Length == 0) return null;
+                if (answer.Length == 0) return new AgentRunResult(null, AgentFailure.ProviderDown);
                 session.Record(question, answer);
-                return new AgentOutcome(Acted: false, answer);
+                return new AgentRunResult(new AgentOutcome(Acted: false, answer), AgentFailure.None);
             }
 
             messages.Add(new Dictionary<string, object?>
@@ -76,7 +89,7 @@ static class AgentLoop
                 {
                     var text = outcome.Toast ?? outcome.ResultForModel;
                     session.Record(question, text);
-                    return new AgentOutcome(Acted: true, text);
+                    return new AgentRunResult(new AgentOutcome(Acted: true, text), AgentFailure.None);
                 }
                 messages.Add(new Dictionary<string, object?>
                 {
@@ -88,7 +101,7 @@ static class AgentLoop
         }
 
         Log.Write($"Palon agent: no final answer within {MaxRounds} rounds");
-        return null;
+        return new AgentRunResult(null, AgentFailure.RoundCap);
     }
 
     static async Task<ToolOutcome> ExecuteAsync(

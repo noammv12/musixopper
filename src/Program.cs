@@ -26,6 +26,7 @@ static class Program
         Log.Init();
         Log.Write($"Palon {Version} starting");
         Settings.MigrateFromPredecessors(); // must run before Shell reads Settings
+        Settings.UpgradeDeprecatedGeminiModel();
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Write($"Unhandled: {e.ExceptionObject}");
         TaskScheduler.UnobservedTaskException += (_, e) =>
         {

@@ -238,9 +238,12 @@ static class AiChat
         foreach (var provider in Providers())
         {
             // rejectTruncated: half a tool call is unusable, half an answer
-            // would be displayed — and spoken — verbatim.
+            // would be displayed — and spoken — verbatim. The short retry
+            // delay keeps a transient failure from stalling a user who is
+            // standing there waiting for the spoken answer.
             var (turn, error) = await RequestChatAsync(
-                provider, BuildBody(provider, messages, temperature, maxTokens, tools), rejectTruncated: true, ct);
+                provider, BuildBody(provider, messages, temperature, maxTokens, tools), rejectTruncated: true, ct,
+                retryDelayMs: 500);
             if (turn is not null)
             {
                 LastError = null;
@@ -279,7 +282,8 @@ static class AiChat
     }
 
     static async Task<(ChatTurn? Turn, string Error)> RequestChatAsync(
-        Provider provider, Dictionary<string, object> body, bool rejectTruncated, CancellationToken ct)
+        Provider provider, Dictionary<string, object> body, bool rejectTruncated, CancellationToken ct,
+        int retryDelayMs = 2000)
     {
         for (var attempt = 0; attempt < 2; attempt++)
         {
@@ -293,7 +297,7 @@ static class AiChat
                 var status = (int)response.StatusCode;
                 if ((status == 429 || status >= 500) && attempt == 0)
                 {
-                    await Task.Delay(2000, ct);
+                    await Task.Delay(retryDelayMs, ct);
                     continue;
                 }
                 if (response.StatusCode == HttpStatusCode.Unauthorized) return (null, "key rejected (401)");
@@ -338,7 +342,7 @@ static class AiChat
             {
                 try
                 {
-                    await Task.Delay(2000, ct);
+                    await Task.Delay(retryDelayMs, ct);
                 }
                 catch
                 {

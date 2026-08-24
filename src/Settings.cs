@@ -209,15 +209,38 @@ static class Settings
         set => SetProtectedValue("GeminiKey", value);
     }
 
-    /// <summary>Gemini model id; blank falls back to the -latest flash alias
-    /// so Google's model renames don't need an app update.</summary>
+    /// <summary>The pinned default Gemini model. Pinned rather than the
+    /// "-latest" alias: Google deprecated the alias (it 404s), and a pin
+    /// makes latency and quality predictable.</summary>
+    public const string DefaultGeminiModel = "gemini-3.7-flash";
+
+    /// <summary>Gemini model id; blank falls back to the pinned default.</summary>
     public static string GeminiModel
     {
-        get => Read("GeminiModel") is { Length: > 0 } model ? model : "gemini-flash-latest";
+        get => Read("GeminiModel") is { Length: > 0 } model ? model : DefaultGeminiModel;
         set
         {
             if (string.IsNullOrWhiteSpace(value)) DeleteValue("GeminiModel");
             else WriteValue("GeminiModel", value.Trim());
+        }
+    }
+
+    /// <summary>Clears a stored "gemini-flash-latest" — the old default,
+    /// whose alias Google deprecated — so the model re-tracks the current
+    /// default. A genuinely custom model id is left alone.</summary>
+    public static void UpgradeDeprecatedGeminiModel()
+    {
+        try
+        {
+            if (Read("GeminiModel") == "gemini-flash-latest")
+            {
+                DeleteValue("GeminiModel");
+                Log.Write($"Settings: retired gemini-flash-latest — now tracking {DefaultGeminiModel}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Settings: Gemini model upgrade check failed: {ex.Message}");
         }
     }
 

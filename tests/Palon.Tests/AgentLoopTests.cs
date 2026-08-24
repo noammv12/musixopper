@@ -42,13 +42,14 @@ public class AgentLoopTests
     public async Task Plain_answer_comes_back_and_lands_in_session_memory()
     {
         var session = NewSession();
-        var outcome = await AgentLoop.RunAsync(session, "מה השעה?", CancellationToken.None,
+        var result = await AgentLoop.RunAsync(session, "מה השעה?", CancellationToken.None,
             new AgentTool[] { new FakeDataTool() },
             Script(new ChatTurn("שתיים בצהריים.", Array.Empty<ToolCallRequest>())));
 
-        Assert.NotNull(outcome);
-        Assert.False(outcome!.Acted);
-        Assert.Equal("שתיים בצהריים.", outcome.Text);
+        Assert.NotNull(result.Outcome);
+        Assert.False(result.Outcome!.Acted);
+        Assert.Equal("שתיים בצהריים.", result.Outcome.Text);
+        Assert.Equal(AgentFailure.None, result.Failure);
         Assert.Single(session.Exchanges);
     }
 
@@ -56,33 +57,33 @@ public class AgentLoopTests
     public async Task Tool_result_feeds_the_next_round()
     {
         var tool = new FakeDataTool();
-        var outcome = await AgentLoop.RunAsync(NewSession(), "what is the data?", CancellationToken.None,
+        var result = await AgentLoop.RunAsync(NewSession(), "what is the data?", CancellationToken.None,
             new AgentTool[] { tool },
             Script(
                 new ChatTurn(null, new[] { new ToolCallRequest("1", "fake_data", "{}") }),
                 new ChatTurn("It is 42.", Array.Empty<ToolCallRequest>())));
 
         Assert.Equal(1, tool.Calls);
-        Assert.NotNull(outcome);
-        Assert.Equal("It is 42.", outcome!.Text);
+        Assert.NotNull(result.Outcome);
+        Assert.Equal("It is 42.", result.Outcome!.Text);
     }
 
     [Fact]
     public async Task Terminal_tool_ends_the_turn_without_another_round()
     {
-        var outcome = await AgentLoop.RunAsync(NewSession(), "open it", CancellationToken.None,
+        var result = await AgentLoop.RunAsync(NewSession(), "open it", CancellationToken.None,
             new AgentTool[] { new FakeTerminalTool() },
             Script(new ChatTurn(null, new[] { new ToolCallRequest("1", "fake_open", "{}") })));
 
-        Assert.NotNull(outcome);
-        Assert.True(outcome!.Acted);
-        Assert.Equal("Opening it", outcome.Text);
+        Assert.NotNull(result.Outcome);
+        Assert.True(result.Outcome!.Acted);
+        Assert.Equal("Opening it", result.Outcome.Text);
     }
 
     [Fact]
     public async Task Unknown_tool_and_bad_json_degrade_to_tool_errors_not_crashes()
     {
-        var outcome = await AgentLoop.RunAsync(NewSession(), "hm", CancellationToken.None,
+        var result = await AgentLoop.RunAsync(NewSession(), "hm", CancellationToken.None,
             new AgentTool[] { new FakeDataTool() },
             Script(
                 new ChatTurn(null, new[]
@@ -92,29 +93,31 @@ public class AgentLoopTests
                 }),
                 new ChatTurn("recovered", Array.Empty<ToolCallRequest>())));
 
-        Assert.NotNull(outcome);
-        Assert.Equal("recovered", outcome!.Text);
+        Assert.NotNull(result.Outcome);
+        Assert.Equal("recovered", result.Outcome!.Text);
     }
 
     [Fact]
-    public async Task Provider_failure_returns_null_for_the_legacy_fallback()
+    public async Task Provider_failure_reads_as_ProviderDown_for_the_legacy_fallback()
     {
-        var outcome = await AgentLoop.RunAsync(NewSession(), "hi", CancellationToken.None,
+        var result = await AgentLoop.RunAsync(NewSession(), "hi", CancellationToken.None,
             new AgentTool[] { new FakeDataTool() },
             Script((ChatTurn?)null));
-        Assert.Null(outcome);
+        Assert.Null(result.Outcome);
+        Assert.Equal(AgentFailure.ProviderDown, result.Failure);
     }
 
     [Fact]
-    public async Task Round_cap_returns_null_instead_of_spinning()
+    public async Task Round_cap_reads_as_RoundCap_instead_of_spinning()
     {
         var tool = new FakeDataTool();
         var loopForever = new ChatTurn(null, new[] { new ToolCallRequest("1", "fake_data", "{}") });
-        var outcome = await AgentLoop.RunAsync(NewSession(), "loop", CancellationToken.None,
+        var result = await AgentLoop.RunAsync(NewSession(), "loop", CancellationToken.None,
             new AgentTool[] { tool },
             Script(loopForever, loopForever, loopForever, loopForever, loopForever, loopForever));
 
-        Assert.Null(outcome);
-        Assert.Equal(4, tool.Calls); // MaxRounds
+        Assert.Null(result.Outcome);
+        Assert.Equal(AgentFailure.RoundCap, result.Failure);
+        Assert.Equal(3, tool.Calls); // MaxRounds
     }
 }
