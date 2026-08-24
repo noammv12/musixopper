@@ -411,11 +411,11 @@ static class AiChat
                     // Name the shape of the emptiness: finish=length with
                     // tokens spent means thinking ate the cap; finish=stop
                     // with 0 tokens means the model really said nothing.
-                    var finish = choice.TryGetProperty("finish_reason", out var fin) ? fin.GetString() : null;
+                    var finishReason = choice.TryGetProperty("finish_reason", out var fin) ? fin.GetString() : null;
                     var spent = doc.RootElement.TryGetProperty("usage", out var usage)
                         && usage.TryGetProperty("completion_tokens", out var spentEl)
                         ? spentEl.GetRawText() : "?";
-                    return (null, $"empty reply (finish={finish ?? "?"}, completion_tokens={spent})");
+                    return (null, $"empty reply (finish={finishReason ?? "?"}, completion_tokens={spent})");
                 }
                 ClearCooling(provider);
                 var seconds = (Environment.TickCount64 - started) / 1000.0;
