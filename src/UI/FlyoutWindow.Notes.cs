@@ -441,7 +441,9 @@ partial class FlyoutWindow
             var header = Ui.Caption(
                 $"{local:HH:mm} · {Math.Max(1, note.DurationSec / 60)} min" +
                 (note.Number is { } number ? $" · {number}" : "") +
-                (note.State == "transcript-only" ? " · no summary" : note.State == "recovered" ? " · recovered" : ""));
+                (note.State == "transcript-only"
+                    ? " · no summary" + (note.SummaryError is { } why ? $" — {why}" : "")
+                    : note.State == "recovered" ? " · recovered" : ""));
             stack.Children.Add(header);
 
             var body = note.Summary ?? note.Transcript;

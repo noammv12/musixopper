@@ -330,9 +330,13 @@ static class AiChat
             ["temperature"] = temperature,
             ["stream"] = false,
             // Gemini Flash thinks by default and thinking tokens count
-            // against max_tokens — the caps sized for deepseek-chat
-            // would be eaten by reasoning and return empty replies.
-            ["max_tokens"] = provider.IsGemini ? Math.Max(maxTokens * 4, 2048) : maxTokens,
+            // against max_tokens — the caps sized for deepseek-chat would be
+            // eaten by reasoning and return empty replies. The 4096 floor is
+            // for long inputs (call-summary transcripts): even at low effort
+            // the thinking scales with the input, and 2048 was observed fully
+            // consumed with nothing left for the answer. A high cap costs
+            // nothing unless tokens are actually generated.
+            ["max_tokens"] = provider.IsGemini ? Math.Max(maxTokens * 4, 4096) : maxTokens,
         };
         if (provider.IsGemini) body["reasoning_effort"] = "low";
         if (tools is { Length: > 0 })
@@ -402,7 +406,17 @@ static class AiChat
                         calls.Add(new ToolCallRequest(id, name, argumentsJson));
                     }
                 }
-                if (calls.Count == 0 && string.IsNullOrWhiteSpace(content)) return (null, "empty reply");
+                if (calls.Count == 0 && string.IsNullOrWhiteSpace(content))
+                {
+                    // Name the shape of the emptiness: finish=length with
+                    // tokens spent means thinking ate the cap; finish=stop
+                    // with 0 tokens means the model really said nothing.
+                    var finish = choice.TryGetProperty("finish_reason", out var fin) ? fin.GetString() : null;
+                    var spent = doc.RootElement.TryGetProperty("usage", out var usage)
+                        && usage.TryGetProperty("completion_tokens", out var spentEl)
+                        ? spentEl.GetRawText() : "?";
+                    return (null, $"empty reply (finish={finish ?? "?"}, completion_tokens={spent})");
+                }
                 ClearCooling(provider);
                 var seconds = (Environment.TickCount64 - started) / 1000.0;
                 if (seconds > 3) Log.Write($"AI: {provider.Name} answered in {seconds:0.0}s");
