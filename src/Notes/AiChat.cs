@@ -205,8 +205,12 @@ static class AiChat
         if (Settings.DeepSeekKey is { } deepSeek)
             all.Add(new Provider("DeepSeek", "https://api.deepseek.com/chat/completions", "deepseek-chat", deepSeek, IsGemini: false));
         // Benched providers go last, not away: they still get a turn when
-        // they're all we have, and any success un-benches them.
-        return all.Where(p => !IsCooling(p.Name)).Concat(all.Where(p => IsCooling(p.Name)));
+        // they're all we have, and any success un-benches them. Materialized
+        // eagerly — a lazy Concat would re-check cooldowns mid-walk and hand
+        // a provider benched by this very walk a second turn at the end.
+        var healthy = all.Where(p => !IsCooling(p.Name)).ToList();
+        healthy.AddRange(all.Except(healthy));
+        return healthy;
     }
 
     // ---- provider cooldown ------------------------------------------------

@@ -109,8 +109,6 @@ sealed class Dictation : IDisposable
                 ToastRequested?.Invoke("Didn't catch that");
                 return;
             }
-            StatusChanged?.Invoke("Typing it out…");
-
             if (Settings.DictationPolish && AiChat.HasKey)
             {
                 StatusChanged?.Invoke("Polishing…");
@@ -120,6 +118,7 @@ sealed class Dictation : IDisposable
                 if (!string.IsNullOrWhiteSpace(polished)) text = polished;
             }
 
+            StatusChanged?.Invoke("Typing it out…");
             // Back on the UI thread here (clipboard needs STA).
             var result = await SnippetPaster.PasteTextAsync(text);
             if (result == PasteResult.CopiedOnly) ToastRequested?.Invoke("Dictation copied — press Ctrl+V");
