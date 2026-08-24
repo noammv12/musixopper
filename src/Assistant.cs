@@ -150,7 +150,8 @@ sealed class Assistant : IDisposable
         try
         {
             if (wav is null) return;
-            StatusChanged?.Invoke("Thinking…");
+            StatusChanged?.Invoke("Transcribing…");
+            var clock = System.Diagnostics.Stopwatch.StartNew();
 
             var question = await Task.Run(async () =>
             {
@@ -160,6 +161,7 @@ sealed class Assistant : IDisposable
                 var transcriber = new ChainTranscriber();
                 return (await transcriber.TranscribeAsync(mixed, Settings.NotesLanguage, CancellationToken.None)).Trim();
             });
+            var transcribeSeconds = clock.Elapsed.TotalSeconds;
 
             if (question is null)
             {
@@ -174,10 +176,14 @@ sealed class Assistant : IDisposable
                 return;
             }
             Log.Write($"Palon heard: \"{question}\"");
+            StatusChanged?.Invoke("Thinking…");
 
             if (!AiChat.HasKey) return; // removed mid-flight
 
+            clock.Restart();
             var result = await AgentLoop.RunAsync(_session, question, CancellationToken.None);
+            // The one line that turns "it was slow" into a named stage.
+            Log.Write($"Palon timings: transcribe {transcribeSeconds:0.0}s · agent {clock.Elapsed.TotalSeconds:0.0}s");
             if (result.Outcome is not { } outcome)
             {
                 if (result.Failure == AgentFailure.ProviderDown)

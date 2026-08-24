@@ -88,7 +88,7 @@ sealed class Dictation : IDisposable
         try
         {
             if (wav is null) return;
-            StatusChanged?.Invoke("Typing it out…");
+            StatusChanged?.Invoke("Transcribing…");
 
             var text = await Task.Run(async () =>
             {
@@ -109,6 +109,7 @@ sealed class Dictation : IDisposable
                 ToastRequested?.Invoke("Didn't catch that");
                 return;
             }
+            StatusChanged?.Invoke("Typing it out…");
 
             if (Settings.DictationPolish && AiChat.HasKey)
             {
