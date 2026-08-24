@@ -30,11 +30,20 @@ static class AiChat
     const int MaxDictationChars = 8_000;
 
     const string SummaryPrompt =
-        "You write concise notes from a sales-call transcript. Reply in the language the " +
-        "transcript is mostly written in (Hebrew transcript → Hebrew reply). Output exactly " +
-        "4 lines: 3 lines starting with '• ' — the key facts, decisions or objections; then " +
-        "1 line starting with 'Next step: ' (in Hebrew: 'הצעד הבא: ') with the single most " +
-        "important follow-up. No headings, no extra text.";
+        "You write the quick note a salesperson jots down for themselves right after a " +
+        "sales call, from its transcript. Reply in the language the transcript is mostly " +
+        "in (Hebrew transcript → Hebrew note). One short flowing paragraph, 1–3 sentences, " +
+        "telegraphic and informal — first person, run-on clauses and dashes are fine, no " +
+        "bullets, no headings, no labels. Open with the prospect's experience/relevance " +
+        "status, then what happened on the call, and end with the agreed next step and its " +
+        "timeframe. Only facts from the transcript — never invent a WhatsApp send or a " +
+        "callback that wasn't agreed. Examples of the voice to imitate (style only — never " +
+        "copy their facts):\n" +
+        "\"אין ניסיון - התחיל בלא רלוונטי רוצה לסחור מהבנק, הוסבר על קולמקס ישראל והעלתה " +
+        "מישהו לקו לראות האם עידף לה על הבנק והבינו ביחד שכן, הוסבר על הפרטים וביקשה לדבר " +
+        "בשבוע הבא כי היא בדיוק מסיימת תהליך גירושים מבעלה.... נשלח ווצאפ ואחזור אליה שבוע הבא.\"\n" +
+        "\"סחר באינטראקטיב ישראל בעבר - יותר רלוונטי לקולמקס פרו רוצה לפתוח חשבון ב2,000$ " +
+        "הוסבר על הפרטים ואחזור אליו בימיםה קרובים, נשלח ווצאפ\"";
 
     const string PolishPrompt =
         "You clean up dictated text. Fix punctuation and casing, remove filler words, false " +

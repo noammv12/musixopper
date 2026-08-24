@@ -28,6 +28,27 @@ public class NoteBriefTests
     }
 
     [Fact]
+    public void Free_form_note_surfaces_the_closing_promise()
+    {
+        var body = "אין ניסיון - התחיל בלא רלוונטי רוצה לסחור מהבנק, הוסבר על הפרטים וביקשה לדבר " +
+            "בשבוע הבא.... נשלח ווצאפ ואחזור אליה שבוע הבא.";
+        Assert.Equal("נשלח ווצאפ ואחזור אליה שבוע הבא", NoteBrief.KeyLine(body));
+    }
+
+    [Fact]
+    public void Free_form_note_without_sentence_breaks_comes_back_whole()
+    {
+        var body = "סחר באינטראקטיב בעבר - רוצה לפתוח חשבון ב2,000$ הוסבר על הפרטים ואחזור אליו בימים הקרובים, נשלח ווצאפ";
+        Assert.Equal(body, NoteBrief.KeyLine(body));
+    }
+
+    [Fact]
+    public void A_too_short_last_clause_keeps_the_whole_line()
+    {
+        Assert.Equal("דיברנו על המחיר והמסלול. סבבה.", NoteBrief.KeyLine("דיברנו על המחיר והמסלול. סבבה."));
+    }
+
+    [Fact]
     public void Compose_carries_number_age_and_truncates()
     {
         var note = new CallNote("id", Now.AddDays(-3), 300, null,

@@ -20,8 +20,10 @@ static class NoteBrief
         return prefix + Bidi.Isolate(line);
     }
 
-    /// <summary>The next-step line when the summary has one, else the first
-    /// non-empty line with bullet dressing stripped.</summary>
+    /// <summary>The next-step line when the summary has one (the old 4-line
+    /// note shape, still in the store), else the promise off the end of a
+    /// free-form note — its last clause — else the first non-empty line
+    /// with bullet dressing stripped.</summary>
     internal static string KeyLine(string body)
     {
         string? first = null;
@@ -34,7 +36,19 @@ static class NoteBrief
                 return line;
             first ??= line;
         }
-        return first ?? "";
+        return first is null ? "" : LastClause(first);
+    }
+
+    static readonly char[] SentenceEnds = { '.', '!', '?', '…' };
+    const int MinClauseChars = 15;
+
+    /// <summary>Free-form notes close with the agreed next step ("נשלח ווצאפ
+    /// ואחזור אליה שבוע הבא."), so the brief surfaces the last clause — unless
+    /// it's too short to mean anything on its own.</summary>
+    static string LastClause(string line)
+    {
+        var clauses = line.Split(SentenceEnds, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return clauses.Length > 0 && clauses[^1].Length >= MinClauseChars ? clauses[^1] : line;
     }
 
     internal static string Ago(DateTime thenUtc, DateTime nowUtc)
