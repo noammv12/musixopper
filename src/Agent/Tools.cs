@@ -39,8 +39,10 @@ sealed class OpenUrlTool : AgentTool
     public override string Name => "open_url";
     public override string Description =>
         "Open a website in the browser. Use for well-known sites that are not saved commands " +
-        "(YouTube, Gmail, WhatsApp Web...) or for web searches " +
-        "(https://www.google.com/search?q=..., URL-encoded). Prefer open_command when one matches.";
+        "(YouTube, Gmail, WhatsApp Web...), or for a web search (https://www.google.com/search?q=..., " +
+        "URL-encoded) ONLY when the user explicitly asked to search. A question is answered " +
+        "directly, never turned into a search of the literal transcript. Prefer open_command " +
+        "when one matches.";
     public override string ParametersJson => """
         {"type":"object","properties":{
           "url":{"type":"string","description":"Full https:// address to open."}
