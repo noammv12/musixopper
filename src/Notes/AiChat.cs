@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -77,12 +78,20 @@ static class AiChat
     /// <summary>True when any AI provider is configured.</summary>
     public static bool HasKey => Settings.GeminiKey is not null || Settings.DeepSeekKey is not null;
 
+    // Per-request time budgets. The HttpClient's 60 s stays as the outer
+    // bound, but a user standing there waiting must never pay it: a hanging
+    // provider (unlike a fast 4xx) otherwise eats a minute per agent round.
+    const int InteractiveTimeoutMs = 15_000; // Ask-Palon: someone is waiting for a spoken answer
+    const int ForegroundTimeoutMs = 30_000;  // polish / follow-up / recap: on screen, less urgent
+    const int BackgroundTimeoutMs = 60_000;  // call summaries: nobody is watching
+
     /// <summary>The summary, or null plus the per-call failure reason —
     /// returned inline so concurrent AI calls can't garble the reason.</summary>
     public static Task<(string? Summary, string? Error)> SummarizeAsync(string transcript, CancellationToken ct)
     {
         if (transcript.Length > MaxTranscriptChars) transcript = transcript[..MaxTranscriptChars];
-        return ChatCoreAsync(SummaryPrompt, "Transcript:\n" + transcript, 0.3, 400, ct);
+        return ChatCoreAsync(SummaryPrompt, "Transcript:\n" + transcript, 0.3, 400, ct,
+            requestTimeoutMs: BackgroundTimeoutMs);
     }
 
     /// <summary>Cleaned-up dictation, or null when unavailable (caller keeps the raw text).</summary>
@@ -143,7 +152,8 @@ static class AiChat
 
         // rejectTruncated: half a JSON object must not reach the fallback
         // below, where it would be displayed — and spoken — verbatim.
-        var raw = await ChatAsync(prompt.ToString(), question, 0.2, 500, ct, rejectTruncated: true);
+        var raw = await ChatAsync(prompt.ToString(), question, 0.2, 500, ct, rejectTruncated: true,
+            requestTimeoutMs: InteractiveTimeoutMs);
         if (raw is null) return null;
 
         try
@@ -187,23 +197,54 @@ static class AiChat
     {
         // Gemini first: its free tier absorbs the daily volume; DeepSeek is
         // the paid fallback. Either alone also works.
+        var all = new List<Provider>(2);
         if (Settings.GeminiKey is { } gemini)
-            yield return new Provider("Gemini",
+            all.Add(new Provider("Gemini",
                 "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-                Settings.GeminiModel, gemini, IsGemini: true);
+                Settings.GeminiModel, gemini, IsGemini: true));
         if (Settings.DeepSeekKey is { } deepSeek)
-            yield return new Provider("DeepSeek", "https://api.deepseek.com/chat/completions", "deepseek-chat", deepSeek, IsGemini: false);
+            all.Add(new Provider("DeepSeek", "https://api.deepseek.com/chat/completions", "deepseek-chat", deepSeek, IsGemini: false));
+        // Benched providers go last, not away: they still get a turn when
+        // they're all we have, and any success un-benches them.
+        return all.Where(p => !IsCooling(p.Name)).Concat(all.Where(p => IsCooling(p.Name)));
     }
 
-    static async Task<string?> ChatAsync(string systemPrompt, string userContent, double temperature, int maxTokens, CancellationToken ct, bool rejectTruncated = false) =>
-        (await ChatCoreAsync(systemPrompt, userContent, temperature, maxTokens, ct, rejectTruncated)).Text;
+    // ---- provider cooldown ------------------------------------------------
+    // A provider whose requests hang or die at the network layer gets benched
+    // briefly. Without this, the agent loop re-walks the chain from the top
+    // every round — one dead-hanging provider taxes every round (and every
+    // next question) with its full timeout.
 
-    static async Task<(string? Text, string? Error)> ChatCoreAsync(string systemPrompt, string userContent, double temperature, int maxTokens, CancellationToken ct, bool rejectTruncated = false)
+    static readonly object CooldownGate = new();
+    static readonly Dictionary<string, DateTime> CoolingUntil = new();
+    static readonly TimeSpan Cooldown = TimeSpan.FromSeconds(90);
+
+    static bool IsCooling(string name)
+    {
+        lock (CooldownGate)
+            return CoolingUntil.TryGetValue(name, out var until) && until > DateTime.UtcNow;
+    }
+
+    static void MarkCooling(Provider provider)
+    {
+        lock (CooldownGate) CoolingUntil[provider.Name] = DateTime.UtcNow + Cooldown;
+        Log.Write($"AI: {provider.Name} benched for {Cooldown.TotalSeconds:0}s after a slow failure");
+    }
+
+    static void ClearCooling(Provider provider)
+    {
+        lock (CooldownGate) CoolingUntil.Remove(provider.Name);
+    }
+
+    static async Task<string?> ChatAsync(string systemPrompt, string userContent, double temperature, int maxTokens, CancellationToken ct, bool rejectTruncated = false, int requestTimeoutMs = ForegroundTimeoutMs) =>
+        (await ChatCoreAsync(systemPrompt, userContent, temperature, maxTokens, ct, rejectTruncated, requestTimeoutMs)).Text;
+
+    static async Task<(string? Text, string? Error)> ChatCoreAsync(string systemPrompt, string userContent, double temperature, int maxTokens, CancellationToken ct, bool rejectTruncated = false, int requestTimeoutMs = ForegroundTimeoutMs)
     {
         var errors = new List<string>(2);
         foreach (var provider in Providers())
         {
-            var (text, error) = await ChatOnceAsync(provider, systemPrompt, userContent, temperature, maxTokens, ct, rejectTruncated);
+            var (text, error) = await ChatOnceAsync(provider, systemPrompt, userContent, temperature, maxTokens, ct, rejectTruncated, requestTimeoutMs);
             if (text is not null)
             {
                 LastError = null;
@@ -220,7 +261,7 @@ static class AiChat
 
     static async Task<(string? Text, string Error)> ChatOnceAsync(
         Provider provider, string systemPrompt, string userContent,
-        double temperature, int maxTokens, CancellationToken ct, bool rejectTruncated)
+        double temperature, int maxTokens, CancellationToken ct, bool rejectTruncated, int requestTimeoutMs)
     {
         var messages = new object[]
         {
@@ -228,7 +269,8 @@ static class AiChat
             new { role = "user", content = userContent },
         };
         var (turn, error) = await RequestChatAsync(
-            provider, BuildBody(provider, messages, temperature, maxTokens, tools: null), rejectTruncated, ct);
+            provider, BuildBody(provider, messages, temperature, maxTokens, tools: null), rejectTruncated, ct,
+            requestTimeoutMs: requestTimeoutMs);
         return string.IsNullOrWhiteSpace(turn?.Content) ? (null, error.Length > 0 ? error : "empty reply") : (turn!.Content!.Trim(), "");
     }
 
@@ -252,7 +294,7 @@ static class AiChat
             // standing there waiting for the spoken answer.
             var (turn, error) = await RequestChatAsync(
                 provider, BuildBody(provider, messages, temperature, maxTokens, tools), rejectTruncated: true, ct,
-                retryDelayMs: 500);
+                retryDelayMs: 500, requestTimeoutMs: InteractiveTimeoutMs);
             if (turn is not null)
             {
                 LastError = null;
@@ -292,17 +334,22 @@ static class AiChat
 
     static async Task<(ChatTurn? Turn, string Error)> RequestChatAsync(
         Provider provider, Dictionary<string, object> body, bool rejectTruncated, CancellationToken ct,
-        int retryDelayMs = 2000)
+        int retryDelayMs = 2000, int requestTimeoutMs = ForegroundTimeoutMs)
     {
         for (var attempt = 0; attempt < 2; attempt++)
         {
+            // Per-request budget under the HttpClient's 60 s: sized to who is
+            // waiting (15 s when someone stands there listening for the answer).
+            using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            budget.CancelAfter(requestTimeoutMs);
+            var started = Environment.TickCount64;
             try
             {
                 using var request = new HttpRequestMessage(HttpMethod.Post, provider.Url);
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", provider.Key);
                 request.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
 
-                using var response = await Http.SendAsync(request, ct);
+                using var response = await Http.SendAsync(request, budget.Token);
                 var status = (int)response.StatusCode;
                 if ((status == 429 || status >= 500) && attempt == 0)
                 {
@@ -314,7 +361,7 @@ static class AiChat
                 if (status == 429) return (null, "rate limited (429)");
                 if (!response.IsSuccessStatusCode) return (null, $"HTTP {status}");
 
-                using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+                using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(budget.Token));
                 var choice = doc.RootElement.GetProperty("choices")[0];
                 if (rejectTruncated
                     && choice.TryGetProperty("finish_reason", out var finish)
@@ -345,9 +392,23 @@ static class AiChat
                     }
                 }
                 if (calls.Count == 0 && string.IsNullOrWhiteSpace(content)) return (null, "empty reply");
+                ClearCooling(provider);
+                var seconds = (Environment.TickCount64 - started) / 1000.0;
+                if (seconds > 3) Log.Write($"AI: {provider.Name} answered in {seconds:0.0}s");
                 return (new ChatTurn(content, calls), "");
             }
-            catch (Exception ex) when (attempt == 0 && ex is not OperationCanceledException)
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                // The budget fired, not the caller. No second attempt — a
+                // retry would double the stall for whoever is waiting.
+                MarkCooling(provider);
+                return (null, $"timed out ({requestTimeoutMs / 1000}s)");
+            }
+            catch (OperationCanceledException)
+            {
+                return (null, "cancelled");
+            }
+            catch (Exception) when (attempt == 0)
             {
                 try
                 {
@@ -358,12 +419,11 @@ static class AiChat
                     return (null, "cancelled");
                 }
             }
-            catch (OperationCanceledException)
-            {
-                return (null, "cancelled");
-            }
             catch (Exception ex)
             {
+                // Two straight network-layer deaths: bench the provider so
+                // the next round (and question) doesn't pay for it again.
+                if (ex is HttpRequestException or IOException) MarkCooling(provider);
                 return (null, ex.Message);
             }
         }
