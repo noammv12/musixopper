@@ -20,8 +20,10 @@ Requires Windows 10 version 1903 or later (Windows 11 works).
 
 A small capsule floats just above the taskbar (drag it left/right — the spot is remembered):
 
-- **Resting**: a quiet sliver with a status dot — green (listening), amber (on a call).
-- **Hover**: expands into a pill with your status, snippet chips, and the 🎙 💬 ⏰ 📝 chips — dictate, ask Palon, reminders, notes. **…** opens settings.
+- **Resting**: a quiet capsule with a status dot — green (ready), amber (on a call, with the live call timer). Nothing on it moves by itself.
+- **Hover**: expands into a bar with your status, this month's progress (**40/55** — shown once you set a target in Sales), how many callbacks are **overdue** (red, click to open them), and chips: **Palon** (ask), Terminal, dictate, callbacks, notes, up to three snippet chips (click = paste, right-click = copy), and **…** for settings.
+- **Right after a call** (once the note is ready): the pill becomes a card — "the call with … ended · 6:12", the summary's first line, and **"מתי לחזור?"** chips. If Palon heard a promise on the call ("דבר איתי ביום ראשון") that time is already highlighted. One tap books the callback (with undo). **העתק סיכום** copies a Salesforce-ready note: who, date/time, duration, summary, next step. The card tucks itself away after ~20 s untouched; ✕ dismisses it. Short/unanswered calls show nothing.
+- **When a callback is due**: "הגיע הזמן לחזור ל…" with the note, **copy number**, **+10 min**, **+1 h**, **done** — done shows a check and how many are left today (with undo). Late ones say **באיחור**.
 - **Call events**: briefly shows "Paused for your call" / "Music resumed", then tucks away.
 - Auto-hides during presentations and fullscreen apps; never steals focus from what you're typing.
 

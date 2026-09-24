@@ -4,7 +4,6 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using Palon.Interop;
@@ -15,61 +14,55 @@ namespace Palon.UI;
 
 enum DockState
 {
-    Collapsed,
-    Expanded,
-    Toast,
-    Reminder,
-    Dictation,
+    Collapsed,  // the quiet capsule: status dot (+ timer and level bars on a call)
+    Expanded,   // hover: status · progress · overdue · chips
+    Toast,      // a one-line transient
+    Card,       // after-call or callback-due card (see DockCardQueue)
+    Dictation,  // dictation / Ask-Palon listening
 }
 
 /// <summary>
-/// The Palon dock: a small always-on-top capsule that lives just above the
-/// taskbar. Collapsed it's a quiet sliver with a status dot; on hover it
-/// expands to show status and snippet chips (click = paste into the focused
-/// app); on call events it self-expands as a toast for two seconds.
-/// It never takes activation (WS_EX_NOACTIVATE | TOOLWINDOW) — that's what
-/// makes click-to-paste possible. Only ever Hide() it, never Close().
+/// The Palon dock: a small always-on-top capsule just above the taskbar.
+/// One pill morphs (width, height, radius — exponential ease-out) between
+/// the resting capsule, the hover bar, toasts, the listening pill and the
+/// two cards: right after a call (summary, one-tap callback, copy for
+/// Salesforce) and when a callback comes due. Content crossfades; nothing
+/// moves on its own except Palon. It never takes activation
+/// (WS_EX_NOACTIVATE | TOOLWINDOW) — that's what makes click-to-paste
+/// possible and why it can never steal focus. Only ever Hide() it, never Close().
+/// Split across src/UI/Dock/*.cs (resting bar, cards, kit, pure logic).
 /// </summary>
-sealed class DockWindow : Window
+sealed partial class DockWindow : Window
 {
-    // Collapsed sliver / expanded pill metrics (DIP).
-    const double CollapsedWidth = 36;
-    const double CollapsedHeight = 10;
+    // Pill metrics (DIP).
+    const double IdleWidth = 40;
+    const double IdleHeight = 12;
+    const double OnCallHeight = 26;
     const double ExpandedHeight = 40;
     const double ToastHeight = 36;
+    const double CardWidth = 404;
+    const double CardRadius = 22;
     const double WindowWidth = 640;
-    const double WindowHeight = 76;
+    const double WindowHeight = 360; // room for the tallest card; transparent pixels are click-through
     const double BottomGap = 4;    // pill bottom to work-area bottom
     const double EdgeKeepIn = 60;  // min px between pill center and screen edge
-    const double RestingOpacity = 0.7;
+    const double RestingOpacity = 0.75;
     const double DisabledOpacity = 0.45;
 
     static readonly Geometry PauseGlyph = Geometry.Parse("M0,0 H3.6 V11 H0 Z M6.4,0 H10 V11 H6.4 Z");
     static readonly Geometry PlayGlyph = Geometry.Parse("M0,0 L10,5.5 L0,11 Z");
-    // The Palon P at 14 px — stem + one right bowl, same geometry as the app icon.
-    static readonly Geometry PMark = Geometry.Parse("M5.78,2.89 L5.78,11.11 M5.78,2.89 A2.28,2.28 0 0 1 5.78,7.44");
 
     readonly Border _pill;
     readonly Border _glassSheen;
     readonly ScaleTransform _pillScale = new(1, 1);
-    readonly Ellipse _collapsedDot;
-    readonly StackPanel _expandedContent;
     readonly StackPanel _toastContent;
-    readonly Ellipse _statusDot;
-    readonly TextBlock _statusText;
-    readonly StackPanel _chipsPanel;
     readonly ShapePath _toastIcon;
     readonly TextBlock _toastText;
-    readonly StackPanel _reminderContent;
-    readonly TextBlock _reminderLabel;
-    readonly TextBlock _reminderCount;
-    TextBlock _reminderOpenLabel = null!;
-    Border _reminderCopyButton = null!;
     readonly StackPanel _dictationContent;
     readonly Ellipse _dictationDot;
     readonly StackPanel _wavePanel;
     readonly Border[] _waveBars = new Border[5];
-    readonly TextBlock _assistantGlyph;
+    readonly ShapePath _assistantIcon;
     readonly TextBlock _dictationText;
 
     // Waveform: center-weighted bar profile, level smoothed with fast
@@ -88,6 +81,7 @@ sealed class DockWindow : Window
     readonly DispatcherTimer _repositionDebounce;
     readonly DispatcherTimer _callTicker;
     DateTime _callStartedUtc;
+    double _restWidth;
     int _pollTicks;
 
     DockState _state = DockState.Collapsed;
@@ -122,15 +116,11 @@ sealed class DockWindow : Window
     public event Action? DictationCancelRequested;
     public event Action? AssistantToggleRequested;
     public event Action? AssistantCancelRequested;
+    /// <summary>A due callback's link should open (the scheduler opens it and marks it done).</summary>
+    public event Action<Callback>? ReminderOpenRequested;
     bool _dictationActive;
     bool _assistantActive;
     string _assistantStatus = "";
-    public event Action<Callback>? ReminderOpenRequested;
-    public event Action<Callback>? ReminderSnoozeRequested;
-    public event Action<Callback>? ReminderDismissRequested;
-
-    readonly Queue<(Callback Reminder, bool Missed)> _reminderQueue = new();
-    (Callback Reminder, bool Missed)? _currentReminder;
 
     public DockWindow()
     {
@@ -148,67 +138,35 @@ sealed class DockWindow : Window
         Left = -10000;
         Top = -10000;
         FontFamily = Font.Family;
-        // Same deal as the flyout: keep the pill's 1px stroke on device pixels.
+        // Keep the pill's 1px stroke on device pixels.
         UseLayoutRounding = true;
         SnapsToDevicePixels = true;
 
-        _collapsedDot = new Ellipse { Width = 6, Height = 6 };
-        _collapsedDot.SetResourceReference(Shape.FillProperty, "StatusGoodBrush");
-
-        // -- expanded content ------------------------------------------------
-        var pMark = new ShapePath
-        {
-            Data = PMark,
-            StrokeThickness = 1.75,
-            StrokeStartLineCap = PenLineCap.Round,
-            StrokeEndLineCap = PenLineCap.Round,
-            Width = 14,
-            Height = 14,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        pMark.SetResourceReference(Shape.StrokeProperty, "AccentBrush");
-
-        _statusDot = new Ellipse { Width = 8, Height = 8, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
-        _statusDot.SetResourceReference(Shape.FillProperty, "StatusGoodBrush");
-        _statusText = new TextBlock { Text = "Listening for calls", FontSize = Font.Body, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
-        _statusText.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
-
-        var divider = new Border { Width = 1, Height = 16, Margin = new Thickness(12, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center };
-        divider.SetResourceReference(Border.BackgroundProperty, "DividerBrush");
-
-        _chipsPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-
-        _expandedContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 12, 0) };
-        _expandedContent.Children.Add(pMark);
-        _expandedContent.Children.Add(_statusDot);
-        _expandedContent.Children.Add(_statusText);
-        _expandedContent.Children.Add(divider);
-        _expandedContent.Children.Add(_chipsPanel);
+        BuildResting(); // _restContent + _expandedContent (Dock/DockResting.cs)
 
         // -- toast content ----------------------------------------------------
-        _toastIcon = new ShapePath { Width = 10, Height = 11, VerticalAlignment = VerticalAlignment.Center };
+        _toastIcon = new ShapePath { Width = 10, Height = 11, VerticalAlignment = VerticalAlignment.Center, FlowDirection = FlowDirection.LeftToRight };
         _toastIcon.SetResourceReference(Shape.FillProperty, "TextPrimaryBrush");
         // Medium, not SemiBold: the sanctioned exception — on the compact pill
         // Medium at Lead size reads better (see AUDIT.md). MaxWidth sits just
-        // under the pill's 600px clamp so a long line ellipsizes instead of
-        // hard-clipping mid-glyph.
+        // under the pill's clamp so a long line ellipsizes instead of
+        // hard-clipping mid-glyph (AUDIT #6).
         _toastText = new TextBlock
         {
             FontSize = Font.Lead,
             FontWeight = FontWeights.Medium,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(8, 0, 0, 0),
+            Margin = new Thickness(8, 0, 8, 0),
             MaxWidth = 540,
             TextTrimming = TextTrimming.CharacterEllipsis,
         };
         _toastText.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
-        _toastContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 16, 0) };
+        _toastContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(14, 0, 14, 0) };
         _toastContent.Children.Add(_toastIcon);
         _toastContent.Children.Add(_toastText);
-        // Like the chips (:939): an actionable toast must claim the press,
-        // or _pill.CaptureMouse() routes the whole gesture to the pill and
-        // this MouseLeftButtonUp never fires — the click was silently inert.
-        // Actionless toasts stay draggable.
+        // An actionable toast must claim the press, or _pill.CaptureMouse()
+        // routes the whole gesture to the pill and MouseLeftButtonUp never
+        // fires (AUDIT #1). Actionless toasts stay draggable.
         _toastContent.MouseLeftButtonDown += (_, e) =>
         {
             if (_toastAction is not null) e.Handled = true;
@@ -222,51 +180,15 @@ sealed class DockWindow : Window
             action();
         };
 
-        // -- reminder content ---------------------------------------------
-        var phone = new TextBlock { Text = "📞", FontSize = Font.Body, VerticalAlignment = VerticalAlignment.Center };
-        _reminderLabel = new TextBlock
-        {
-            FontSize = Font.Lead,
-            FontWeight = FontWeights.Medium,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(8, 0, 0, 0),
-            MaxWidth = 190,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-        };
-        _reminderLabel.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
-        _reminderCount = new TextBlock { FontSize = Font.Small, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
-        _reminderCount.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
-
-        var openButton = ReminderButton("Open", primary: true);
-        _reminderOpenLabel = (TextBlock)openButton.Child;
-        openButton.Margin = new Thickness(12, 0, 0, 0);
-        openButton.MouseLeftButtonUp += (_, _) => ActOnCurrentReminder(r => ReminderOpenRequested?.Invoke(r));
-        // Copy # stays on the notification — copy, dial, then Done.
-        _reminderCopyButton = ReminderButton("Copy #", primary: false);
-        _reminderCopyButton.MouseLeftButtonUp += (_, _) => CopyCurrentReminderNumber();
-        var snoozeButton = ReminderButton("10m", primary: false);
-        snoozeButton.MouseLeftButtonUp += (_, _) => ActOnCurrentReminder(r => ReminderSnoozeRequested?.Invoke(r));
-        var dismissButton = ReminderButton("✕", primary: false);
-        dismissButton.MouseLeftButtonUp += (_, _) => ActOnCurrentReminder(r => ReminderDismissRequested?.Invoke(r));
-
-        _reminderContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 12, 0) };
-        _reminderContent.Children.Add(phone);
-        _reminderContent.Children.Add(_reminderLabel);
-        _reminderContent.Children.Add(_reminderCount);
-        _reminderContent.Children.Add(openButton);
-        _reminderContent.Children.Add(_reminderCopyButton);
-        _reminderContent.Children.Add(snoozeButton);
-        _reminderContent.Children.Add(dismissButton);
-
         // -- dictation / assistant content ------------------------------------
-        _dictationDot = new Ellipse { Width = 8, Height = 8, VerticalAlignment = VerticalAlignment.Center };
-        _dictationDot.SetResourceReference(Shape.FillProperty, "StatusGoodBrush");
-        // Wispr-style waveform — swapped in for the dot once mic levels flow.
+        _dictationDot = new Ellipse { Width = 8, Height = 8, VerticalAlignment = VerticalAlignment.Center, Fill = DockPalette.Done };
+        // Waveform — swapped in for the dot once mic levels flow.
         _wavePanel = new StackPanel
         {
             Orientation = Orientation.Horizontal,
             VerticalAlignment = VerticalAlignment.Center,
             Visibility = Visibility.Collapsed,
+            FlowDirection = FlowDirection.LeftToRight,
         };
         for (var i = 0; i < _waveBars.Length; i++)
         {
@@ -282,50 +204,50 @@ sealed class DockWindow : Window
             _waveBars[i] = bar;
             _wavePanel.Children.Add(bar);
         }
-        _assistantGlyph = new TextBlock
-        {
-            Text = "💬",
-            FontSize = Font.Body,
-            VerticalAlignment = VerticalAlignment.Center,
-            Visibility = Visibility.Collapsed,
-        };
+        _assistantIcon = DockKit.Icon(DockKit.IconChat);
+        _assistantIcon.Visibility = Visibility.Collapsed;
         _dictationText = new TextBlock
         {
             FontSize = Font.Lead,
             FontWeight = FontWeights.Medium,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(8, 0, 0, 0),
+            Margin = new Thickness(8, 0, 8, 0),
         };
         _dictationText.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
-        var dictationFinish = ReminderButton("Finish", primary: true);
-        dictationFinish.Margin = new Thickness(12, 0, 0, 0);
-        dictationFinish.MouseLeftButtonUp += (_, _) =>
-            (_assistantActive ? AssistantToggleRequested : DictationToggleRequested)?.Invoke();
-        var dictationCancel = ReminderButton("✕", primary: false);
-        dictationCancel.MouseLeftButtonUp += (_, _) =>
-            (_assistantActive ? AssistantCancelRequested : DictationCancelRequested)?.Invoke();
-        _dictationContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 12, 0) };
+        var dictationFinish = DockKit.Button("סיום", DockKit.Kind.Primary, () =>
+            (_assistantActive ? AssistantToggleRequested : DictationToggleRequested)?.Invoke());
+        dictationFinish.Height = 28;
+        dictationFinish.Margin = new Thickness(4, 0, 0, 0);
+        var dictationCancel = DockKit.IconButton(DockKit.IconClose, "ביטול", () =>
+            (_assistantActive ? AssistantCancelRequested : DictationCancelRequested)?.Invoke());
+        dictationCancel.Margin = new Thickness(4, 0, 0, 0);
+        _dictationContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(14, 0, 6, 0) };
         _dictationContent.Children.Add(_dictationDot);
         _dictationContent.Children.Add(_wavePanel);
-        _dictationContent.Children.Add(_assistantGlyph);
+        _dictationContent.Children.Add(_assistantIcon);
         _dictationContent.Children.Add(_dictationText);
         _dictationContent.Children.Add(dictationFinish);
         _dictationContent.Children.Add(dictationCancel);
 
-        var host = new Grid();
-        host.Children.Add(_collapsedDot);
+        BuildCardHost(); // _cardHost (Dock/DockCards.cs)
+
+        var host = new Grid { ClipToBounds = true, FlowDirection = FlowDirection.RightToLeft };
+        host.Children.Add(_restContent);
         host.Children.Add(_expandedContent);
         host.Children.Add(_toastContent);
-        host.Children.Add(_reminderContent);
+        host.Children.Add(_cardHost);
         host.Children.Add(_dictationContent);
         _glassSheen = new Border { IsHitTestVisible = false, Margin = new Thickness(1) };
         _glassSheen.SetResourceReference(Border.BackgroundProperty, "GlassSheenBrush");
-        host.Children.Add(_glassSheen); // light on the glass, over everything, never clickable
+
+        var layers = new Grid();
+        layers.Children.Add(host);
+        layers.Children.Add(_glassSheen); // light on the glass, over everything, never clickable
 
         _pill = new Border
         {
-            Width = CollapsedWidth,
-            Height = CollapsedHeight,
+            Width = IdleWidth,
+            Height = IdleHeight,
             Opacity = RestingOpacity,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Bottom,
@@ -333,13 +255,13 @@ sealed class DockWindow : Window
             Cursor = Cursors.Hand,
             BorderThickness = new Thickness(1),
             Effect = Ui.Shadow(),
-            Child = host,
+            Child = layers,
         };
         _pill.SetResourceReference(Border.BackgroundProperty, "SurfaceBrush");
         _pill.SetResourceReference(Border.BorderBrushProperty, "SurfaceStrokeBrush");
         _pill.RenderTransform = _pillScale;
-        _pill.RenderTransformOrigin = new Point(0.5, 1); // pops up from the taskbar edge
-        SetPillRadius(5);
+        _pill.RenderTransformOrigin = new Point(0.5, 1); // grows up from the taskbar edge
+        SetPillRadius(IdleHeight / 2);
         Content = _pill;
 
         ApplyContentVisibility();
@@ -356,7 +278,7 @@ sealed class DockWindow : Window
             _collapseDelay.Stop();
             if (!_pill.IsMouseOver && _state == DockState.Expanded) SetState(DockState.Collapsed);
         };
-        _toastTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(2000) };
+        _toastTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(2400) };
         _toastTimer.Tick += (_, _) =>
         {
             _toastTimer.Stop();
@@ -381,19 +303,25 @@ sealed class DockWindow : Window
 
         _pill.MouseEnter += (_, _) =>
         {
-            if (_state is DockState.Reminder or DockState.Dictation) return; // persistent states
             _collapseDelay.Stop();
+            if (_state == DockState.Card) PauseCardIdle();
+            if (_state is DockState.Card or DockState.Dictation) return; // persistent states
             if (_state == DockState.Collapsed) _hoverIntent.Start();
-            else if (_state == DockState.Toast)
+            else if (_state == DockState.Toast && _toastAction is null)
             {
+                // A plain toast yields to the hover bar; an actionable one
+                // holds still under the pointer so it can be clicked.
                 _toastTimer.Stop();
                 SetState(DockState.Expanded);
             }
+            else if (_state == DockState.Toast) _toastTimer.Stop();
         };
         _pill.MouseLeave += (_, _) =>
         {
             _hoverIntent.Stop();
             if (_state == DockState.Expanded) _collapseDelay.Start();
+            else if (_state == DockState.Card) ResumeCardIdle();
+            else if (_state == DockState.Toast) _toastTimer.Start();
         };
         _pill.MouseLeftButtonDown += OnPillMouseDown;
         _pill.MouseMove += OnPillMouseMove;
@@ -401,7 +329,11 @@ sealed class DockWindow : Window
 
         SnippetStore.Changed += RefreshChips;
         SnippetStore.Changed += ApplySnippetHotkeys;
+        DockActions.Changed += RefreshChips;
+        CallbackStore.Changed += OnCallbacksChanged;
+        Palon.Sales.SalesStore.Changed += OnSalesChanged;
         RefreshHotkeyStrings();
+        RefreshDayStats();
 
         SourceInitialized += (_, _) =>
         {
@@ -554,14 +486,14 @@ sealed class DockWindow : Window
 
     void UpdateListeningText()
     {
-        // 💬 marks Palon listening; the pulsing dot marks dictation — until
-        // mic levels flow and the waveform takes the dot's place.
-        _assistantGlyph.Visibility = _assistantActive ? Visibility.Visible : Visibility.Collapsed;
+        // The chat mark says Palon is listening; the green dot marks
+        // dictation — until mic levels flow and the waveform takes its place.
+        _assistantIcon.Visibility = _assistantActive ? Visibility.Visible : Visibility.Collapsed;
         _dictationDot.Visibility = _assistantActive || _waveActive ? Visibility.Collapsed : Visibility.Visible;
         _dictationText.Text =
-            _assistantActive ? "Palon is listening — ask away"
-            : DictationHotkeyLive ? $"Listening — {_dictationHotkey} to finish"
-            : "Listening — click Finish when done";
+            _assistantActive ? "Palon מקשיב — שאל"
+            : DictationHotkeyLive ? $"מכתיב — {_dictationHotkey} לסיום"
+            : "מכתיב — סיום כשגמרת";
     }
 
     bool DictationHotkeyLive => !_dictationHotkey.IsOff && !_dictationHotkeyFailed;
@@ -616,7 +548,11 @@ sealed class DockWindow : Window
         _fullscreenPoll.Stop();
         _callTicker.Stop();
         _repositionDebounce.Stop();
+        StopCardTimers();
         SnippetStore.Changed -= RefreshChips;
+        CallbackStore.Changed -= OnCallbacksChanged;
+        DockActions.Changed -= RefreshChips;
+        Palon.Sales.SalesStore.Changed -= OnSalesChanged;
         SnippetStore.Changed -= ApplySnippetHotkeys;
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplayChanged;
         Microsoft.Win32.SystemEvents.SessionSwitch -= OnSessionSwitch;
@@ -684,22 +620,24 @@ sealed class DockWindow : Window
         {
             _callStartedUtc = DateTime.UtcNow;
             _callTicker.Start();
+            // A new call: after-call cards step aside (the note stays in
+            // Notes), a showing callback card waits for the call to end.
+            _cards.OnCallStarted();
+            _cardShownKey = null;
+            if (_state == DockState.Card)
+            {
+                StopCardTimers();
+                SetState(RestState());
+            }
         }
         else if (state != CallState.OnCall)
         {
             _callTicker.Stop();
         }
-        var dotKey = state switch
-        {
-            CallState.OnCall => "AmberBrush",
-            CallState.Disabled => "TextSecondaryBrush",
-            _ => "StatusGoodBrush",
-        };
-        _collapsedDot.SetResourceReference(Shape.FillProperty, dotKey);
-        _statusDot.SetResourceReference(Shape.FillProperty, dotKey);
+        ApplyCallVisuals();
         UpdateStatusText();
-        if (_state == DockState.Collapsed)
-            SettleCollapsedOpacity(Motion.Fast);
+        if (_state == DockState.Collapsed) ApplyStateVisuals(DockState.Collapsed); // the capsule re-fits (timer in/out)
+        if (wasOnCall && state != CallState.OnCall) TryShowCard(); // a parked callback card returns
     }
 
     /// <summary>Shown in the expanded status line while a note is being processed.</summary>
@@ -738,22 +676,32 @@ sealed class DockWindow : Window
 
     void UpdateStatusText()
     {
+        var onCall = _callState == CallState.OnCall;
+        var timer = onCall ? DockText.Timer(DateTime.UtcNow - _callStartedUtc) : "";
+        _restTimer.Text = timer;
+        _statusTimer.Text = timer;
+        if (onCall && _state == DockState.Collapsed)
+        {
+            // The capsule re-fits only when the (4-DIP quantized) width
+            // actually changes — e.g. the timer crossing an hour.
+            var (w, h) = RestMetrics();
+            if (Math.Abs(w - _restWidth) > 0.5) ApplyStateVisuals(DockState.Collapsed);
+        }
         var text = _callState switch
         {
-            CallState.OnCall => (DateTime.UtcNow - _callStartedUtc) is { TotalHours: >= 1 } elapsed
-                ? $"On a call — {elapsed:hh\\:mm\\:ss}"
-                : $"On a call — {DateTime.UtcNow - _callStartedUtc:mm\\:ss}",
-            CallState.Disabled => "Paused",
+            CallState.OnCall => "בשיחה",
+            CallState.Disabled => "מושהה",
             _ => _assistantStatus.Length > 0 ? _assistantStatus
                 : _dictationStatus.Length > 0 ? _dictationStatus
                 : _notesStatus.Length > 0 ? _notesStatus
-                : "Listening for calls",
+                : "מוכן",
         };
         if (_statusText.Text == text) return;
         _statusText.Text = text;
-        // The call timer re-renders every second — pulsing then would flicker.
-        if (_callState != CallState.OnCall)
-            _statusText.BeginAnimation(OpacityProperty, Motion.FromTo(0.35, 1, Motion.Base));
+        DockKit.AlignFlow(_statusText);
+        // Crossfade the word, never the ticking timer (it would flicker).
+        _statusText.BeginAnimation(OpacityProperty, DockMotion.FromTo(0.3, 1, DockMotion.FadeIn));
+        if (_state == DockState.Expanded) RefitExpanded();
     }
 
     public void ShowToast(string text, bool paused, Action? onClick = null, bool showIcon = true, bool important = false)
@@ -763,7 +711,7 @@ sealed class DockWindow : Window
             Dispatcher.InvokeAsync(() => ShowToast(text, paused, onClick, showIcon, important));
             return;
         }
-        if (_fullscreenHidden || !IsVisible || _state is DockState.Reminder or DockState.Dictation)
+        if (_fullscreenHidden || !IsVisible || _state is DockState.Card or DockState.Dictation)
         {
             // Blocked right now — important toasts are held and replayed when
             // the dock returns to a normal state, never dropped.
@@ -778,6 +726,7 @@ sealed class DockWindow : Window
         void Apply()
         {
             _toastText.Text = text;
+            DockKit.AlignFlow(_toastText);
             _toastIcon.Data = paused ? PauseGlyph : PlayGlyph;
             _toastIcon.Visibility = showIcon ? Visibility.Visible : Visibility.Collapsed;
             _toastAction = onClick;
@@ -785,18 +734,20 @@ sealed class DockWindow : Window
         }
 
         _toastTimer.Stop();
-        _toastTimer.Start();
+        // Actionable toasts get time to be read and reached for.
+        _toastTimer.Interval = TimeSpan.FromMilliseconds(onClick is null ? 2400 : 5000);
+        if (!_pill.IsMouseOver) _toastTimer.Start();
         if (_state == DockState.Toast)
         {
             // Toast replacing a toast: dip the old line out, swap, fade the
-            // new one in as the pill resizes — text never teleports mid-morph.
-            // A third toast during the dip simply replaces this animation.
-            var fadeOut = Motion.Fade(0, Motion.Exit);
+            // new one in as the pill re-morphs — text never teleports (AUDIT #13).
+            var fadeOut = DockMotion.To(0, DockMotion.FadeOut);
             fadeOut.Completed += (_, _) =>
             {
+                if (_state != DockState.Toast) return;
                 Apply();
-                AnimatePillTo(MeasureWidth(_toastContent), ToastHeight, Motion.Fast, Motion.Out);
-                _toastContent.BeginAnimation(OpacityProperty, Motion.FromTo(0, 1, Motion.Fast));
+                MorphTo(MeasureWidth(_toastContent), ToastHeight, ToastHeight / 2, DockMotion.MorphQuick);
+                _toastContent.BeginAnimation(OpacityProperty, DockMotion.FromTo(0, 1, DockMotion.FadeIn));
             };
             _toastContent.BeginAnimation(OpacityProperty, fadeOut);
             return;
@@ -869,7 +820,7 @@ sealed class DockWindow : Window
         UpdateListeningText();
         if (activated)
         {
-            if (_state != DockState.Reminder) SetState(DockState.Dictation);
+            SetState(DockState.Dictation); // the mic outranks a card; the card waits (RestState)
         }
         else if (_state == DockState.Dictation)
         {
@@ -877,13 +828,13 @@ sealed class DockWindow : Window
         }
     }
 
-    void StartDictationPulse() => _dictationDot.BeginAnimation(OpacityProperty,
-        new DoubleAnimation(1, 0.45, TimeSpan.FromMilliseconds(Motion.PulseFast))
-        {
-            AutoReverse = true,
-            RepeatBehavior = RepeatBehavior.Forever,
-            EasingFunction = Motion.Sine, // breathe, don't blink
-        });
+    // No breathing dot: the dock's only ambient motion is Palon. The dot
+    // simply holds until the waveform (real mic levels) takes over.
+    void StartDictationPulse()
+    {
+        _dictationDot.BeginAnimation(OpacityProperty, null);
+        _dictationDot.Opacity = 1;
+    }
 
     void StopDictationPulse()
     {
@@ -915,7 +866,7 @@ sealed class DockWindow : Window
             var span = Math.Clamp(_voiceLevel * WaveWeights[i] + jitter, 0, 1);
             var height = WaveMinHeight + (WaveMaxHeight - WaveMinHeight) * span;
             _waveBars[i].BeginAnimation(HeightProperty,
-                Motion.FromTo(_waveBars[i].ActualHeight, height, Motion.Fast, Motion.Out));
+                DockMotion.FromTo(_waveBars[i].ActualHeight, height, Motion.Fast));
         }
     }
 
@@ -927,7 +878,7 @@ sealed class DockWindow : Window
         _wavePanel.Visibility = Visibility.Visible;
         UpdateListeningText(); // hides the dot
         // The bars are wider than the dot — let the pill grow to fit.
-        AnimatePillTo(MeasureWidth(_dictationContent), ExpandedHeight, Motion.Fast, Motion.Out);
+        MorphTo(MeasureWidth(_dictationContent), ExpandedHeight, ExpandedHeight / 2, DockMotion.MorphQuick);
     }
 
     void StopWave()
@@ -943,243 +894,30 @@ sealed class DockWindow : Window
         UpdateListeningText();
     }
 
-    /// <summary>Where the dock settles when a transient state ends.</summary>
+
+    /// <summary>Where the dock settles when a transient state ends: the mic
+    /// outranks a waiting card, a card outranks the resting bar.</summary>
     DockState RestState() =>
         _dictationActive || _assistantActive ? DockState.Dictation
+        : _cards.Current is not null && _callState != CallState.OnCall ? DockState.Card
         : _pill.IsMouseOver ? DockState.Expanded
         : DockState.Collapsed;
 
-    // ---- reminders -------------------------------------------------------------
-
-    public void ShowReminder(Callback reminder, bool missed)
-    {
-        if (!CheckAccess())
-        {
-            Dispatcher.InvokeAsync(() => ShowReminder(reminder, missed));
-            return;
-        }
-        _reminderQueue.Enqueue((reminder, missed));
-        TryShowReminder();
-    }
-
-    void TryShowReminder()
-    {
-        if (_fullscreenHidden || !IsVisible)
-        {
-            return; // held in the queue; surfaced when the dock returns
-        }
-        if (_state == DockState.Reminder)
-        {
-            UpdateReminderContent();
-            return;
-        }
-        if (_reminderQueue.Count == 0 || _currentReminder is not null) return;
-        _currentReminder = _reminderQueue.Dequeue();
-        UpdateReminderContent();
-        _toastTimer.Stop();
-        SetState(DockState.Reminder);
-    }
-
-    void CopyCurrentReminderNumber()
-    {
-        if (_currentReminder is not { Reminder.Phone: { Length: > 0 } phone }) return;
-        try
-        {
-            Clipboard.SetText(phone);
-            ((TextBlock)_reminderCopyButton.Child).Text = "Copied ✓";
-        }
-        catch (Exception ex)
-        {
-            Log.Write($"Callback copy failed: {ex.Message}"); // clipboard held by another app
-        }
-    }
-
-    void ActOnCurrentReminder(Action<Callback> action)
-    {
-        if (_currentReminder is not { } current) return;
-        _currentReminder = null;
-        action(current.Reminder);
-        if (_reminderQueue.Count > 0)
-        {
-            _currentReminder = _reminderQueue.Dequeue();
-            UpdateReminderContent();
-            AnimatePillTo(MeasureWidth(_reminderContent), ExpandedHeight, Motion.Fast, Motion.Out);
-            return;
-        }
-        SetState(RestState());
-    }
-
-    void UpdateReminderContent()
-    {
-        if (_currentReminder is not { } current) return;
-        _reminderOpenLabel.Text = current.Reminder.HasUrl ? "Open" : "Done";
-        // The label is user text (often Hebrew) glued to an LTR prefix —
-        // isolate it so the separators keep their place.
-        _reminderLabel.Text = (current.Missed ? "Missed · " : "") + Bidi.Isolate(current.Reminder.DisplayLine);
-        _reminderCopyButton.Visibility = current.Reminder.HasPhone ? Visibility.Visible : Visibility.Collapsed;
-        ((TextBlock)_reminderCopyButton.Child).Text = "Copy #";
-        _reminderCount.Text = _reminderQueue.Count > 0 ? $"+{_reminderQueue.Count}" : "";
-        if (_state == DockState.Reminder)
-            AnimatePillTo(MeasureWidth(_reminderContent), ExpandedHeight, Motion.Fast, Motion.Out);
-    }
-
-    Border ReminderButton(string text, bool primary)
-    {
-        var label = new TextBlock
-        {
-            Text = text,
-            FontSize = Font.Body,
-            FontWeight = FontWeights.SemiBold,
-            VerticalAlignment = VerticalAlignment.Center,
-            HorizontalAlignment = HorizontalAlignment.Center,
-        };
-        label.SetResourceReference(TextBlock.ForegroundProperty, primary ? "OnAccentBrush" : "TextPrimaryBrush");
-        var button = new Border
-        {
-            CornerRadius = new CornerRadius(Radius.Card),
-            Padding = Pad.Chip,
-            Margin = new Thickness(6, 0, 0, 0),
-            Cursor = Cursors.Hand,
-            VerticalAlignment = VerticalAlignment.Center,
-            Child = label,
-        };
-        if (primary)
-        {
-            button.SetResourceReference(Border.BackgroundProperty, "AccentBrush");
-            button.MouseEnter += (_, _) => button.Opacity = Ui.HoverDim;
-            button.MouseLeave += (_, _) => button.Opacity = 1.0;
-        }
-        else
-        {
-            button.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
-            Ui.HoverFill(button);
-        }
-        Ui.HoverSpring(button, 1.05);
-        button.MouseLeftButtonDown += (_, e) => e.Handled = true;
-        return button;
-    }
-
-    // ---- chips -----------------------------------------------------------------
-
-    void RefreshChips()
-    {
-        if (!CheckAccess())
-        {
-            Dispatcher.InvokeAsync(RefreshChips);
-            return;
-        }
-        _chipsPanel.Children.Clear();
-        // Four snippets, not five: the notes chip needs the width budget.
-        foreach (var snippet in SnippetStore.Load().Take(4))
-            _chipsPanel.Children.Add(MakeChip(snippet));
-
-        var dictate = MakeChipShell("🎙");
-        dictate.ToolTip = DictationHotkeyLive
-            ? $"Dictate ({_dictationHotkey}) — speak, and the text is typed where your cursor is"
-            : "Dictate — speak, and the text is typed where your cursor is";
-        dictate.MouseLeftButtonUp += (_, _) => DictationToggleRequested?.Invoke();
-        _chipsPanel.Children.Add(dictate);
-
-        var ask = MakeChipShell("💬");
-        ask.ToolTip = AssistantHotkeyLive
-            ? $"Ask Palon ({_assistantHotkey}) — he answers, opens things, sets reminders, searches your notes"
-            : "Ask Palon — he answers, opens things, sets reminders, searches your notes";
-        ask.MouseLeftButtonUp += (_, _) => AssistantToggleRequested?.Invoke();
-        _chipsPanel.Children.Add(ask);
-
-        var remind = MakeChipShell("⏰");
-        remind.ToolTip = "Remind me to call someone back";
-        remind.MouseLeftButtonUp += (_, _) => OpenRemindersRequested?.Invoke();
-        _chipsPanel.Children.Add(remind);
-
-        var notes = MakeChipShell("📝");
-        notes.ToolTip = "Your call notes";
-        notes.MouseLeftButtonUp += (_, _) => OpenNotesRequested?.Invoke();
-        _chipsPanel.Children.Add(notes);
-
-        var more = MakeChipShell("…");
-        more.MouseLeftButtonUp += (_, _) => OpenFlyoutRequested?.Invoke();
-        _chipsPanel.Children.Add(more);
-
-        if (_state == DockState.Expanded) AnimatePillTo(MeasureExpandedWidth(), ExpandedHeight, Motion.Fast, Motion.Out);
-    }
-
-    Border MakeChip(Snippet snippet)
-    {
-        var original = snippet.Label.Length > 0 ? snippet.Label : "(untitled)";
-        var chip = MakeChipShell(original);
-        var label = (TextBlock)chip.Child;
-        chip.ToolTip = snippet.Text.Length > 120 ? snippet.Text[..120] + "…" : snippet.Text;
-
-        // One revert timer per chip: rapid clicks restart it instead of
-        // stacking timers, so the feedback never reverts early and the
-        // MinWidth pin holds until the last flash is done.
-        var revert = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Motion.Revert) };
-        revert.Tick += (_, _) =>
-        {
-            revert.Stop();
-            label.Text = original;
-            chip.MinWidth = 0;
-        };
-        void Feedback(string message)
-        {
-            chip.MinWidth = chip.ActualWidth; // keep the pill from jumping while the text swaps
-            label.Text = message;
-            revert.Stop();
-            revert.Start();
-        }
-
-        chip.MouseLeftButtonUp += async (_, _) =>
-        {
-            var result = await SnippetPaster.PasteAsync(snippet);
-            Feedback(result switch
-            {
-                PasteResult.Pasted => "Pasted ✓",
-                PasteResult.CopiedOnly => "Copied ✓",
-                _ => "Failed",
-            });
-        };
-        chip.MouseRightButtonUp += (_, _) =>
-        {
-            var result = SnippetPaster.CopyOnly(snippet);
-            Feedback(result == PasteResult.Failed ? "Failed" : "Copied ✓");
-        };
-        return chip;
-    }
-
-    Border MakeChipShell(string text)
-    {
-        var label = new TextBlock
-        {
-            Text = text,
-            FontSize = Font.Body,
-            MaxWidth = 90, // five glyph chips now share the pill's width budget
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            VerticalAlignment = VerticalAlignment.Center,
-            HorizontalAlignment = HorizontalAlignment.Center,
-        };
-        label.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
-        var chip = new Border
-        {
-            CornerRadius = new CornerRadius(Radius.Card),
-            Padding = Pad.Chip,
-            Margin = new Thickness(6, 0, 0, 0),
-            Cursor = Cursors.Hand,
-            VerticalAlignment = VerticalAlignment.Center,
-            Child = label,
-        };
-        chip.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
-        Ui.HoverFill(chip);
-        Ui.HoverSpring(chip);
-        // Chips never start a pill drag.
-        chip.MouseLeftButtonDown += (_, e) => e.Handled = true;
-        return chip;
-    }
-
-    // ---- state & animation --------------------------------------------------------
+    // ---- state & motion --------------------------------------------------------
 
     void SetState(DockState state)
     {
+        if (state == DockState.Card)
+        {
+            // Every road into the card goes through Present, so the host
+            // always holds the card the queue says is current.
+            if (_cards.Current is not { } card) state = _pill.IsMouseOver ? DockState.Expanded : DockState.Collapsed;
+            else if (_cardShownKey != card.Key)
+            {
+                Present(card);
+                return;
+            }
+        }
         if (_state == state) return;
         if (_state == DockState.Dictation)
         {
@@ -1189,96 +927,75 @@ sealed class DockWindow : Window
         var outgoing = ContentFor(_state);
         _state = state;
         TransitionContent(outgoing, ContentFor(state));
-        if (state is DockState.Collapsed or DockState.Expanded && _pendingToast is { } held)
+        if (state is DockState.Collapsed or DockState.Expanded)
         {
-            _pendingToast = null;
-            Dispatcher.InvokeAsync(() => ShowToast(held.Text, held.Paused, held.OnClick, held.ShowIcon, important: true));
+            if (_pendingToast is { } held)
+            {
+                _pendingToast = null;
+                Dispatcher.InvokeAsync(() => ShowToast(held.Text, held.Paused, held.OnClick, held.ShowIcon, important: true));
+            }
+            else if (_cards.Current is null && _cards.WaitingCount > 0)
+            {
+                Dispatcher.InvokeAsync(TryShowCard);
+            }
         }
         ApplyStateVisuals(state);
     }
 
-    /// <summary>The current state's pill geometry, opacity and content
-    /// motion. Split from SetState so an un-hide can re-assert visuals a
-    /// mid-morph hide may have left stale.</summary>
+    /// <summary>The state's pill geometry, opacity and content motion. Split
+    /// from SetState so an un-hide can re-assert visuals a mid-morph hide
+    /// may have left stale.</summary>
     void ApplyStateVisuals(DockState state)
     {
         switch (state)
         {
             case DockState.Collapsed:
-                AnimatePillRadius(5, Motion.Base);
-                AnimatePillTo(CollapsedWidth, CollapsedHeight, Motion.Base, Motion.InOut);
-                SettleCollapsedOpacity(Motion.Base, Motion.InOut);
-                FadeInContent(_collapsedDot); // reclaims opacity from its exit fade
+            {
+                var (w, h) = RestMetrics();
+                _restWidth = w;
+                MorphTo(w, h, h / 2, DockMotion.Morph);
+                _pill.BeginAnimation(OpacityProperty, DockMotion.To(RestingOpacityFor(), DockMotion.Morph));
+                FadeInContent(_restContent);
                 break;
+            }
             case DockState.Expanded:
                 Reposition();
-                AnimatePillRadius(20, Motion.Slow);
-                AnimatePillTo(MeasureExpandedWidth(), ExpandedHeight, Motion.Slow, Motion.Overshoot);
-                _pill.BeginAnimation(OpacityProperty, Motion.Fade(1.0, Motion.Fast));
+                RefreshDayStats();
+                MorphTo(MeasureWidth(_expandedContent), ExpandedHeight, ExpandedHeight / 2, DockMotion.Morph);
+                _pill.BeginAnimation(OpacityProperty, DockMotion.To(1.0, DockMotion.FadeIn));
                 FadeInContent(_expandedContent);
                 Ui.StaggerIn(_chipsPanel, 18); // chips land one beat apart
-                PopPill();
                 break;
             case DockState.Toast:
-                AnimatePillRadius(18, Motion.Base);
-                AnimatePillTo(MeasureWidth(_toastContent), ToastHeight, Motion.Base, Motion.Out);
-                _pill.BeginAnimation(OpacityProperty, Motion.Fade(1.0, Motion.Fast));
+                MorphTo(MeasureWidth(_toastContent), ToastHeight, ToastHeight / 2, DockMotion.Morph);
+                _pill.BeginAnimation(OpacityProperty, DockMotion.To(1.0, DockMotion.FadeIn));
                 FadeInContent(_toastContent);
-                RiseIn(_toastContent);
-                PopPill();
                 break;
-            case DockState.Reminder:
+            case DockState.Card:
                 Reposition();
-                AnimatePillRadius(20, Motion.Slow);
-                AnimatePillTo(MeasureWidth(_reminderContent), ExpandedHeight, Motion.Slow, Motion.Overshoot);
-                _pill.BeginAnimation(OpacityProperty, Motion.Fade(1.0, Motion.Fast));
-                FadeInContent(_reminderContent);
-                PopPill();
+                MorphTo(CardWidth, MeasureCardHeight(), CardRadius, DockMotion.Morph);
+                _pill.BeginAnimation(OpacityProperty, DockMotion.To(1.0, DockMotion.FadeIn));
+                DockKit.RiseIn(_cardHost);
+                SettleIn(); // one soft entrance — never a pulse
+                if (!_pill.IsMouseOver) ResumeCardIdle(); // back from dictation/fullscreen: re-arm the tuck
                 break;
             case DockState.Dictation:
                 Reposition();
-                AnimatePillRadius(20, Motion.Slow);
-                AnimatePillTo(MeasureWidth(_dictationContent), ExpandedHeight, Motion.Slow, Motion.Overshoot);
-                _pill.BeginAnimation(OpacityProperty, Motion.Fade(1.0, Motion.Fast));
+                MorphTo(MeasureWidth(_dictationContent), ExpandedHeight, ExpandedHeight / 2, DockMotion.Morph);
+                _pill.BeginAnimation(OpacityProperty, DockMotion.To(1.0, DockMotion.FadeIn));
                 FadeInContent(_dictationContent);
-                PopPill();
                 if (_waveActive) UpdateListeningText();
                 else StartDictationPulse();
                 break;
         }
     }
 
-    /// <summary>Fade the pill down to its resting opacity, then hand over to
-    /// the idle breathe — a barely-there slow swell that says "alive" the way
-    /// Wispr Flow's sliver does. Any later opacity animation replaces it.</summary>
-    void SettleCollapsedOpacity(int ms, IEasingFunction? ease = null)
-    {
-        var settle = Motion.Fade(RestingOpacityFor(), ms, ease);
-        settle.Completed += (_, _) =>
-        {
-            if (_state == DockState.Collapsed && _callState == CallState.Idle) StartIdleBreathe();
-        };
-        _pill.BeginAnimation(OpacityProperty, settle);
-    }
-
-    void StartIdleBreathe()
-    {
-        var rest = RestingOpacityFor();
-        _pill.BeginAnimation(OpacityProperty,
-            new DoubleAnimation(rest, rest - 0.12, TimeSpan.FromMilliseconds(Motion.PulseSlow * 2))
-            {
-                AutoReverse = true,
-                RepeatBehavior = RepeatBehavior.Forever,
-                EasingFunction = Motion.Sine,
-            });
-    }
-
     void ApplyContentVisibility()
     {
-        _collapsedDot.Visibility = _state == DockState.Collapsed ? Visibility.Visible : Visibility.Collapsed;
+        _restContent.Visibility = _state == DockState.Collapsed ? Visibility.Visible : Visibility.Collapsed;
         _expandedContent.Visibility = _state == DockState.Expanded ? Visibility.Visible : Visibility.Collapsed;
         _toastContent.Visibility = _state == DockState.Toast ? Visibility.Visible : Visibility.Collapsed;
-        _reminderContent.Visibility = _state == DockState.Reminder ? Visibility.Visible : Visibility.Collapsed;
+        _cardHost.Visibility = _state == DockState.Card ? Visibility.Visible : Visibility.Collapsed;
         _dictationContent.Visibility = _state == DockState.Dictation ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -1286,42 +1003,48 @@ sealed class DockWindow : Window
     {
         DockState.Expanded => _expandedContent,
         DockState.Toast => _toastContent,
-        DockState.Reminder => _reminderContent,
+        DockState.Card => _cardHost,
         DockState.Dictation => _dictationContent,
-        _ => _collapsedDot,
+        _ => _restContent,
     };
 
-    /// <summary>Outgoing content exits with a quick fade instead of blinking
-    /// off; the incoming fade (FadeInContent, delayed a beat) starts as the
-    /// exit lands, so swaps read as a hand-off, not a cut.</summary>
+    /// <summary>Outgoing content exits with a quick fade; the incoming fade
+    /// starts as the exit lands, so swaps read as a hand-off, not a cut.</summary>
     void TransitionContent(UIElement outgoing, UIElement incoming)
     {
         if (outgoing == incoming) return;
         incoming.Visibility = Visibility.Visible;
-        var exit = Motion.Fade(0, Motion.Exit);
+        var exit = DockMotion.To(0, DockMotion.FadeOut);
         exit.Completed += (_, _) =>
         {
             // A rapid flip may have made it the active content again —
-            // FadeInContent already reclaimed its opacity in that case.
+            // the incoming fade already reclaimed its opacity in that case.
             if (ContentFor(_state) != outgoing) outgoing.Visibility = Visibility.Collapsed;
         };
         outgoing.BeginAnimation(OpacityProperty, exit);
     }
 
-    double RestingOpacityFor() => _callState == CallState.Disabled ? DisabledOpacity : RestingOpacity;
-
-    double MeasureExpandedWidth() => MeasureWidth(_expandedContent);
+    double RestingOpacityFor() => _callState switch
+    {
+        CallState.Disabled => DisabledOpacity,
+        CallState.OnCall => 0.95, // the live call reads at a glance
+        _ => RestingOpacity,
+    };
 
     double MeasureWidth(UIElement content)
     {
         content.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        return Math.Min(content.DesiredSize.Width + 8, WindowWidth - 40);
+        return Math.Min(Math.Ceiling(content.DesiredSize.Width) + 2, WindowWidth - 40);
     }
 
-    void AnimatePillTo(double width, double height, int ms, IEasingFunction ease)
+    /// <summary>Morphs the pill: width, height and corner radius on one
+    /// exponential ease-out, from wherever they are right now (a morph
+    /// interrupting a morph continues smoothly — no jumps).</summary>
+    void MorphTo(double width, double height, double radius, int ms)
     {
-        _pill.BeginAnimation(WidthProperty, Motion.FromTo(_pill.ActualWidth, width, ms, ease));
-        _pill.BeginAnimation(HeightProperty, Motion.FromTo(_pill.ActualHeight, height, ms, ease));
+        _pill.BeginAnimation(WidthProperty, DockMotion.FromTo(_pill.ActualWidth, width, ms));
+        _pill.BeginAnimation(HeightProperty, DockMotion.FromTo(_pill.ActualHeight, height, ms));
+        BeginAnimation(PillRadiusProperty, DockMotion.FromTo(PillRadius, Math.Min(radius, height / 2), ms));
     }
 
     void SetPillRadius(double radius)
@@ -1332,10 +1055,10 @@ sealed class DockWindow : Window
 
     /// <summary>Animatable corner radius — CornerRadius can't take a
     /// DoubleAnimation, so this DP proxies into SetPillRadius and the radius
-    /// morphs with the width instead of snapping ahead of it.</summary>
+    /// morphs with the size instead of snapping ahead of it.</summary>
     public static readonly DependencyProperty PillRadiusProperty = DependencyProperty.Register(
         nameof(PillRadius), typeof(double), typeof(DockWindow),
-        new PropertyMetadata(5.0, (d, e) => ((DockWindow)d).SetPillRadius((double)e.NewValue)));
+        new PropertyMetadata(IdleHeight / 2, (d, e) => ((DockWindow)d).SetPillRadius((double)e.NewValue)));
 
     public double PillRadius
     {
@@ -1343,41 +1066,21 @@ sealed class DockWindow : Window
         set => SetValue(PillRadiusProperty, value);
     }
 
-    // Motion.Out, not the pill's Overshoot: a radius that overshoots past
-    // height/2 squares off the collapsed sliver for a frame.
-    void AnimatePillRadius(double to, int ms) =>
-        BeginAnimation(PillRadiusProperty, Motion.FromTo(PillRadius, to, ms, Motion.Out));
-
-    /// <summary>A tiny spring up from the taskbar edge whenever the pill grows.</summary>
-    void PopPill()
+    /// <summary>The card's single soft entrance: it settles up from 0.98 — no overshoot, no pulse.</summary>
+    void SettleIn()
     {
-        _pillScale.BeginAnimation(ScaleTransform.ScaleXProperty, Motion.FromTo(0.96, 1, Motion.Slow, Motion.Overshoot));
-        _pillScale.BeginAnimation(ScaleTransform.ScaleYProperty, Motion.FromTo(0.96, 1, Motion.Slow, Motion.Overshoot));
-    }
-
-    static void PrepareFade(UIElement element)
-    {
-        element.BeginAnimation(OpacityProperty, null);
-        element.Opacity = 0;
+        _pillScale.BeginAnimation(ScaleTransform.ScaleXProperty, DockMotion.FromTo(0.98, 1, DockMotion.Morph));
+        _pillScale.BeginAnimation(ScaleTransform.ScaleYProperty, DockMotion.FromTo(0.98, 1, DockMotion.Morph));
     }
 
     void FadeInContent(UIElement content)
     {
-        PrepareFade(content);
-        var fadeIn = Motion.FromTo(0, 1, Motion.Fast);
-        // One Exit beat late, so the incoming fade starts as the outgoing
-        // content's exit fade lands (TransitionContent).
-        fadeIn.BeginTime = TimeSpan.FromMilliseconds(Motion.Exit);
+        content.BeginAnimation(OpacityProperty, null);
+        content.Opacity = 0;
+        var fadeIn = DockMotion.FromTo(0, 1, DockMotion.FadeIn);
+        // Starts as the outgoing content's exit fade lands (TransitionContent).
+        fadeIn.BeginTime = TimeSpan.FromMilliseconds(DockMotion.FadeOut);
         content.BeginAnimation(OpacityProperty, fadeIn);
-    }
-
-    static void RiseIn(UIElement content)
-    {
-        var rise = new TranslateTransform(0, 4);
-        content.RenderTransform = rise;
-        var up = Motion.FromTo(4, 0, Motion.Base, Motion.Out);
-        up.BeginTime = TimeSpan.FromMilliseconds(Motion.Exit);
-        rise.BeginAnimation(TranslateTransform.YProperty, up);
     }
 
     // ---- drag --------------------------------------------------------------------
@@ -1496,7 +1199,7 @@ sealed class DockWindow : Window
             // A hide mid-morph froze the pill's animated size/opacity where
             // they were — re-run the state's visuals so it returns whole.
             ApplyStateVisuals(_state);
-            TryShowReminder();
+            TryShowCard();
             if (_state is DockState.Collapsed or DockState.Expanded && _pendingToast is { } held)
             {
                 _pendingToast = null;
