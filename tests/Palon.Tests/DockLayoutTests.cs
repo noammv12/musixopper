@@ -54,4 +54,29 @@ public class DockLayoutTests
     {
         Assert.Equal(400, DockLayout.ClampCenter(10, 900, 0, 800, 120));
     }
+
+    [Fact]
+    public void Window_fits_pill_plus_margins_and_caps()
+    {
+        Assert.Equal((220.0, 70.0), DockLayout.WindowSize(180, 44, 20, 6, 840, 320));
+        Assert.Equal((221.0, 71.0), DockLayout.WindowSize(180.4, 44.2, 20, 6, 840, 320));
+        Assert.Equal((840.0, 320.0), DockLayout.WindowSize(2000, 900, 20, 6, 840, 320));
+        Assert.Equal((40.0, 26.0), DockLayout.WindowSize(double.NaN, -5, 20, 6, 840, 320));
+    }
+
+    [Fact]
+    public void Morph_span_covers_both_ends()
+    {
+        Assert.Equal((600.0, 48.0), DockLayout.MorphSpan(180, 48, 600, 44));
+        Assert.Equal((400.0, 200.0), DockLayout.MorphSpan(400, 52, 300, 200));
+    }
+
+    [Fact]
+    public void Resize_keeps_bottom_center()
+    {
+        var (l, t) = DockLayout.AnchorBottomCenter(100, 500, 220, 70, 640, 270);
+        Assert.Equal(100 + 110 - 320, l);
+        Assert.Equal(500 + 70 - 270, t);
+        Assert.Equal(100 + 110, l + 640 / 2.0);
+    }
 }

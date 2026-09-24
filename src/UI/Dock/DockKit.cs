@@ -104,6 +104,8 @@ static class DockPalette
     public static readonly Brush PrimaryHover = Vertical("#FFFFFFFF", "#FFE2E4E8");
     /// <summary>A hairline of light along the top edge.</summary>
     public static readonly Brush Sheen = Vertical("#26FFFFFF", "#00FFFFFF", 0.35);
+    /// <summary>One band of the pill's static shadow; bands stack, darkest at the edge.</summary>
+    public static readonly Brush ShadowRing = Frozen("#16000000");
 
     static Brush Frozen(string hex)
     {

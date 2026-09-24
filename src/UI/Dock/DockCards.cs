@@ -32,6 +32,28 @@ sealed partial class DockWindow
     Action? _onTuck;           // runs once the card has tucked (the rest flash with undo)
     PalonAvatar? _cardAvatar;
 
+    PalonAvatar? _cardAvatarSlot;
+
+    /// <summary>The one avatar every card uses: moved between card rebuilds
+    /// instead of a new instance each time (a detached avatar unhooks from the
+    /// frame clock on Unloaded).</summary>
+    PalonAvatar CardAvatar(double size, PalonMood mood)
+    {
+        var a = _cardAvatarSlot ??= new PalonAvatar { VerticalAlignment = VerticalAlignment.Center };
+        switch (a.Parent)
+        {
+            case Panel p: p.Children.Remove(a); break;
+            case Decorator d: d.Child = null; break;
+            case ContentControl c: c.Content = null; break;
+        }
+        a.Width = a.Height = size;
+        a.Margin = new Thickness(0);
+        Grid.SetColumn(a, 0);
+        Grid.SetRow(a, 0);
+        a.Mood = mood;
+        return a;
+    }
+
     void BuildCardTimers()
     {
         _cardIdle = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(DockMotion.AfterCallIdleMs) };
@@ -505,7 +527,7 @@ sealed partial class DockWindow
         var hasSummary = note.Summary is { Length: > 0 };
         var meta = $"שיחה {DockText.Iso(DockText.Duration(note.DurationSec))} · {(hasSummary ? "הסיכום מוכן" : "אין סיכום")}"
                    + (created is not null ? $" · נקבעה בשיחה ל{DockText.When(created.DueAtUtc.ToLocalTime(), now)}" : "");
-        _cardAvatar = new PalonAvatar { Width = 40, Height = 40, Mood = PalonMood.Idle, VerticalAlignment = VerticalAlignment.Center };
+        _cardAvatar = CardAvatar(40, PalonMood.Idle);
         var close = DockKit.IconButton(DockKit.IconClose, "סגור", AdvanceCard);
         var header = Header(_cardAvatar, who, null, meta, null, close);
 
@@ -829,17 +851,17 @@ sealed partial class DockWindow
 
     FrameworkElement BuildNudgeCard(Nudge nudge)
     {
-        var avatar = new PalonAvatar { Width = 36, Height = 36, Mood = PalonMood.Talk, VerticalAlignment = VerticalAlignment.Center };
+        var avatar = CardAvatar(36, PalonMood.Talk);
+        var head = new Grid();
         var glance = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1800) };
         glance.Tick += (_, _) =>
         {
             glance.Stop();
-            avatar.Mood = PalonMood.Idle;
+            if (ReferenceEquals(avatar.Parent, head)) avatar.Mood = PalonMood.Idle; // still this card's
         };
         glance.Start();
         var kind = nudge.Kind == NudgeKind.Reminder ? "תזכורת" : "הצעה";
         var title = Wrapped(nudge.Text, 15, DockPalette.Text, FontWeights.SemiBold, 2);
-        var head = new Grid();
         head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         head.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         head.Children.Add(avatar);

@@ -39,8 +39,11 @@ enum MomentKind { None, Card, Quick, Listening, CallChips }
 /// </summary>
 sealed partial class DockWindow : Window
 {
-    const double WindowWidth = 840;  // room for the widest hover row; the pill is measured, the rest is click-through
-    const double WindowHeight = 320; // room for the tallest card; transparent pixels are click-through
+    // The layered (AllowsTransparency) window is sized to the pill + its shadow
+    // margin, so every redraw only touches pill pixels. These are the caps.
+    const double WindowWidth = 840;  // widest the window (pill + margins) may grow
+    const double WindowHeight = 320; // tallest (the tallest card)
+    const double ShadowMargin = 20;  // around the pill (sides / top) for the soft static shadow
     const double BottomGap = 6;
     const double EdgeKeepIn = 120;   // min px between pill center and screen edge
     const double RestHeight = 44;
@@ -50,6 +53,9 @@ sealed partial class DockWindow : Window
     const double DisabledOpacity = 0.5;
 
     readonly Border _pill;
+    readonly Grid _stage;            // the pill + its static shadow rings
+    readonly Border[] _shadowRings;
+    readonly DispatcherTimer _windowShrink; // after a morph: fit the window back to the pill
     readonly Border _callGlass;      // amber layer, faded in on a call
     readonly Grid _host;
     readonly Border _momentHost;
@@ -109,8 +115,8 @@ sealed partial class DockWindow : Window
         ShowActivated = false;
         Focusable = false;
         ResizeMode = ResizeMode.NoResize;
-        Width = WindowWidth;   // fixed HWND size; only the inner pill animates
-        Height = WindowHeight; // (transparent pixels are click-through)
+        Width = 180 + 2 * ShadowMargin;   // fitted to the pill (FitWindow)
+        Height = RestHeight + ShadowMargin + BottomGap;
         WindowStartupLocation = WindowStartupLocation.Manual;
         Left = -10000;
         Top = -10000;
@@ -143,22 +149,49 @@ sealed partial class DockWindow : Window
         {
             Width = 180,
             Height = RestHeight,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Bottom,
-            Margin = new Thickness(20, 20, 20, BottomGap),
             Cursor = Cursors.Hand,
             BorderThickness = new Thickness(1),
             BorderBrush = DockPalette.Stroke,
             Background = DockPalette.Glass,
-            Effect = Ui.Shadow(),
+            // No Effect: a DropShadowEffect here re-blurred the whole pill on every
+            // avatar frame / ticker second. The shadow is static rings instead.
             Child = layers,
             ClipToBounds = false,
         };
+        _stage = new Grid
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Margin = new Thickness(ShadowMargin, ShadowMargin, ShadowMargin, BottomGap),
+        };
+        _shadowRings = new Border[DockLayout.ShadowBands.Length];
+        for (var i = 0; i < _shadowRings.Length; i++)
+        {
+            var band = DockLayout.ShadowBands[i];
+            var ring = new Border
+            {
+                IsHitTestVisible = false,
+                Margin = new Thickness(-band, -band + 2, -band, -Math.Min(band, BottomGap)),
+                BorderThickness = new Thickness(band),
+                BorderBrush = DockPalette.ShadowRing,
+            };
+            _shadowRings[i] = ring;
+            _stage.Children.Add(ring);
+        }
+        _stage.Children.Add(_pill);
         // The glass layers follow the pill's radius.
         _callGlass.CornerRadius = sheen.CornerRadius = new CornerRadius(RestHeight / 2);
         _radiusTargets = new[] { _callGlass, sheen };
         SetPillRadius(RestHeight / 2);
-        Content = _pill;
+        Content = _stage;
+
+        _windowShrink = new DispatcherTimer();
+        _windowShrink.Tick += (_, _) =>
+        {
+            _windowShrink.Stop();
+            var (w, h, _) = TargetShape();
+            FitWindow(w, h);
+        };
 
         _hoverIntent = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(140) };
         _hoverIntent.Tick += (_, _) =>
@@ -175,9 +208,12 @@ sealed partial class DockWindow : Window
         _fullscreenPoll = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
         _fullscreenPoll.Tick += (_, _) =>
         {
+            // Keeps running while fullscreen-hidden (it is what un-hides us), but
+            // does nothing else then; stopped outright by Shutdown().
             UpdateFullscreenHidden();
+            if (_fullscreenHidden || !IsVisible) return;
             // Cheap insurance against z-order theft.
-            if (++_pollTicks % 5 == 0 && IsVisible) ReassertTopmost();
+            if (++_pollTicks % 5 == 0) ReassertTopmost();
             if (_pollTicks % 30 == 0) RefreshToday(); // the day rolls over; stores changed elsewhere
         };
         _repositionDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
@@ -473,6 +509,7 @@ sealed partial class DockWindow : Window
         _collapseDelay.Stop();
         _fullscreenPoll.Stop();
         _callTicker.Stop();
+        _windowShrink.Stop();
         _repositionDebounce.Stop();
         StopCardTimers();
         _flashTimer.Stop();
@@ -553,7 +590,7 @@ sealed partial class DockWindow : Window
             _callStartedUtc = DateTime.UtcNow;
             _callBooked = null;
             BeginCallCapsule();
-            _callTicker.Start();
+            if (!_fullscreenHidden) _callTicker.Start();
             // A new call: after-call cards and nudges step aside; a showing
             // callback card waits for the call to end.
             _cards.OnCallStarted();
@@ -795,7 +832,7 @@ sealed partial class DockWindow : Window
         {
             // no screen info: the window bound alone
         }
-        return DockLayout.MaxPillWidth(WindowWidth, _pill.Margin.Left + _pill.Margin.Right, workDip);
+        return DockLayout.MaxPillWidth(WindowWidth, _stage.Margin.Left + _stage.Margin.Right, workDip);
     }
 
     /// <summary>Slides the window so a pill of width <paramref name="pillWidth"/> sits
@@ -824,14 +861,24 @@ sealed partial class DockWindow : Window
         DockKit.ApplyTips(_pill);
         if (!animate)
         {
+            _windowShrink.Stop();
             _pill.BeginAnimation(WidthProperty, null);
             _pill.BeginAnimation(HeightProperty, null);
             BeginAnimation(PillRadiusProperty, null);
             _pill.Width = w;
             _pill.Height = h;
             PillRadius = r;
+            FitWindow(w, h);
             return;
         }
+        // During the morph the window covers both the old and the new pill;
+        // once it lands, it shrinks back to just the pill.
+        var (fromW, fromH) = (PillWidthNow(), PillHeightNow());
+        var (spanW, spanH) = DockLayout.MorphSpan(fromW, fromH, w, h);
+        FitWindow(spanW, spanH);
+        _windowShrink.Stop();
+        _windowShrink.Interval = TimeSpan.FromMilliseconds(ms + 40);
+        _windowShrink.Start();
         // From wherever the pill is right now: a morph interrupting a morph continues smoothly.
         if (Math.Abs(_pill.ActualWidth - w) > 0.5 || _pill.ActualWidth == 0)
             _pill.BeginAnimation(WidthProperty, DockMotion.FromTo(_pill.ActualWidth > 0 ? _pill.ActualWidth : w, w, ms, DockMotion.Shape));
@@ -849,6 +896,9 @@ sealed partial class DockWindow : Window
     {
         radius = Math.Max(0, radius);
         _pill.CornerRadius = new CornerRadius(radius);
+        if (_shadowRings is not null)
+            for (var i = 0; i < _shadowRings.Length; i++)
+                _shadowRings[i].CornerRadius = new CornerRadius(radius + DockLayout.ShadowBands[i]);
         var inner = new CornerRadius(Math.Max(0, radius - 1));
         if (_radiusTargets is null) return;
         foreach (var b in _radiusTargets) b.CornerRadius = inner;
@@ -939,6 +989,33 @@ sealed partial class DockWindow : Window
     }
 
     double PillWidthNow() => Math.Max(_pill.ActualWidth, double.IsNaN(_pill.Width) ? 0 : _pill.Width);
+    double PillHeightNow() => Math.Max(_pill.ActualHeight, double.IsNaN(_pill.Height) ? 0 : _pill.Height);
+
+    /// <summary>Sizes the window to a pill of <paramref name="pillW"/>×<paramref name="pillH"/>
+    /// (plus shadow margins), keeping its bottom-center anchor. One SetWindowPos,
+    /// so the resize and the move land together.</summary>
+    void FitWindow(double pillW, double pillH)
+    {
+        var (w, h) = DockLayout.WindowSize(pillW, pillH, ShadowMargin, BottomGap, WindowWidth, WindowHeight);
+        if (Math.Abs(w - Width) < 0.5 && Math.Abs(h - Height) < 0.5) return;
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero || Left < -5000)
+        {
+            Width = w;
+            Height = h;
+            return;
+        }
+        var (left, top) = DockLayout.AnchorBottomCenter(Left, Top, Width, Height, w, h);
+        var scale = CurrentScale();
+        NativeMethods.SetWindowPos(hwnd, IntPtr.Zero,
+            (int)Math.Round(left * scale), (int)Math.Round(top * scale),
+            (int)Math.Round(w * scale), (int)Math.Round(h * scale),
+            NativeMethods.SWP_NOZORDER | NativeMethods.SWP_NOACTIVATE);
+        Left = left;
+        Top = top;
+        Width = w;
+        Height = h;
+    }
 
     void PersistDockX()
     {
@@ -973,7 +1050,16 @@ sealed partial class DockWindow : Window
         _fullscreenHidden = hide;
         if (hide && _moment == MomentKind.Quick) CloseQuick(restoreFocus: false);
         Visibility = hide ? Visibility.Hidden : Visibility.Visible;
-        if (hide) return;
+        if (hide)
+        {
+            _callTicker.Stop(); // nothing to tick while nobody can see it
+            return;
+        }
+        if (OnCall)
+        {
+            UpdateCallTimer();
+            _callTicker.Start();
+        }
         Reposition();
         // A hide mid-morph froze the pill where it was — settle it whole.
         ApplyShape(animate: false);

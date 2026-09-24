@@ -379,4 +379,26 @@ static class DockLayout
         if (lo > hi) return (left + right) / 2; // wider than the screen: center it
         return Math.Clamp(center, lo, hi);
     }
+
+    /// <summary>Widths of the stacked static-shadow bands around the pill (no Effect).</summary>
+    public static readonly double[] ShadowBands = { 2, 5, 9, 14 };
+
+    /// <summary>The window size for a pill: pill + side/top shadow margin + bottom gap,
+    /// capped at the window maxima.</summary>
+    public static (double W, double H) WindowSize(double pillW, double pillH, double margin, double bottomGap, double maxW, double maxH)
+    {
+        static double Safe(double v) => double.IsNaN(v) || double.IsInfinity(v) || v < 0 ? 0 : v;
+        var w = Math.Ceiling(Safe(pillW) + 2 * margin);
+        var h = Math.Ceiling(Safe(pillH) + margin + bottomGap);
+        return (Math.Min(w, maxW), Math.Min(h, maxH));
+    }
+
+    /// <summary>The pill box a morph needs the window to cover: both endpoints.</summary>
+    public static (double W, double H) MorphSpan(double fromW, double fromH, double toW, double toH) =>
+        (Math.Max(fromW, toW), Math.Max(fromH, toH));
+
+    /// <summary>New (left, top) for a window resized from (w, h) to (newW, newH)
+    /// keeping its horizontal center and its bottom edge.</summary>
+    public static (double Left, double Top) AnchorBottomCenter(double left, double top, double w, double h, double newW, double newH) =>
+        (left + (w - newW) / 2, top + h - newH);
 }
