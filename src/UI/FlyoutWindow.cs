@@ -77,6 +77,9 @@ sealed partial class FlyoutWindow : Window
 
     public event Action? QuitRequested;
 
+    /// <summary>Opens the full Terminal workspace (Shell wires it to TerminalWindow.ShowSingleton).</summary>
+    public event Action? TerminalRequested;
+
     /// <summary>Set by Shell: re-registers the dock's Ctrl+Alt+1–9 snippet hotkeys.</summary>
     public Action? ApplySnippetHotkeys { get; set; }
 
@@ -313,7 +316,7 @@ sealed partial class FlyoutWindow : Window
         var linkGrid = new Grid { Margin = new Thickness(2, Space.Section, 2, 0) };
         linkGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         linkGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        for (var r = 0; r < 3; r++)
+        for (var r = 0; r < 4; r++)
             linkGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
         void AddLink(string text, int row, int column, Action onClick)
@@ -332,6 +335,11 @@ sealed partial class FlyoutWindow : Window
         AddLink("Reminders…", 1, 1, ShowReminders);
         AddLink("Notes & dictation…", 2, 0, ShowNotes);
         AddLink("Stats…", 2, 1, ShowStats);
+        AddLink("Terminal…", 3, 0, () =>
+        {
+            HideFlyout();
+            TerminalRequested?.Invoke();
+        });
         panel.Children.Add(linkGrid);
 
         _hotkeyCaption = Ui.Text("", Font.Caption, "TextSecondaryBrush");
