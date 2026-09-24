@@ -55,6 +55,22 @@ sealed class TerminalWindow : Window
         _instance?.OpenAsk();
     }
 
+    /// <summary>
+    /// The dock chip / hotkey screen read: capture → privacy gate first
+    /// (nothing opens or sends before the user approves), then the Terminal
+    /// opens on Ask and reads the approved image there, with Copy.
+    /// </summary>
+    public static async void ReadScreenFromShortcut()
+    {
+        var (shot, error) = await Vision.ScreenReader.CaptureAsync(windowMode: false,
+            "Palon יקרא את מה שבתמונה ויסכם. אפשר לשאול עליו שאלות המשך ב-Ask.");
+        if (shot is null && error is null) return; // cancelled — nothing happens
+        ShowAsk();
+        if (_instance?._ask is not { } ask) return;
+        if (shot is null) ask.ShowNotice("קרא מהמסך", error!);
+        else ask.ReadApprovedShot(shot, receipt: false);
+    }
+
     internal Func<CallState> CallStateSource => _callState;
     internal Func<string?> CurrentNumberSource => _currentNumber;
 

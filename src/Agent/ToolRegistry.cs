@@ -23,6 +23,7 @@ static class ToolRegistry
         new RememberAboutMeTool(),
         new ForgetAboutMeTool(),
         new RecallClientTool(),
+        new LookAtScreenTool(),
     };
 
     /// <summary>Serializable request payload for the "tools" field.</summary>

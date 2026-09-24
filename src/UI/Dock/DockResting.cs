@@ -189,6 +189,12 @@ sealed partial class DockWindow
             _chipsPanel.Children.Add(terminal);
         }
 
+        var scan = IconChip(DockKit.IconScan, null, TerminalWindow.ReadScreenFromShortcut);
+        scan.ToolTip = ScreenHotkeyLive
+            ? $"קרא מהמסך ({ScreenHotkeyLabel}) — סמן אזור, אשר, ו-Palon יקרא"
+            : "קרא מהמסך — סמן אזור, אשר, ו-Palon יקרא";
+        _chipsPanel.Children.Add(scan);
+
         var dictate = IconChip(DockKit.IconMic, null, () => DictationToggleRequested?.Invoke());
         dictate.ToolTip = DictationHotkeyLive
             ? $"הכתבה ({_dictationHotkey}) — מדברים, והטקסט מוקלד איפה שהסמן"

@@ -84,7 +84,8 @@ static class DockKit
     public static readonly Geometry IconChat = Geometry.Parse("M2,3.8 C2,2.8 2.8,2 3.8,2 H10.2 C11.2,2 12,2.8 12,3.8 V8.2 C12,9.2 11.2,10 10.2,10 H6 L3.4,12.2 V10 H3.8 C2.8,10 2,9.2 2,8.2 Z");
     public static readonly Geometry IconTerminal = Geometry.Parse("M3,4 L6,7 L3,10 M7.5,10.5 H11");
     public static readonly Geometry IconClock = Geometry.Parse("M7,1.8 A5.2,5.2 0 1 1 6.99,1.8 Z M7,4.2 V7 L8.9,8.3");
-    public static readonly Geometry IconNote = Geometry.Parse("M3.5,1.8 H8.5 L11,4.3 V12.2 H3.5 Z M5.5,7 H9 M5.5,9.4 H9");
+    public static readonly Geometry IconScan = Geometry.Parse("M2,4.5 V3 A1,1 0 0 1 3,2 H4.5 M9.5,2 H11 A1,1 0 0 1 12,3 V4.5 M12,9.5 V11 A1,1 0 0 1 11,12 H9.5 M4.5,12 H3 A1,1 0 0 1 2,11 V9.5 M4.5,6 H9.5 M4.5,8 H8");
+    public static readonly Geometry IconNote =Geometry.Parse("M3.5,1.8 H8.5 L11,4.3 V12.2 H3.5 Z M5.5,7 H9 M5.5,9.4 H9");
     public static readonly Geometry IconMore = Geometry.Parse("M3,7 H3.01 M7,7 H7.01 M11,7 H11.01");
     public static readonly Geometry IconClose = Geometry.Parse("M4,4 L10,10 M10,4 L4,10");
     public static readonly Geometry IconCopy = Geometry.Parse("M5,5 H11 V12 H5 Z M3,9 V2.5 H9");

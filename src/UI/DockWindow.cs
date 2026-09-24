@@ -106,6 +106,31 @@ sealed partial class DockWindow : Window
     Hotkey _assistantHotkey = Hotkey.LoadAssistant();
     bool _assistantHotkeyFailed;
 
+    const int ScreenHotkeyId = 0xA13;
+    const string ScreenHotkeyLabel = "Ctrl+Alt+Shift+S";
+    bool _screenHotkeyRegistered;
+    bool ScreenHotkeyLive => _screenHotkeyRegistered;
+
+    /// <summary>(Re)binds the opt-in screen-read hotkey. False when on but taken by another app.</summary>
+    public bool ApplyScreenHotkey()
+    {
+        if (!CheckAccess()) return Dispatcher.Invoke(ApplyScreenHotkey);
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) return true; // SourceInitialized applies
+        NativeMethods.UnregisterHotKey(hwnd, ScreenHotkeyId);
+        _screenHotkeyRegistered = false;
+        var ok = true;
+        if (Settings.ScreenReadHotkey)
+        {
+            ok = NativeMethods.RegisterHotKey(hwnd, ScreenHotkeyId,
+                NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT | NativeMethods.MOD_SHIFT | NativeMethods.MOD_NOREPEAT, 0x53 /* S */);
+            _screenHotkeyRegistered = ok;
+            if (!ok) Log.Write($"Screen-read hotkey {ScreenHotkeyLabel} unavailable (taken by another app)");
+        }
+        RefreshChips();
+        return ok;
+    }
+
     const int SnippetHotkeyBase = 0xA21; // ids 0xA21–0xA29 = Ctrl+Alt+1–9
     readonly Snippet?[] _hotkeySnippets = new Snippet?[9];
 
@@ -345,6 +370,7 @@ sealed partial class DockWindow : Window
             if (HwndSource.FromHwnd(hwnd) is { } source) source.AddHook(WndProc);
             ApplyDictationHotkey();
             ApplyAssistantHotkey();
+            ApplyScreenHotkey();
             ApplySnippetHotkeys();
 
             // A silently-dead hotkey reads as "hotkeys don't exist" — say it
@@ -471,6 +497,7 @@ sealed partial class DockWindow : Window
         if (hwnd == IntPtr.Zero) return;
         NativeMethods.UnregisterHotKey(hwnd, DictationHotkeyId);
         NativeMethods.UnregisterHotKey(hwnd, AssistantHotkeyId);
+        NativeMethods.UnregisterHotKey(hwnd, ScreenHotkeyId);
         for (var i = 0; i < _hotkeySnippets.Length; i++)
         {
             NativeMethods.UnregisterHotKey(hwnd, SnippetHotkeyBase + i);
@@ -536,6 +563,7 @@ sealed partial class DockWindow : Window
             var hwnd = new WindowInteropHelper(this).Handle;
             NativeMethods.UnregisterHotKey(hwnd, DictationHotkeyId);
             NativeMethods.UnregisterHotKey(hwnd, AssistantHotkeyId);
+            NativeMethods.UnregisterHotKey(hwnd, ScreenHotkeyId);
             for (var i = 0; i < _hotkeySnippets.Length; i++)
                 NativeMethods.UnregisterHotKey(hwnd, SnippetHotkeyBase + i);
         }
@@ -776,6 +804,11 @@ sealed partial class DockWindow : Window
             else if (id == AssistantHotkeyId)
             {
                 AssistantToggleRequested?.Invoke();
+                handled = true;
+            }
+            else if (id == ScreenHotkeyId)
+            {
+                TerminalWindow.ReadScreenFromShortcut();
                 handled = true;
             }
             else if (id >= SnippetHotkeyBase && id < SnippetHotkeyBase + _hotkeySnippets.Length)
