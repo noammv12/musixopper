@@ -107,6 +107,11 @@ static class AiChat
             requestTimeoutMs: BackgroundTimeoutMs);
     }
 
+    /// <summary>One-shot element pick for Salesforce step recovery: a short,
+    /// deterministic reply ({"ref":"eN"} or {"ref":null}); null on failure.</summary>
+    public static Task<string?> LocateElementAsync(string systemPrompt, string userContent, CancellationToken ct) =>
+        ChatAsync(systemPrompt, userContent, 0.0, 60, ct, rejectTruncated: true, requestTimeoutMs: ForegroundTimeoutMs);
+
     /// <summary>Cleaned-up dictation, or null when unavailable (caller keeps the raw text).</summary>
     public static Task<string?> PolishAsync(string text, bool professional, CancellationToken ct)
     {

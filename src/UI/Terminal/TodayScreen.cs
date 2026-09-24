@@ -267,6 +267,10 @@ sealed class TodayScreen : TerminalScreen
             t.ToolTip = tpl.Title;
             buttons.Children.Add(t);
         }
+        var sf = Kit.Pill("ל-Salesforce", PillKind.Secondary, () => SalesforceSheets.LogCall(Host, note, null), height: 30, fontSize: 12.5);
+        sf.Margin = new Thickness(6, 0, 0, 0);
+        sf.ToolTip = "תיעוד השיחה ב-Salesforce — עם תצוגה מקדימה ואישור לפני שמירה";
+        buttons.Children.Add(sf);
         Grid.SetColumn(buttons, 2);
         g.Children.Add(buttons);
         return Kit.ListRow(g);
