@@ -22,6 +22,8 @@ sealed class Shell : IDisposable
     readonly Assistant _assistant;
     readonly DispatcherTimer _ticker;
     readonly EventWaitHandle _showFlyoutSignal;
+    readonly EventWaitHandle _showTerminalSignal;
+    readonly RegisteredWaitHandle _showTerminalWait;
     readonly RegisteredWaitHandle _showFlyoutWait;
     CallState _lastEngineState = CallState.Idle;
 
@@ -40,6 +42,7 @@ sealed class Shell : IDisposable
         _flyout.TerminalRequested += () => TerminalWindow.ShowSingleton();
         TerminalWindow.Configure(() => _engine.State, () => _engine.CurrentNumber);
         DockActions.OpenTerminal = () => TerminalWindow.ShowSingleton();
+        TerminalWindow.ReportFailure = message => _dock.ShowToast(message, paused: false, showIcon: false, important: true);
         DockActions.LogToSalesforce = (note, callback) => SalesforceSheets.Open(note, callback);
         _tray.QuitRequested += Quit;
         _flyout.QuitRequested += Quit;
@@ -173,6 +176,12 @@ sealed class Shell : IDisposable
             _showFlyoutSignal,
             (_, _) => Application.Current.Dispatcher.InvokeAsync(() => _flyout.ShowFlyout()),
             null, Timeout.Infinite, executeOnlyOnce: false);
+        // `Palon.exe terminal` (diagnostic) opens this instance's Terminal.
+        _showTerminalSignal = new EventWaitHandle(false, EventResetMode.AutoReset, TraySignals.ShowTerminalName);
+        _showTerminalWait = ThreadPool.RegisterWaitForSingleObject(
+            _showTerminalSignal,
+            (_, _) => Application.Current.Dispatcher.InvokeAsync(() => TerminalWindow.ShowSingleton()),
+            null, Timeout.Infinite, executeOnlyOnce: false);
 
         // The dock is already up — anything from here down is best-effort
         // and must not take the Shell (and with it the dock) down.
@@ -304,6 +313,8 @@ sealed class Shell : IDisposable
         _stats.Dispose();
         _showFlyoutWait.Unregister(null);
         _showFlyoutSignal.Dispose();
+        _showTerminalWait.Unregister(null);
+        _showTerminalSignal.Dispose();
         _dock.Shutdown();
         _tray.Dispose();
         _engine.Dispose();

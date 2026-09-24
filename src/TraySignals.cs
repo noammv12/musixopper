@@ -10,4 +10,5 @@ static class TraySignals
     public const string CallStartName = @"Local\Palon.CallStart";
     public const string CallEndName = @"Local\Palon.CallEnd";
     public const string ShowFlyoutName = @"Local\Palon.ShowFlyout";
+    public const string ShowTerminalName = @"Local\Palon.ShowTerminal";
 }

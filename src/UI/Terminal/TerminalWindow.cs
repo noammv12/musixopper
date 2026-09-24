@@ -35,17 +35,74 @@ sealed class TerminalWindow : Window
     }
 
     /// <summary>Opens the Terminal, or brings it to the front (optionally on a page).</summary>
+    /// <summary>Shown when the Terminal fails to open (Shell wires the dock toast).</summary>
+    internal static Action<string>? ReportFailure;
+
     public static void ShowSingleton(TerminalPage? page = null)
     {
-        if (_instance is null)
+        TerminalWindow? created = null;
+        try
         {
-            _instance = new TerminalWindow();
-            _instance.Closed += (_, _) => _instance = null;
-            _instance.Show();
+            if (_instance is null)
+            {
+                Log.Write("Terminal: opening");
+                created = new TerminalWindow();
+                _instance = created;
+                created.Closed += (_, _) => { if (ReferenceEquals(_instance, created)) _instance = null; };
+                created.Show();
+                Log.Write("Terminal: opened");
+            }
+            var w = _instance!;
+            if (w.WindowState == WindowState.Minimized) w.WindowState = WindowState.Normal;
+            w.Activate();
+            if (page is TerminalPage p) w.Navigate(p);
         }
-        if (_instance.WindowState == WindowState.Minimized) _instance.WindowState = WindowState.Normal;
-        _instance.Activate();
-        if (page is TerminalPage p) _instance.Navigate(p);
+        catch (Exception ex)
+        {
+            Log.Write($"Terminal: failed: {ex}");
+            if (created is not null)
+            {
+                try { created.Close(); } catch { }
+                _instance = null;
+            }
+            var msg = "הטרמינל לא נפתח: " + ex.Message;
+            try
+            {
+                if (ReportFailure is { } report) report(msg);
+                else MessageBox.Show(msg, "Palon", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            catch (Exception inner)
+            {
+                Log.Write($"Terminal: failure report failed: {inner.Message}");
+            }
+        }
+    }
+
+    TerminalScreen MakeScreen(TerminalPage page, Func<TerminalScreen> make)
+    {
+        try
+        {
+            return make();
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Terminal screen {page} failed to build: {ex}");
+            return new FailedScreen(this, page.ToString());
+        }
+    }
+
+    sealed class FailedScreen : TerminalScreen
+    {
+        readonly string _title;
+
+        public FailedScreen(TerminalWindow host, string title) : base(host)
+        {
+            _title = title;
+            Children.Add(Kit.T("המסך הזה נכשל בטעינה — ראה לוג", Display.Section, Tone.RedText, FontWeights.SemiBold, wrap: true));
+        }
+
+        public override string Title => _title;
+        public override void Render(TermData data, bool entrance) { }
     }
 
     /// <summary>Opens the Terminal with the Ask overlay up.</summary>
@@ -168,13 +225,13 @@ sealed class TerminalWindow : Window
 
         Content = _root;
 
-        _screens[TerminalPage.Today] = new TodayScreen(this);
-        _screens[TerminalPage.Callbacks] = new CallbacksScreen(this);
-        _screens[TerminalPage.Month] = new MonthScreen(this);
-        _screens[TerminalPage.Clients] = new ClientsScreen(this);
-        _screens[TerminalPage.Templates] = new TemplatesScreen(this);
-        _screens[TerminalPage.Coaching] = new CoachingScreen(this);
-        _screens[TerminalPage.Memory] = new MemoryScreen(this);
+        _screens[TerminalPage.Today] = MakeScreen(TerminalPage.Today, () => new TodayScreen(this));
+        _screens[TerminalPage.Callbacks] = MakeScreen(TerminalPage.Callbacks, () => new CallbacksScreen(this));
+        _screens[TerminalPage.Month] = MakeScreen(TerminalPage.Month, () => new MonthScreen(this));
+        _screens[TerminalPage.Clients] = MakeScreen(TerminalPage.Clients, () => new ClientsScreen(this));
+        _screens[TerminalPage.Templates] = MakeScreen(TerminalPage.Templates, () => new TemplatesScreen(this));
+        _screens[TerminalPage.Coaching] = MakeScreen(TerminalPage.Coaching, () => new CoachingScreen(this));
+        _screens[TerminalPage.Memory] = MakeScreen(TerminalPage.Memory, () => new MemoryScreen(this));
 
         _clock = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
         _clock.Tick += (_, _) => UpdateClock();
@@ -478,6 +535,9 @@ sealed class TerminalWindow : Window
                     Margin = new Thickness(0, -5, -5, 0), Child = _badgeText, Visibility = Visibility.Collapsed,
                     IsHitTestVisible = false,
                 };
+                // The glyph is still the tile's child — detach it before re-parenting,
+                // or WPF throws "already the logical child of another element".
+                item.Tile.Child = null;
                 item.Tile.Child = new Grid { Children = { item.Glyph, _badge } };
             }
         }

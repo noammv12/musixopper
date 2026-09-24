@@ -72,6 +72,7 @@ static class Program
         "pause" => SignalOrRun(verb, TraySignals.CallStartName, MediaController.CliPauseAsync, payload),
         "resume" or "play" => SignalOrRun(verb, TraySignals.CallEndName, MediaController.CliResumeAsync),
         "test" => RunTest(),
+        "terminal" => RunTerminal(),
         _ => Usage(verb),
     };
 
@@ -102,6 +103,43 @@ static class Program
         catch (Exception ex)
         {
             Log.Write($"CLI '{verb}' failed: {ex.Message}");
+            return 1;
+        }
+    }
+
+    /// <summary>Diagnostic: opens the Terminal in the running app, or standalone in-process.</summary>
+    static int RunTerminal()
+    {
+        Log.Init();
+        if (EventWaitHandle.TryOpenExisting(TraySignals.ShowTerminalName, out var signal))
+        {
+            using (signal) signal.Set();
+            Log.Write("CLI 'terminal' received — signaled the running app");
+            return 0;
+        }
+        Log.Write("CLI 'terminal': app not running — opening the Terminal in-process");
+        try
+        {
+            var app = new System.Windows.Application { ShutdownMode = System.Windows.ShutdownMode.OnLastWindowClose };
+            app.DispatcherUnhandledException += (_, e) =>
+            {
+                Log.Write($"Dispatcher exception (terminal CLI): {e.Exception}");
+                TryWriteLine(e.Exception.ToString());
+                e.Handled = true;
+            };
+            var failed = false;
+            app.Startup += (_, _) =>
+            {
+                Palon.UI.TerminalWindow.ReportFailure = msg => { failed = true; TryWriteLine(msg); System.Windows.MessageBox.Show(msg, "Palon"); };
+                Palon.UI.TerminalWindow.ShowSingleton();
+                if (failed || Palon.UI.TerminalWindow.Instance is null) app.Shutdown(1);
+            };
+            return app.Run();
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Terminal: failed (CLI): {ex}");
+            TryWriteLine(ex.ToString());
             return 1;
         }
     }
@@ -142,7 +180,7 @@ static class Program
     {
         Log.Write($"CLI: unknown verb '{verb}'");
         NativeMethods.AttachConsole(NativeMethods.ATTACH_PARENT_PROCESS);
-        TryWriteLine("Usage: Palon.exe [pause [number] | resume | test]   (no arguments starts the app)");
+        TryWriteLine("Usage: Palon.exe [pause [number] | resume | test | terminal]   (no arguments starts the app)");
         return 2;
     }
 
