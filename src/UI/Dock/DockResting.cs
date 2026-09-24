@@ -1,295 +1,655 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using Palon.Sales;
+using Palon.Terminal;
+using ShapePath = System.Windows.Shapes.Path;
 
 namespace Palon.UI;
 
-/// <summary>The resting capsule and the hover bar.</summary>
+/// <summary>Rest (the slim pill + its micro messages), Hover (one row of
+/// actions) and the on-call amber capsule.</summary>
 sealed partial class DockWindow
 {
-    // Resting capsule: dot (+ static level bars and the live timer on a call).
-    StackPanel _restContent = null!;
-    Ellipse _restDot = null!;
-    StackPanel _restBars = null!;
-    TextBlock _restTimer = null!;
-
-    // Hover bar: status · progress · overdue | chips.
-    StackPanel _expandedContent = null!;
+    // ---- rest ----
+    StackPanel _restRow = null!;
     Ellipse _statusDot = null!;
-    TextBlock _statusText = null!;
-    TextBlock _statusTimer = null!;
-    Border _progressSep = null!;
-    TextBlock _progressText = null!;
-    Border _overdueSep = null!;
+    DockRingsView _rings = null!;
+    Border _overdueBadge = null!;
     TextBlock _overdueText = null!;
-    StackPanel _chipsPanel = null!;
+    StackPanel _flashPanel = null!;
+    ShapePath _flashGlyph = null!;
+    TextBlock _flashText = null!;
+    Border _flashAction = null!;
+    PalonAvatar _restAvatar = null!;
+    DockRings _today;
 
-    static readonly double[] LevelBars = { 6, 10, 7, 9 };
+    // ---- hover ----
+    StackPanel _hoverSeg = null!;
+    StackPanel _moreSeg = null!;
+    Border _quickButton = null!;
+    StackPanel _pinsPanel = null!;
+    StackPanel _snippetsPanel = null!;
+    Border _dictateButton = null!;
+    Border _scanButton = null!;
 
-    void BuildResting()
+    // ---- flash (rest micro message) ----
+    readonly DispatcherTimer _flashTimer = new();
+    Action? _flashClick;
+    Action? _flashUndo;
+    bool _flashOn;
+
+    // ---- call capsule ----
+    Grid _callRow = null!;
+    TextBlock _callName = null!;
+    TextBlock _callSub = null!;
+    Border _callUndo = null!;
+    TextBlock _callTimer = null!;
+    Border _alarmButton = null!;
+    string? _callDisplayName;
+    Callback? _callBooked;
+    QuickPerson? _lastClient;
+
+    void BuildRest()
     {
-        _restDot = new Ellipse { Width = 6, Height = 6, VerticalAlignment = VerticalAlignment.Center, Fill = DockPalette.Done };
-        // No mic meter reaches the dock during a call (only dictation/Ask
-        // stream levels), so the bars are a quiet static glyph, not a fake wave.
-        _restBars = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, FlowDirection = FlowDirection.LeftToRight, Margin = new Thickness(8, 0, 0, 0) };
-        foreach (var h in LevelBars)
+        _statusDot = new Ellipse { Width = 8, Height = 8, Fill = DockPalette.Done, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+        _rings = new DockRingsView { Width = 24, Height = 24, VerticalAlignment = VerticalAlignment.Center, FlowDirection = FlowDirection.LeftToRight };
+        _overdueText = DockKit.Numeric("", 11.5, Brushes.White, FontWeights.SemiBold);
+        _overdueText.HorizontalAlignment = HorizontalAlignment.Center;
+        _overdueBadge = new Border
         {
-            var bar = new Border { Width = 2.5, Height = h * 0.8, CornerRadius = new CornerRadius(1.25), Margin = new Thickness(1.25, 0, 1.25, 0), VerticalAlignment = VerticalAlignment.Center, Background = DockPalette.Muted };
-            _restBars.Children.Add(bar);
+            MinWidth = 20,
+            Height = 20,
+            CornerRadius = new CornerRadius(10),
+            Background = DockPalette.Overdue,
+            Padding = new Thickness(6, 0, 6, 1),
+            Margin = new Thickness(0, 0, 8, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Cursor = Cursors.Hand,
+            Child = _overdueText,
+            Visibility = Visibility.Collapsed,
+        };
+        DockKit.Clickable(_overdueBadge, () => OpenRemindersRequested?.Invoke());
+
+        _flashGlyph = new ShapePath { Width = 10, Height = 11, Fill = DockPalette.Text, VerticalAlignment = VerticalAlignment.Center, FlowDirection = FlowDirection.LeftToRight, Margin = new Thickness(0, 0, 8, 0) };
+        _flashText = DockKit.Text("", Font.Lead, null, FontWeights.Medium);
+        _flashText.MaxWidth = 380;
+        _flashAction = DockKit.Button("בטל", DockKit.Kind.Ghost, () =>
+        {
+            var undo = _flashUndo;
+            _flashUndo = null;
+            if (undo is not null)
+            {
+                undo();
+                Flash("בוטל", null, null, null);
+            }
+        }, height: 28);
+        _flashAction.Margin = new Thickness(6, 0, 0, 0);
+        _flashPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed, Margin = new Thickness(0, 0, 4, 0) };
+        _flashPanel.Children.Add(_flashGlyph);
+        _flashPanel.Children.Add(_flashText);
+        _flashPanel.Children.Add(_flashAction);
+        _flashPanel.MouseLeftButtonDown += (_, e) =>
+        {
+            if (_flashClick is not null) e.Handled = true;
+        };
+        _flashPanel.MouseLeftButtonUp += (_, e) =>
+        {
+            if (_flashClick is not { } click) return;
+            e.Handled = true;
+            _flashClick = null;
+            EndFlash();
+            click();
+        };
+        _flashTimer.Tick += (_, _) =>
+        {
+            _flashTimer.Stop();
+            if (_pill.IsMouseOver && (_flashClick is not null || _flashUndo is not null)) return; // MouseLeave re-arms
+            EndFlash();
+        };
+
+        _restAvatar = new PalonAvatar { Width = 28, Height = 28, Mood = PalonMood.Idle, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0), ToolTip = "Palon · פתח את Now" };
+        var avatarPressed = false;
+        _restAvatar.MouseLeftButtonDown += (_, e) =>
+        {
+            if (_mode != DockMode.Hover) return; // at rest a click just opens the row
+            e.Handled = true;
+            avatarPressed = true;
+        };
+        _restAvatar.MouseLeftButtonUp += (_, e) =>
+        {
+            if (!avatarPressed) return;
+            avatarPressed = false;
+            e.Handled = true;
+            TerminalWindow.ShowSingleton();
+        };
+        _restAvatar.MouseLeave += (_, _) => avatarPressed = false;
+
+        BuildHover();
+
+        _restRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(16, 0, 8, 0),
+        };
+        _restRow.Children.Add(_statusDot);
+        _restRow.Children.Add(_rings);
+        _restRow.Children.Add(new Border { Width = 8 });
+        _restRow.Children.Add(_overdueBadge);
+        _restRow.Children.Add(_flashPanel);
+        _restRow.Children.Add(_hoverSeg);
+        _restRow.Children.Add(_restAvatar);
+    }
+
+    void BuildHover()
+    {
+        _quickButton = DockKit.Button("+ חזרה", DockKit.Kind.Primary, () => OpenQuick(), height: 34);
+        _pinsPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        var more = DockKit.IconButton(DockKit.IconMore, "עוד: הכתבה, קריאת מסך, קטעים", ToggleMore, 34, DockPalette.Text);
+
+        _dictateButton = DockKit.IconButton(DockKit.IconMic, "הכתבה", () => DictationToggleRequested?.Invoke(), 34, DockPalette.Text);
+        _scanButton = DockKit.IconButton(DockKit.IconScan, "קרא מהמסך", TerminalWindow.ReadScreenFromShortcut, 34, DockPalette.Text);
+        var ask = DockKit.IconButton(DockKit.IconChat, "שאל את Palon", () => AssistantToggleRequested?.Invoke(), 34, DockPalette.Text);
+        var settings = DockKit.IconButton(DockKit.IconGear, "קטעים והגדרות", () => OpenFlyoutRequested?.Invoke(), 34, DockPalette.Text);
+        _snippetsPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        _moreSeg = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
+        _moreSeg.Children.Add(DockKit.Divider());
+        _moreSeg.Children.Add(_dictateButton);
+        _moreSeg.Children.Add(_scanButton);
+        _moreSeg.Children.Add(ask);
+        _moreSeg.Children.Add(_snippetsPanel);
+        _moreSeg.Children.Add(settings);
+
+        _hoverSeg = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
+        _hoverSeg.Children.Add(DockKit.Divider());
+        _hoverSeg.Children.Add(_quickButton);
+        _hoverSeg.Children.Add(_pinsPanel);
+        _hoverSeg.Children.Add(more);
+        _hoverSeg.Children.Add(_moreSeg);
+        _hoverSeg.Children.Add(DockKit.Divider());
+        foreach (FrameworkElement child in _hoverSeg.Children)
+            if (child is Border { Width: not 1 } b) b.Margin = new Thickness(0, 0, 6, 0);
+
+        RebuildPins();
+        RebuildSnippets();
+        RefreshHoverTips();
+    }
+
+    void ExpandHover()
+    {
+        _moreSeg.Visibility = Visibility.Collapsed;
+        RebuildPins(); // the first name may have changed since last time
+        _hoverSeg.BeginAnimation(OpacityProperty, null);
+        _hoverSeg.Visibility = Visibility.Visible;
+        _hoverSeg.Opacity = 0;
+        var fade = DockMotion.FromTo(0, 1, 350);
+        fade.BeginTime = DockMotion.Delay(60);
+        _hoverSeg.BeginAnimation(OpacityProperty, fade);
+        _restAvatar.RenderTransformOrigin = new Point(0.5, 0.5);
+        var lean = new RotateTransform(0);
+        _restAvatar.RenderTransform = lean;
+        lean.BeginAnimation(RotateTransform.AngleProperty, DockMotion.FromTo(0, 10, 600, DockMotion.Spring));
+    }
+
+    void CollapseHover()
+    {
+        if (_restAvatar.RenderTransform is RotateTransform lean)
+            lean.BeginAnimation(RotateTransform.AngleProperty, DockMotion.To(0, 450));
+        if (_hoverSeg.Visibility != Visibility.Visible) return;
+        // Collapse first so the pill measures its resting width; the spring and
+        // the clip carry the row out of view.
+        _hoverSeg.BeginAnimation(OpacityProperty, null);
+        _hoverSeg.Opacity = 0;
+        _hoverSeg.Visibility = Visibility.Collapsed;
+        _moreSeg.Visibility = Visibility.Collapsed;
+    }
+
+    void ToggleMore()
+    {
+        _moreSeg.Visibility = _moreSeg.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+        if (_moreSeg.Visibility == Visibility.Visible) DockKit.RiseIn(_moreSeg, 0);
+        Refit();
+    }
+
+    void RefreshHoverTips()
+    {
+        if (_quickButton is null) return;
+        _quickButton.ToolTip = LiveQuickHotkey is { } key ? $"חזרה מהירה ({key})" : "חזרה מהירה";
+        _dictateButton.ToolTip = DictationHotkeyLive ? $"הכתבה ({_dictationHotkey})" : "הכתבה";
+        _scanButton.ToolTip = _screenHotkeyRegistered ? $"קרא מהמסך ({ScreenHotkeyLabel})" : "קרא מהמסך";
+    }
+
+    // ---- pinned templates ---------------------------------------------------------
+
+    void OnTemplatesChanged() => Dispatcher.InvokeAsync(RebuildPins, DispatcherPriority.Background);
+
+    /// <summary>The client the templates greet: the caller, else the last client.</summary>
+    string CurrentFirstName()
+    {
+        var name = OnCall ? _callDisplayName : _lastClient?.Name;
+        if (string.IsNullOrWhiteSpace(name) || name.Any(char.IsAsciiDigit)) return "";
+        return TemplateFill.FirstName(name);
+    }
+
+    void RebuildPins()
+    {
+        if (_pinsPanel is null) return;
+        _pinsPanel.Children.Clear();
+        List<MessageTemplate> pins;
+        try
+        {
+            pins = DockPins.Pick(TemplatesStore.Load(), Settings.DockPinnedTemplates);
         }
-        _restTimer = DockKit.Numeric("", Font.Body, DockPalette.Muted);
-        _restTimer.Margin = new Thickness(8, 0, 0, 0);
-        _restContent = new StackPanel
+        catch (Exception ex)
         {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        _restContent.Children.Add(_restDot);
-        _restContent.Children.Add(_restBars);
-        _restContent.Children.Add(_restTimer);
-
-        _statusDot = new Ellipse { Width = 7, Height = 7, VerticalAlignment = VerticalAlignment.Center, Fill = DockPalette.Done };
-        _statusText = DockKit.Text("מוכן", Font.Lead, DockPalette.Muted);
-        _statusText.Margin = new Thickness(8, 0, 0, 0);
-        _statusText.MaxWidth = 170;
-        _statusTimer = DockKit.Numeric("", Font.Lead, DockPalette.Muted);
-        _statusTimer.Margin = new Thickness(6, 0, 0, 0);
-
-        _progressSep = Separator();
-        _progressText = DockKit.Numeric("", Font.Lead);
-        _progressText.ToolTip = "הפקדות החודש / יעד";
-        _overdueSep = Separator();
-        _overdueText = DockKit.Text("", Font.Lead, DockPalette.OverdueText);
-        _overdueText.Cursor = System.Windows.Input.Cursors.Hand;
-        _overdueText.ToolTip = "פתח את החזרות";
-        DockKit.Clickable(_overdueText, () => OpenRemindersRequested?.Invoke());
-
-        _chipsPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-
-        _expandedContent = new StackPanel
+            Log.Write($"Dock pins load failed: {ex.Message}");
+            return;
+        }
+        var first = CurrentFirstName();
+        foreach (var t in pins)
         {
-            Orientation = Orientation.Horizontal,
-            VerticalAlignment = VerticalAlignment.Center,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Thickness(16, 0, 6, 0),
-        };
-        _expandedContent.Children.Add(_statusDot);
-        _expandedContent.Children.Add(_statusText);
-        _expandedContent.Children.Add(_statusTimer);
-        _expandedContent.Children.Add(_progressSep);
-        _expandedContent.Children.Add(_progressText);
-        _expandedContent.Children.Add(_overdueSep);
-        _expandedContent.Children.Add(_overdueText);
-        _expandedContent.Children.Add(Separator());
-        _expandedContent.Children.Add(_chipsPanel);
-
-        ApplyCallVisuals();
+            var label = DockPins.ShortLabel(t);
+            var button = DockKit.Button(label, DockKit.Kind.Secondary, null, height: 34);
+            button.Margin = new Thickness(0, 0, 6, 0);
+            button.ToolTip = first.Length > 0 ? $"{t.Title} · העתק עם השם {first}" : $"{t.Title} · העתק";
+            var text = DockKit.LabelOf(button);
+            var revert = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1600) };
+            revert.Tick += (_, _) =>
+            {
+                revert.Stop();
+                DockKit.SetText(text, label);
+                button.MinWidth = 0;
+                Refit();
+            };
+            var template = t;
+            DockKit.Clickable(button, () =>
+            {
+                var name = CurrentFirstName();
+                var filled = TemplateFill.Fill(template, name);
+                var ok = DockKit.TryCopy(filled);
+                if (ok)
+                {
+                    try
+                    {
+                        TemplateLearningStore.LogCopy(template, OnCall ? _callDisplayName : _lastClient?.Name,
+                            OnCall ? _callNumber : _lastClient?.Phone, filled, null, "dock");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Write($"Dock template log failed: {ex.Message}");
+                    }
+                }
+                if (!revert.IsEnabled) button.MinWidth = button.ActualWidth;
+                DockKit.SetText(text, !ok ? "נכשל" : name.Length > 0 ? $"הועתק · {name}" : "הועתק");
+                revert.Stop();
+                revert.Start();
+                Refit();
+            });
+            _pinsPanel.Children.Add(button);
+        }
+        if (_mode == DockMode.Hover) Refit();
     }
 
-    static Border Separator()
+    // ---- snippets (in "…") ------------------------------------------------------------
+
+    void OnSnippetsChanged()
     {
-        var sep = new Border { Width = 1, Height = 14, Margin = new Thickness(12, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
-        sep.SetResourceReference(Border.BackgroundProperty, "DividerBrush");
-        return sep;
+        Dispatcher.InvokeAsync(RebuildSnippets, DispatcherPriority.Background);
+        ApplySnippetHotkeys();
     }
 
-    /// <summary>Dot color + on-call extras (bars, timer) for the current call state.</summary>
-    void ApplyCallVisuals()
+    void RebuildSnippets()
     {
-        var dot = _callState switch
+        _snippetsPanel.Children.Clear();
+        List<Snippet> snippets;
+        try
         {
-            CallState.OnCall => DockPalette.OnCall,
-            CallState.Disabled => DockPalette.Faint,
-            _ => DockPalette.Done,
-        };
-        _restDot.Fill = dot;
-        _statusDot.Fill = dot;
-        var onCall = _callState == CallState.OnCall;
-        _restBars.Visibility = onCall ? Visibility.Visible : Visibility.Collapsed;
-        _restTimer.Visibility = onCall ? Visibility.Visible : Visibility.Collapsed;
-        _statusTimer.Visibility = onCall ? Visibility.Visible : Visibility.Collapsed;
-        _restDot.Width = _restDot.Height = onCall ? 8 : 6;
+            snippets = SnippetStore.Load().Take(3).ToList();
+        }
+        catch
+        {
+            return;
+        }
+        foreach (var snippet in snippets)
+        {
+            var original = snippet.Label.Length > 0 ? snippet.Label : "(ללא שם)";
+            var chip = DockKit.Button(original, DockKit.Kind.Secondary, null, DockKit.IconSnippet, height: 34);
+            chip.Margin = new Thickness(0, 0, 6, 0);
+            DockKit.LabelOf(chip).MaxWidth = 90;
+            chip.ToolTip = (snippet.Text.Length > 120 ? snippet.Text[..120] + "…" : snippet.Text) + "\n(קליק ימני: העתק בלבד)";
+            var label = DockKit.LabelOf(chip);
+            var revert = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Motion.Revert) };
+            revert.Tick += (_, _) =>
+            {
+                revert.Stop();
+                DockKit.SetText(label, original);
+                chip.MinWidth = 0;
+            };
+            void Show(string message)
+            {
+                if (!revert.IsEnabled) chip.MinWidth = chip.ActualWidth;
+                DockKit.SetText(label, message);
+                revert.Stop();
+                revert.Start();
+            }
+            DockKit.Clickable(chip, async () =>
+            {
+                // The foreground app is the paste target — the dock never activated.
+                var result = await SnippetPaster.PasteAsync(snippet);
+                Show(result switch { PasteResult.Pasted => "הודבק ✓", PasteResult.CopiedOnly => "הועתק ✓", _ => "נכשל" });
+            });
+            chip.MouseRightButtonUp += (_, _) => Show(SnippetPaster.CopyOnly(snippet) == PasteResult.Failed ? "נכשל" : "הועתק ✓");
+            _snippetsPanel.Children.Add(chip);
+        }
     }
 
-    /// <summary>The resting capsule's size: a sliver idle, a readable chip on a call.</summary>
-    (double Width, double Height) RestMetrics()
+    // ---- today: rings, overdue, status dot ------------------------------------------------
+
+    void OnStoresChanged() => Dispatcher.InvokeAsync(RefreshToday, DispatcherPriority.Background);
+
+    void RefreshToday()
     {
-        if (_callState != CallState.OnCall) return (IdleWidth, IdleHeight);
-        _restContent.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        // Width is quantized to 4 DIP so the ticking timer ("09:59" → "10:00")
-        // never nudges the capsule by a pixel.
-        return (Math.Ceiling((_restContent.DesiredSize.Width + 28) / 4) * 4, OnCallHeight);
-    }
-
-    void RefitExpanded()
-    {
-        if (_state != DockState.Expanded) return;
-        MorphTo(MeasureWidth(_expandedContent), ExpandedHeight, ExpandedHeight / 2, DockMotion.MorphQuick);
-    }
-
-    // ---- day stats: progress + overdue --------------------------------------------
-
-    void OnSalesChanged() => Dispatcher.InvokeAsync(RefreshDayStats, DispatcherPriority.Background);
-
-    /// <summary>"40/55" this month (hidden without a target) and "2 באיחור" (hidden at zero).</summary>
-    void RefreshDayStats()
-    {
-        string? progress = null;
-        string? overdue = null;
         var now = DateTime.Now;
         try
         {
-            if (SalesStore.Get(now.Year, now.Month) is { } book)
-                progress = DockText.Progress(book.Deals.Count, book.Target);
+            var callbacks = CallbackStore.Load();
+            var calls = Palon.Notes.NotesStore.Load().Select(n => n.StartedUtc.ToLocalTime());
+            var book = SalesStore.Get(now.Year, now.Month);
+            _today = DockRings.Compute(now, calls, book?.Deals.Select(d => d.Date) ?? Enumerable.Empty<DateTime>(), book?.Target, callbacks);
         }
         catch (Exception ex)
         {
-            Log.Write($"Dock progress read failed: {ex.Message}");
+            Log.Write($"Dock today read failed: {ex.Message}");
         }
-        try
-        {
-            overdue = DockText.Overdue(CallbackPlanner.Counts(CallbackStore.Load(), now).Overdue);
-        }
-        catch (Exception ex)
-        {
-            Log.Write($"Dock overdue read failed: {ex.Message}");
-        }
-        _progressText.Text = progress ?? "";
-        _progressText.Visibility = _progressSep.Visibility = progress is null ? Visibility.Collapsed : Visibility.Visible;
-        _overdueText.Text = overdue ?? "";
-        _overdueText.Visibility = _overdueSep.Visibility = overdue is null ? Visibility.Collapsed : Visibility.Visible;
-        RefitExpanded();
+        _rings.Set(_today.CallsP, _today.DepositsP, _today.CallbacksP);
+        _rings.ToolTip = _today.Label;
+        _overdueText.Text = _today.Overdue.ToString(CultureInfo.InvariantCulture);
+        _overdueBadge.ToolTip = _today.Overdue == 1 ? "חזרה אחת באיחור" : $"{_today.Overdue} חזרות באיחור";
+        var show = _today.Overdue > 0 && !_flashOn;
+        var changed = (_overdueBadge.Visibility == Visibility.Visible) != show;
+        _overdueBadge.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (changed && _mode != DockMode.Moment && !OnCall) Refit();
     }
 
-    // ---- chips ---------------------------------------------------------------------
-
-    void RefreshChips()
+    void UpdateStatusDot()
     {
-        if (!CheckAccess())
+        _statusDot.Fill = _callState switch
         {
-            Dispatcher.InvokeAsync(RefreshChips);
+            CallState.OnCall => DockPalette.OnCall,
+            CallState.Disabled => DockPalette.Faint,
+            _ when _notesStatus.Length > 0 => DockPalette.Rings[0],
+            _ => DockPalette.Done,
+        };
+        _statusDot.ToolTip = _callState switch
+        {
+            CallState.OnCall => "בשיחה",
+            CallState.Disabled => "מושהה",
+            _ => _notesStatus.Length > 0 ? _notesStatus : "מוכן",
+        };
+    }
+
+    // ---- flash: the rest-state micro message ------------------------------------------------
+
+    /// <summary>A one-line message in the pill (music paused, "דני · מחר 11:00 · בטל").
+    /// On a call it takes the capsule's second line instead — nothing grows.</summary>
+    void Flash(string text, System.Windows.Media.Geometry? glyph, Action? onClick, Action? undo)
+    {
+        _flashClick = onClick;
+        _flashUndo = undo;
+        _flashTimer.Stop();
+        _flashTimer.Interval = TimeSpan.FromMilliseconds(onClick is null && undo is null ? DockMotion.FlashMs : DockMotion.FlashActionMs);
+        if (OnCall)
+        {
+            SetCallSub(text, undo);
+            _flashOn = true;
+            _flashTimer.Start();
             return;
         }
-        _chipsPanel.Children.Clear();
-
-        var ask = IconChip(DockKit.IconChat, "Palon", () => AssistantToggleRequested?.Invoke());
-        ask.ToolTip = AssistantHotkeyLive
-            ? $"שאל את Palon ({_assistantHotkey})"
-            : "שאל את Palon";
-        _chipsPanel.Children.Add(ask);
-
-        if (DockActions.HasTerminal)
-        {
-            var terminal = IconChip(DockKit.IconTerminal, null, () => DockActions.OpenTerminal());
-            terminal.ToolTip = "טרמינל";
-            _chipsPanel.Children.Add(terminal);
-        }
-
-        var scan = IconChip(DockKit.IconScan, null, TerminalWindow.ReadScreenFromShortcut);
-        scan.ToolTip = ScreenHotkeyLive
-            ? $"קרא מהמסך ({ScreenHotkeyLabel}) — סמן אזור, אשר, ו-Palon יקרא"
-            : "קרא מהמסך — סמן אזור, אשר, ו-Palon יקרא";
-        _chipsPanel.Children.Add(scan);
-
-        var dictate = IconChip(DockKit.IconMic, null, () => DictationToggleRequested?.Invoke());
-        dictate.ToolTip = DictationHotkeyLive
-            ? $"הכתבה ({_dictationHotkey}) — מדברים, והטקסט מוקלד איפה שהסמן"
-            : "הכתבה — מדברים, והטקסט מוקלד איפה שהסמן";
-        _chipsPanel.Children.Add(dictate);
-
-        var callbacks = IconChip(DockKit.IconClock, null, () => OpenRemindersRequested?.Invoke());
-        callbacks.ToolTip = "חזרות";
-        _chipsPanel.Children.Add(callbacks);
-
-        var notes = IconChip(DockKit.IconNote, null, () => OpenNotesRequested?.Invoke());
-        notes.ToolTip = "הערות שיחה";
-        _chipsPanel.Children.Add(notes);
-
-        var snippets = SnippetStore.Load().Take(3).ToList();
-        if (snippets.Count > 0)
-        {
-            var sep = Separator();
-            sep.Margin = new Thickness(8, 0, 4, 0);
-            _chipsPanel.Children.Add(sep);
-            foreach (var snippet in snippets) _chipsPanel.Children.Add(SnippetChip(snippet));
-        }
-
-        var more = IconChip(DockKit.IconMore, null, () => OpenFlyoutRequested?.Invoke());
-        more.ToolTip = "קטעים והגדרות";
-        _chipsPanel.Children.Add(more);
-
-        if (_state == DockState.Expanded) RefitExpanded();
+        DockKit.SetText(_flashText, text);
+        _flashGlyph.Data = glyph;
+        _flashGlyph.Visibility = glyph is null ? Visibility.Collapsed : Visibility.Visible;
+        _flashAction.Visibility = undo is null ? Visibility.Collapsed : Visibility.Visible;
+        _flashPanel.Cursor = onClick is null ? Cursors.Arrow : Cursors.Hand;
+        _flashOn = true;
+        _rings.Visibility = Visibility.Collapsed;
+        _overdueBadge.Visibility = Visibility.Collapsed;
+        _flashPanel.Visibility = Visibility.Visible;
+        DockKit.RiseIn(_flashPanel, 0);
+        if (!_pill.IsMouseOver || onClick is null && undo is null) _flashTimer.Start();
+        if (_mode != DockMode.Moment) Refit();
     }
 
-    /// <summary>A 30px round glyph chip (optionally with a word), hover fill, press spring.</summary>
-    static Border IconChip(Geometry icon, string? label, Action onClick)
+    void ResumeFlashTimer()
     {
-        var row = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        row.Children.Add(DockKit.Icon(icon));
-        if (label is not null)
-        {
-            var text = DockKit.Text(label, Font.Body, null, FontWeights.Medium);
-            text.Margin = new Thickness(6, 0, 0, 0);
-            row.Children.Add(text);
-        }
-        var chip = new Border
-        {
-            MinWidth = 30,
-            Height = 30,
-            CornerRadius = new CornerRadius(15),
-            Padding = new Thickness(label is null ? 0 : 10, 0, label is null ? 0 : 12, 0),
-            Margin = new Thickness(0, 0, 4, 0),
-            Cursor = System.Windows.Input.Cursors.Hand,
-            VerticalAlignment = VerticalAlignment.Center,
-            Child = row,
-        };
-        chip.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
-        Ui.HoverFill(chip);
-        DockKit.Clickable(chip, onClick);
-        return chip;
+        if (_flashOn && !_flashTimer.IsEnabled) _flashTimer.Start();
     }
 
-    Border SnippetChip(Snippet snippet)
+    void EndFlash()
     {
-        var original = snippet.Label.Length > 0 ? snippet.Label : "(ללא שם)";
-        var label = DockKit.Text(original, Font.Body, null, FontWeights.Medium);
-        label.MaxWidth = 84;
-        var chip = new Border
+        _flashTimer.Stop();
+        _flashOn = false;
+        _flashClick = null;
+        _flashUndo = null;
+        if (OnCall)
         {
-            Height = 30,
-            CornerRadius = new CornerRadius(15),
-            Padding = new Thickness(12, 0, 12, 1),
-            Margin = new Thickness(0, 0, 4, 0),
-            Cursor = System.Windows.Input.Cursors.Hand,
-            VerticalAlignment = VerticalAlignment.Center,
-            Child = label,
-            Tag = label,
-            ToolTip = (snippet.Text.Length > 120 ? snippet.Text[..120] + "…" : snippet.Text) + "\n(קליק ימני: העתק בלבד)",
-        };
-        chip.SetResourceReference(Border.BackgroundProperty, "ControlFillBrush");
-        Ui.HoverFill(chip);
+            SetCallSub(CallBookedLine(), _callBooked is null ? null : UndoCallBooking);
+            return;
+        }
+        _flashPanel.Visibility = Visibility.Collapsed;
+        _rings.Visibility = Visibility.Visible;
+        DockKit.RiseIn(_rings, 0);
+        RefreshToday();
+        if (_mode != DockMode.Moment) Refit();
+    }
 
-        // One revert timer per chip, width pinned while the text swaps (AUDIT #9).
-        var flash = DockKit.Flasher(chip, original);
-        DockKit.Clickable(chip, async () =>
+    // ---- the on-call capsule -----------------------------------------------------------------
+
+    void BuildCall()
+    {
+        var dot = new Ellipse { Width = 9, Height = 9, Fill = DockPalette.OnCall, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) };
+        _callName = DockKit.Text("", 14, null, FontWeights.SemiBold);
+        _callName.MaxWidth = 170;
+        _callSub = DockKit.Text("", 11.5, DockPalette.Muted);
+        _callSub.MaxWidth = 170;
+        _callUndo = DockKit.Button("בטל", DockKit.Kind.Ghost, () => UndoCallBooking(), height: 22);
+        _callUndo.Padding = new Thickness(6, 0, 6, 1);
+        _callUndo.Visibility = Visibility.Collapsed;
+        var subRow = new StackPanel { Orientation = Orientation.Horizontal };
+        subRow.Children.Add(_callSub);
+        subRow.Children.Add(_callUndo);
+        var names = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        names.Children.Add(_callName);
+        names.Children.Add(subRow);
+        _callTimer = DockKit.Numeric("00:00", 14, DockPalette.OnCall, FontWeights.Medium);
+        _callTimer.Margin = new Thickness(10, 0, 10, 0);
+        _alarmButton = DockKit.IconButton(DockKit.IconClock, "קבע חזרה", OnCallAlarm, 38, null, DockKit.Kind.Primary);
+
+        _callRow = new Grid { Margin = new Thickness(18, 0, 7, 0), VerticalAlignment = VerticalAlignment.Center };
+        _callRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _callRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        _callRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _callRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _callRow.Children.Add(dot);
+        Grid.SetColumn(names, 1);
+        _callRow.Children.Add(names);
+        Grid.SetColumn(_callTimer, 2);
+        _callRow.Children.Add(_callTimer);
+        Grid.SetColumn(_alarmButton, 3);
+        _callRow.Children.Add(_alarmButton);
+    }
+
+    void BeginCallCapsule()
+    {
+        string? name = null;
+        try
         {
-            var result = await SnippetPaster.PasteAsync(snippet);
-            flash(result switch
+            name = ClientIndex.NameForPhone(CallbackStore.Load(), _callNumber);
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Dock caller lookup failed: {ex.Message}");
+        }
+        _callDisplayName = name ?? _callNumber;
+        if (_callNumber is not null || name is not null) _lastClient = new QuickPerson(name ?? _callNumber!, _callNumber);
+        DockKit.SetText(_callName, _callDisplayName ?? "בשיחה");
+        if (_callName.FlowDirection == FlowDirection.LeftToRight) _callName.HorizontalAlignment = HorizontalAlignment.Right;
+        SetCallSub(CallBookedLine(), null);
+        UpdateCallTimer();
+        RebuildPins();
+    }
+
+    void EndCallCapsule()
+    {
+        _lastCallBooking = _callBooked; // the after-call card adjusts this one instead of adding another
+        _callBooked = null;
+        _chipsTimer = null;
+        _alarmButton.ToolTip = "קבע חזרה";
+        DockKit.Paint(_alarmButton, DockKit.Kind.Primary);
+        ((ShapePath)_alarmButton.Child).Stroke = DockPalette.OnPrimary;
+        if (_flashOn) EndFlash();
+    }
+
+    void UpdateCallTimer()
+    {
+        if (!OnCall) return;
+        var text = DockText.Timer(DateTime.UtcNow - _callStartedUtc); // the only thing that moves on a call
+        _callTimer.Text = text;
+        if (_chipsTimer is not null) _chipsTimer.Text = text;
+    }
+
+    string CallBookedLine() =>
+        _callBooked is { } b ? $"חזרה · {DockText.When(b.DueAtUtc.ToLocalTime(), DateTime.Now)}"
+        : _callNumber is not null && _callDisplayName != _callNumber ? _callNumber : "⏰ לחיצה אחת קובעת חזרה";
+
+    void SetCallSub(string text, Action? undo)
+    {
+        DockKit.SetText(_callSub, text);
+        _callSub.ToolTip = text.Length > 30 ? text : null; // a long caller brief reads in full on hover
+        _callSub.Foreground = _callBooked is not null && undo is not null ? DockPalette.Done : DockPalette.Muted;
+        _callUndo.Visibility = undo is null ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>⏰: the first press books the smart default for the caller
+    /// (heard time, else tomorrow 10:00); the next press opens the chips.</summary>
+    void OnCallAlarm()
+    {
+        if (_callBooked is null)
+        {
+            var now = DateTime.Now;
+            var when = DockQuick.ApplyRules(DockQuick.SmartDefault(null, now), RulesFor(_callDisplayName, _callNumber));
+            _callBooked = BookFor(_callDisplayName, _callNumber, when, "חזרה משיחה");
+            if (_callBooked is null)
             {
-                PasteResult.Pasted => "הודבק ✓",
-                PasteResult.CopiedOnly => "הועתק ✓",
-                _ => "נכשל",
-            });
-        });
-        chip.MouseRightButtonUp += (_, _) =>
+                SetCallSub("לא הצלחתי לקבוע", null);
+                return;
+            }
+            SetCallSub(CallBookedLine(), UndoCallBooking);
+            _alarmButton.ToolTip = "עוד זמנים לחזרה";
+            DockKit.Paint(_alarmButton, DockKit.Kind.Secondary);
+            ((ShapePath)_alarmButton.Child).Stroke = DockPalette.Text;
+            RefreshToday();
+            return;
+        }
+        if (_moment == MomentKind.CallChips) SetMode(DockMode.Rest);
+        else ShowCallChips();
+    }
+
+    void UndoCallBooking()
+    {
+        if (_callBooked is { } b)
         {
-            var result = SnippetPaster.CopyOnly(snippet);
-            flash(result == PasteResult.Failed ? "נכשל" : "הועתק ✓");
-        };
-        return chip;
+            try
+            {
+                CallbackStore.Remove(b.Id);
+            }
+            catch (Exception ex)
+            {
+                Log.Write($"Dock call undo failed: {ex.Message}");
+            }
+        }
+        _callBooked = null;
+        _alarmButton.ToolTip = "קבע חזרה";
+        DockKit.Paint(_alarmButton, DockKit.Kind.Primary);
+        ((ShapePath)_alarmButton.Child).Stroke = DockPalette.OnPrimary;
+        SetCallSub(CallBookedLine(), null);
+        if (_moment == MomentKind.CallChips) SetMode(DockMode.Rest);
+        RefreshToday();
+    }
+
+    /// <summary>Adds a callback for someone (name and/or phone). Null on failure.</summary>
+    static Callback? BookFor(string? name, string? phone, DateTime whenLocal, string note, string? callNoteId = null)
+    {
+        try
+        {
+            var isNumber = name is not null && name.Any(char.IsAsciiDigit) && CallbackStore.NormalizePhone(name) is not null;
+            return CallbackStore.Add(note, whenLocal.ToUniversalTime(),
+                name: isNumber ? null : name, phone: phone ?? (isNumber ? name : null),
+                source: CallbackSource.Manual, callNoteId: callNoteId);
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Dock booking failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    static IReadOnlyList<Palon.Memory.TimeRule> RulesFor(string? name, string? phone)
+    {
+        try
+        {
+            return Palon.Memory.MemoryStore.RulesFor(name, phone);
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Dock rules read failed: {ex.Message}");
+            return Array.Empty<Palon.Memory.TimeRule>();
+        }
+    }
+}
+
+/// <summary>Three concentric progress rings (calls · deposits · callbacks), drawn once per change — never animated.</summary>
+sealed class DockRingsView : FrameworkElement
+{
+    readonly double[] _p = new double[3];
+
+    public void Set(double calls, double deposits, double callbacks)
+    {
+        _p[0] = calls;
+        _p[1] = deposits;
+        _p[2] = callbacks;
+        InvalidateVisual();
+    }
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        var c = new Point(ActualWidth / 2, ActualHeight / 2);
+        var radii = new[] { 10.5, 7, 3.5 };
+        for (var i = 0; i < 3; i++)
+        {
+            var r = radii[i];
+            var track = new Pen(DockPalette.RingTrack, 2.4);
+            dc.DrawEllipse(null, track, c, r, r);
+            var p = Math.Clamp(_p[i], 0, 1);
+            if (p <= 0) continue;
+            var pen = new Pen(DockPalette.Rings[i], 2.4) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+            if (p >= 0.999)
+            {
+                dc.DrawEllipse(null, pen, c, r, r);
+                continue;
+            }
+            var a = p * 2 * Math.PI;
+            var start = new Point(c.X, c.Y - r);
+            var end = new Point(c.X + r * Math.Sin(a), c.Y - r * Math.Cos(a));
+            var fig = new PathFigure { StartPoint = start, IsClosed = false };
+            fig.Segments.Add(new ArcSegment(end, new Size(r, r), 0, p > 0.5, SweepDirection.Clockwise, true));
+            var geo = new PathGeometry(new[] { fig });
+            dc.DrawGeometry(null, pen, geo);
+        }
     }
 }
