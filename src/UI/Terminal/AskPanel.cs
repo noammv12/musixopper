@@ -360,6 +360,7 @@ sealed class AskPanel : Border
         {
             // On the UI context, like the voice path: some tools touch windows.
             var result = await AgentLoop.RunAsync(_session, question, ct, tools);
+            if (result.Failure == AgentFailure.Cancelled || ct.IsCancellationRequested) return; // closed mid-answer — stay quiet
             answer = result.Outcome?.Text ?? (result.Failure == AgentFailure.ProviderDown
                 ? "Palon לא מצליח להגיע למודל כרגע — נסה שוב עוד רגע."
                 : "לא הצלחתי למצוא תשובה. נסה לנסח אחרת.");
