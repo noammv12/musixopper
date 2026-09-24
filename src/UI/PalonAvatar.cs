@@ -41,7 +41,7 @@ sealed class PalonAvatar : FrameworkElement
     /// pointer when <see cref="FollowPointer"/> is on. Eased, never jumps.
     /// </summary>
     public static readonly DependencyProperty GazeProperty = DependencyProperty.Register(
-        nameof(Gaze), typeof(Point?), typeof(PalonAvatar), new PropertyMetadata(null));
+        nameof(Gaze), typeof(Point?), typeof(PalonAvatar), new PropertyMetadata(null, (d, _) => ((PalonAvatar)d).Wake()));
 
     public Point? Gaze
     {
@@ -301,7 +301,7 @@ sealed class PalonAvatar : FrameworkElement
             || PalonEngine.IsMorphing(_state, now) || PalonEngine.IsBlinking(_state, now);
         _wasActive = active; _dirty = false;
         // Next frame budget. Reduced motion with nothing moving needs no clock at all (Wake restarts it).
-        _interval = reduced && !active && !_wasActive && !(FollowPointer && Gaze is null)
+        _interval = reduced && !active
             ? 0
             : AvatarPacer.FrameInterval(Math.Min(RenderSize.Width, RenderSize.Height), busy || near, _windowActive, _windowMinimized);
     }

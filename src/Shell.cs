@@ -30,6 +30,7 @@ sealed class Shell : IDisposable
     public Shell()
     {
         Theme.Initialize();
+        Perf.AvatarProbe = Palon.UI.PalonAvatar.Probe;
 
         _engine = new CallEngine();
         _dock = new DockWindow();
