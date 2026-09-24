@@ -121,6 +121,28 @@ static class Settings
         }
     }
 
+    /// <summary>Model picker selection (Notes.AiModels id); unset = Auto.</summary>
+    public static string AiModelChoice
+    {
+        get => Read("AiModelChoice") is { Length: > 0 } v ? v : "auto";
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value) || value == "auto") DeleteValue("AiModelChoice");
+            else WriteValue("AiModelChoice", value.Trim());
+        }
+    }
+
+    /// <summary>The rep's display name for the Today greeting; null = none.</summary>
+    public static string? RepName
+    {
+        get => Read("RepName") is { Length: > 0 } v ? v : null;
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value)) DeleteValue("RepName");
+            else WriteValue("RepName", value.Trim());
+        }
+    }
+
     /// <summary>ElevenLabs API key — activates the premium voice tier.</summary>
     public static string? ElevenLabsKey
     {

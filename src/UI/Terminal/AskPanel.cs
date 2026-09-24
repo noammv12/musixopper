@@ -58,6 +58,10 @@ sealed class AskPanel : Border
         close.HorizontalAlignment = HorizontalAlignment.Left;
         close.Margin = new Thickness(0, -10, -12, -40);
         root.Children.Add(close);
+        var model = ModelPicker.Pill(host, compact: false);
+        model.HorizontalAlignment = HorizontalAlignment.Right;
+        model.Margin = new Thickness(-8, -8, 0, -30);
+        root.Children.Add(model);
 
         _avatar.HorizontalAlignment = HorizontalAlignment.Center;
         root.Children.Add(_avatar);
