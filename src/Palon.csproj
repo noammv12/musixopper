@@ -31,6 +31,8 @@
          usings out so they can't collide with the WPF namespaces. -->
     <Using Remove="System.Windows.Forms" />
     <Using Remove="System.Drawing" />
+    <!-- WPF drops the implicit System.IO using on Windows; drop it everywhere so Linux compile checks match. -->
+    <Using Remove="System.IO" />
   </ItemGroup>
 
   <ItemGroup Condition="!$([MSBuild]::IsOSPlatform('Windows'))">
