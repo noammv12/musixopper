@@ -769,7 +769,9 @@ sealed class TerminalWindow : Window
                 Key.D2 => TerminalPage.Callbacks,
                 Key.D3 => TerminalPage.Month,
                 Key.D4 => TerminalPage.Clients,
-                Key.D5 => (TerminalPage?)TerminalPage.Templates,
+                Key.D5 => TerminalPage.Templates,
+                Key.D6 => TerminalPage.Coaching,
+                Key.D7 => (TerminalPage?)TerminalPage.Memory,
                 _ => null,
             };
             if (page is TerminalPage p && !OverlayOpen)
