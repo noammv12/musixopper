@@ -283,6 +283,29 @@ sealed class CdpPage : IAsyncDisposable
         }
     }
 
+    /// <summary>True when <paramref name="node"/> is inside <paramref name="root"/>
+    /// (crossing shadow roots), for scoping attribute matches to one composer.</summary>
+    public async Task<bool> ContainsAsync(int root, int node, CancellationToken ct)
+    {
+        try
+        {
+            var rootId = await ObjectIdAsync(root, ct);
+            var nodeId = await ObjectIdAsync(node, ct);
+            var r = await Session.SendAsync("Runtime.callFunctionOn", new
+            {
+                objectId = rootId,
+                functionDeclaration = "function(n){ for (let x = n; x; x = x.parentNode || x.host) if (x === this) return true; return false; }",
+                arguments = new[] { new { objectId = nodeId } },
+                returnByValue = true,
+            }, ct);
+            return r.TryGetProperty("result", out var res) && res.TryGetProperty("value", out var v) && v.ValueKind == JsonValueKind.True;
+        }
+        catch (CdpException)
+        {
+            return false;
+        }
+    }
+
     public async Task<JsonElement?> CallOnAsync(int backendNodeId, string functionDeclaration, CancellationToken ct, params object[] args)
     {
         var objectId = await ObjectIdAsync(backendNodeId, ct);

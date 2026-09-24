@@ -104,6 +104,14 @@ sealed class Shell : IDisposable
         _assistant.StatusChanged += status => _dock.SetAssistantStatus(status);
         _assistant.Level += _dock.SetVoiceLevel;
         _assistant.ToastRequested += message => _dock.ShowToast(message, paused: false, showIcon: false, important: true);
+        // Nightly Salesforce rehearsal: a quiet note only when a taught skill broke.
+        Palon.Salesforce.Rehearsal.Finished += status =>
+        {
+            if (status.Ok) return;
+            Application.Current.Dispatcher.InvokeAsync(() =>
+                _dock.ShowToast(status.Summary(), paused: false, showIcon: false));
+        };
+        Palon.Salesforce.Rehearsal.StartScheduler();
         _assistant.Answered += (question, answer) =>
         {
             _flyout.SetLastExchange(question, answer);

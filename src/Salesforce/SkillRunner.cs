@@ -44,6 +44,11 @@ sealed class SkillRunner
     readonly LoopDetector _loop;
     readonly Action<string>? _progress;
 
+    // Set only while resolving/healing a step that types into or saves a
+    // composer: locators are then scoped to that one composer (ComposerScope).
+    string? _composerHeader;
+    string? _composerError;
+
     public SkillRunner(CdpPage page, Func<string, string, CancellationToken, Task<string?>> ask, LoopDetector loop, Action<string>? progress = null)
     {
         _page = page;
@@ -105,15 +110,28 @@ sealed class SkillRunner
 
             // ---- resolve the element: replay, then heal -----------------------------
             var locators = step.Locators.Select(l => SfVars.Apply(l, vars)).ToList();
-            var (element, via) = await ResolveAsync(locators, ct);
+            _composerHeader = InComposer(skill, step) ? ComposerScope.HeaderFor(skill.Skill) : null;
+            _composerError = null;
+            int? element;
+            string? via;
             var healed = false;
-            if (element is null)
+            try
             {
-                if (step.Optional) { reports.Add(new StepReport(i, intent, StepOutcome.Skipped, "not present")); continue; }
-                if (!_loop.TryUseRecovery()) return Fail($"could not find the element for \"{intent}\" (recovery budget used)");
-                element = await HealAsync(intent, step.Method, ct);
-                if (element is null) return Fail($"could not find the element for \"{intent}\"");
-                healed = true;
+                (element, via) = await ResolveAsync(locators, ct);
+                if (_composerError is { } ambiguous) return Fail(ambiguous);
+                if (element is null)
+                {
+                    if (step.Optional) { reports.Add(new StepReport(i, intent, StepOutcome.Skipped, "not present")); continue; }
+                    if (!_loop.TryUseRecovery()) return Fail($"could not find the element for \"{intent}\" (recovery budget used)");
+                    element = await HealAsync(intent, step.Method, ct);
+                    if (_composerError is { } ambiguous2) return Fail(ambiguous2);
+                    if (element is null) return Fail($"could not find the element for \"{intent}\"");
+                    healed = true;
+                }
+            }
+            finally
+            {
+                _composerHeader = null;
             }
             var facts = await _page.FactsAsync(element.Value, ct);
 
@@ -199,6 +217,29 @@ sealed class SkillRunner
         }
     }
 
+    /// <summary>Typing into or saving a composer (not opening it, not searching).</summary>
+    internal static bool InComposer(SfSkill skill, SfStep step) =>
+        ComposerScope.HeaderFor(skill.Skill) is not null
+        && (step.Method is "fill" or "select" || step.Commit
+            || (step.Method == "click" && step.Locators.Any(l => SfSafety.LooksLikeCommit(l.Name))));
+
+    /// <summary>The AX scope for this resolve: the planned composer while one is
+    /// required (null + _composerError when ambiguous), else the page/modal.</summary>
+    async Task<(IReadOnlyList<AxNode>? Scope, int? Root)> ScopeAsync(List<AxNode> ax, CancellationToken ct)
+    {
+        if (_composerHeader is null) return (AxTree.Scope(ax), null);
+        var visible = new HashSet<string>();
+        foreach (var c in ComposerScope.Candidates(ax))
+            if (c.BackendId is { } b && await _page.IsVisibleAsync(b, ct)) visible.Add(c.Id);
+        var pick = ComposerScope.Pick(ax, _composerHeader, n => visible.Contains(n.Id));
+        if (pick.Refused)
+        {
+            _composerError = pick.Error;
+            return (null, null);
+        }
+        return (pick.Scope, pick.Root?.BackendId);
+    }
+
     static string Norm(string s) => Regex.Replace(s, @"\s+", " ").Trim();
 
     async Task<string?> SafeValueAsync(int id, CancellationToken ct)
@@ -234,20 +275,37 @@ sealed class SkillRunner
         while (true)
         {
             List<AxNode>? ax = null;
+            IReadOnlyList<AxNode>? scope = null;
+            int? root = null;
+            if (_composerHeader is not null)
+            {
+                ax = await _page.AxTreeAsync(ct);
+                (scope, root) = await ScopeAsync(ax, ct);
+                if (scope is null) return (null, null); // ambiguous: refuse, don't wait it out
+            }
             foreach (var l in locators)
             {
                 List<int> hits;
                 if (l.Role is not null)
                 {
                     ax ??= await _page.AxTreeAsync(ct);
-                    var scope = AxTree.Scope(ax);
+                    scope ??= AxTree.Scope(ax);
                     var matches = AxTree.Match(scope, l).Where(n => !n.Disabled).ToList();
                     hits = new List<int>();
                     foreach (var m in matches)
                         if (await _page.IsVisibleAsync(m.BackendId!.Value, ct)) hits.Add(m.BackendId.Value);
                 }
                 else
+                {
                     hits = await _page.QueryAttrAsync(l, ct);
+                    if (root is { } r)
+                    {
+                        var inside = new List<int>();
+                        foreach (var h in hits)
+                            if (await _page.ContainsAsync(r, h, ct)) inside.Add(h);
+                        hits = inside;
+                    }
+                }
                 if (hits.Count == 1) return (hits[0], l.ToString());
             }
             if (DateTime.UtcNow >= until) return (null, null);
@@ -257,7 +315,8 @@ sealed class SkillRunner
 
     async Task<int?> HealAsync(string intent, string method, CancellationToken ct)
     {
-        var scope = AxTree.Scope(await _page.AxTreeAsync(ct));
+        var (scope, _) = await ScopeAsync(await _page.AxTreeAsync(ct), ct);
+        if (scope is null) return null;
         var snapshot = AxTree.Snapshot(scope);
         if (snapshot.Length == 0) return null;
         _progress?.Invoke("מחפש את הכפתור מחדש…");

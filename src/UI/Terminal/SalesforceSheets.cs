@@ -193,6 +193,7 @@ static class SalesforceSheets
                 };
                 var col = Kit.Col(2, Kit.Auto(Kit.T(SfPlanner.Describe(c.Change), 14, Tone.Text)), Kit.T(label + (c.Detail is null ? "" : " · " + c.Detail), 12.5, brush, wrap: true));
                 if (c.UndoNote is { } undo) col.Children.Add(Kit.T(undo, 12, Tone.Muted, wrap: true));
+                if (c.AuditId is { } auditId) col.Children.Add(UndoPill(host, auditId));
                 var row = Kit.ListRow(col, new Thickness(12, 10, 12, 10));
                 row.Margin = new Thickness(0, 8, 0, 0);
                 content.Children.Add(row);
@@ -206,6 +207,73 @@ static class SalesforceSheets
             pills.Add(Kit.Pill("סגור", PillKind.Ghost, close));
             content.Children.Add(Buttons(pills.ToArray()));
         }
+    }
+
+    /// <summary>Undo for one audit entry. The token is minted by this click only.</summary>
+    static Border UndoPill(TerminalWindow host, string auditId)
+    {
+        Border? pill = null;
+        pill = Kit.Pill("בטל פעולה", PillKind.Ghost, async () =>
+        {
+            if (pill is not null) pill.IsEnabled = false;
+            var token = SalesforceAgent.ApproveUndo(auditId);
+            var r = await SalesforceAgent.UndoAsync(auditId, token);
+            host.Toast(r.Message);
+            if (pill is not null) pill.Visibility = r.Ok ? Visibility.Collapsed : Visibility.Visible;
+            if (pill is not null) pill.IsEnabled = !r.Ok;
+        }, height: 30, fontSize: 12.5);
+        pill.HorizontalAlignment = HorizontalAlignment.Left;
+        pill.Margin = new Thickness(0, 6, 0, 0);
+        return pill;
+    }
+
+    /// <summary>Nightly rehearsal status + switch, and the recent actions Palon can undo.</summary>
+    static FrameworkElement RehearsalAndUndo(TerminalWindow host)
+    {
+        var col = new StackPanel { Margin = new Thickness(0, 14, 0, 0) };
+        var s = RehearsalSettings.Load();
+        var taught = RehearsalSchedule.Taught(DefaultSkills.Names.Select(SkillStore.Load)).Count > 0;
+        var active = RehearsalSchedule.Active(s, taught);
+        string state = !taught || s.TestRecordUrl is null
+            ? "חזרה לילית: תופעל אחרי שתלמד את Palon פעולה ברשומת בדיקה"
+            : active ? $"חזרה לילית ב-{s.Time} בימי עבודה (בלי שמירה)" : "חזרה לילית כבויה";
+        col.Children.Add(Line(state, 13, Tone.MutedSoft));
+        if (s.LastStatus is { } last)
+            col.Children.Add(Line(last.Summary(), 12.5, last.Ok ? Tone.GreenText : Tone.AmberText));
+        if (taught && s.TestRecordUrl is not null)
+        {
+            var status = Line("", 12.5, Tone.Muted);
+            col.Children.Add(Buttons(
+                Kit.Pill(active ? "כבה חזרה לילית" : "הפעל חזרה לילית", PillKind.Ghost, () =>
+                {
+                    var cur = RehearsalSettings.Load();
+                    cur.Enabled = !RehearsalSchedule.Active(cur, true);
+                    cur.Save();
+                    host.Toast(cur.Enabled == true ? "החזרה הלילית פעילה" : "החזרה הלילית כבויה");
+                }),
+                Kit.Pill("הרץ חזרה עכשיו", PillKind.Ghost, async () =>
+                {
+                    status.Text = "מריץ בלי שמירה…";
+                    var r = await Rehearsal.RunAsync(CancellationToken.None);
+                    status.Text = r.Summary();
+                    status.Foreground = r.Ok ? Tone.GreenText : Tone.AmberText;
+                })));
+            col.Children.Add(status);
+        }
+
+        var undoable = AuditLog.Undoable(DateTime.UtcNow).Take(5).ToList();
+        if (undoable.Count > 0)
+        {
+            col.Children.Add(Line("אפשר לבטל (24 שעות אחרונות):", 13, Tone.MutedSoft));
+            foreach (var e in undoable)
+            {
+                var row = Kit.Col(2, Kit.T($"{e.AtUtc.ToLocalTime():dd/MM HH:mm} · {e.Description}", 13, Tone.Text, wrap: true), UndoPill(host, e.Id));
+                var item = Kit.ListRow(row, new Thickness(12, 8, 12, 8));
+                item.Margin = new Thickness(0, 6, 0, 0);
+                col.Children.Add(item);
+            }
+        }
+        return col;
     }
 
     static async Task OpenEdge(TerminalWindow host, string? url)
@@ -261,6 +329,7 @@ static class SalesforceSheets
                 else host.Toast("עוד אין פעולות ביומן");
             })));
         col.Children.Add(teachPanel);
+        col.Children.Add(RehearsalAndUndo(host));
         return col;
     }
 

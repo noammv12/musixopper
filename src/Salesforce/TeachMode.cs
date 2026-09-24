@@ -100,7 +100,13 @@ sealed class TeachSession : IAsyncDisposable
         List<TeachObservation> seen;
         lock (_seen) seen = _seen.ToList();
         var outcome = TeachMerge.Merge(SkillStore.Load(skillName), seen, DateOnly.FromDateTime(DateTime.Now));
-        if (outcome.Learned.Count > 0) SkillStore.Save(outcome.Skill);
+        if (outcome.Learned.Count > 0)
+        {
+            SkillStore.Save(outcome.Skill);
+            // The record the user taught on is the rehearsal's test record.
+            if (skillName is "LogCall" or "NewTask")
+                Rehearsal.RememberTestRecord(seen.Select(o => o.Url).LastOrDefault(u => SfPhones.ParseRecordUrl(u) is not null));
+        }
         Log.Write($"Salesforce teach {skillName}: learned {outcome.Learned.Count}, unmatched {outcome.Unmatched.Count}");
         return outcome;
     }

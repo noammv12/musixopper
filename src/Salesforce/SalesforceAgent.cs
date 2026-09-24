@@ -7,7 +7,11 @@ namespace Palon.Salesforce;
 
 enum ChangeStatus { Verified, SavedUnverified, DryRun, Failed, NotRun }
 
-sealed record ChangeResult(SfChange Change, ChangeStatus Status, string? Detail = null, string? UndoNote = null);
+sealed record ChangeResult(SfChange Change, ChangeStatus Status, string? Detail = null, string? UndoNote = null)
+{
+    /// <summary>The audit entry for a saved change — what the Undo action runs on.</summary>
+    public string? AuditId { get; init; }
+}
 
 sealed record ExecuteResult(bool Ok, IReadOnlyList<ChangeResult> Changes, string? Error = null, bool NeedsLogin = false, string? RecordUrl = null);
 
@@ -20,7 +24,7 @@ sealed record PrepareResult(SfPlan? Plan, string? Error = null, bool NeedsLogin 
 /// Palon never deletes, never touches a record outside the plan, and
 /// reports anything it could not verify as not saved.
 /// </summary>
-static class SalesforceAgent
+static partial class SalesforceAgent
 {
     static readonly ApprovalGate Gate = new();
     static readonly SemaphoreSlim OneJob = new(1, 1);
@@ -212,9 +216,10 @@ static class SalesforceAgent
                     SfChangeKind.UpdateField => $"להחזרה: {change.Field} = \"{oldValue ?? "?"}\"",
                     _ => createdUrl is not null ? $"להחזרה: למחוק ידנית את {createdUrl}" : "להחזרה: למחוק ידנית את הפעילות ברשומה",
                 };
-                results.Add(new ChangeResult(change with { OldValue = oldValue },
-                    verified ? ChangeStatus.Verified : ChangeStatus.SavedUnverified,
-                    verified ? null : "נשמר אבל לא אומת בדף — בדוק ידנית", undo));
+                var status = verified ? ChangeStatus.Verified : ChangeStatus.SavedUnverified;
+                var auditId = Audit.WriteChange(plan, change with { OldValue = oldValue }, status, createdUrl);
+                results.Add(new ChangeResult(change with { OldValue = oldValue }, status,
+                    verified ? null : "נשמר אבל לא אומת בדף — בדוק ידנית", undo) { AuditId = auditId });
             }
             foreach (var c in plan.Changes.Skip(results.Count))
                 results.Add(new ChangeResult(c, ChangeStatus.NotRun));
@@ -357,6 +362,66 @@ static class Audit
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Palon", "salesforce", "audit.jsonl");
 
     static readonly object Gate = new();
+
+    /// <summary>One saved change, with an id the Undo action is bound to.</summary>
+    public static string WriteChange(SfPlan plan, SfChange change, ChangeStatus status, string? createdUrl)
+    {
+        var id = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(8)).ToLowerInvariant();
+        Append(JsonSerializer.Serialize(new
+        {
+            at = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
+            evt = "change",
+            id,
+            plan = plan.Hash[..16],
+            note = plan.NoteId,
+            record = plan.Record?.Id,
+            recordUrl = plan.Record?.Url,
+            recordName = plan.Record?.Name,
+            kind = change.Kind.ToString(),
+            status = status.ToString(),
+            createdUrl,
+            field = change.Field,
+            oldValue = change.OldValue,
+            newValue = change.NewValue,
+            description = SfPlanner.Describe(change),
+        }));
+        return id;
+    }
+
+    /// <summary>Undo events: "undo-start", "undo-done", "undo-refused", "undo-failed".</summary>
+    public static void WriteUndo(string evt, string entryId, object? detail) =>
+        Append(JsonSerializer.Serialize(new
+        {
+            at = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
+            evt,
+            @ref = entryId,
+            detail,
+        }));
+
+    /// <summary>Rehearsal events (nightly dry runs).</summary>
+    public static void WriteRehearsal(object detail) =>
+        Append(JsonSerializer.Serialize(new
+        {
+            at = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
+            evt = "rehearsal",
+            detail,
+        }));
+
+    static void Append(string line)
+    {
+        try
+        {
+            lock (Gate)
+            {
+                Directory.CreateDirectory(System.IO.Path.GetDirectoryName(PathFor)!);
+                File.AppendAllText(PathFor, line + "\n");
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.Write($"Salesforce: audit write failed: {ex.Message}");
+        }
+    }
 
     public static void Write(string evt, SfPlan plan, object? detail)
     {

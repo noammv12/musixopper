@@ -9,7 +9,12 @@ namespace Palon.Agent;
 /// feedback (a window opening, music stopping), where another model round
 /// would only add latency; Toast is then what the user sees.
 /// </summary>
-sealed record ToolOutcome(string ResultForModel, bool EndTurn = false, string? Toast = null);
+sealed record ToolOutcome(string ResultForModel, bool EndTurn = false, string? Toast = null)
+{
+    /// <summary>Reverses what a Reversible tool did (delete the reminder it
+    /// created, …). Surfaced to the user as an Undo toast; null = no undo.</summary>
+    public Func<Task<string>>? Undo { get; init; }
+}
 
 /// <summary>
 /// One capability Palon can invoke: a name + description + JSON-Schema
@@ -31,6 +36,13 @@ abstract class AgentTool
     /// "timed out" and moving on. Override for tools that are slow by nature.</summary>
     public virtual TimeSpan Timeout => TimeSpan.FromSeconds(10);
 
+    /// <summary>Permission tier (agent_chat.md §3.1). ReadOnly runs freely and
+    /// is allowed in the plan turn; External always goes through the approve card.</summary>
+    public virtual ToolRisk Risk => ToolRisks.For(Name);
+
+    /// <summary>The Hebrew chip shown while this call runs ("מחפש בהערות…").</summary>
+    public virtual string ProgressLabel(JsonElement args) => ToolLabels.For(Name);
+
     protected static string? Str(JsonElement args, string name) =>
         args.ValueKind == JsonValueKind.Object
         && args.TryGetProperty(name, out var value)
@@ -45,4 +57,23 @@ abstract class AgentTool
         && value.TryGetInt32(out var parsed)
             ? parsed
             : null;
+}
+
+/// <summary>Chip labels for the built-in tools; new tools override ProgressLabel.</summary>
+static class ToolLabels
+{
+    static readonly Dictionary<string, string> Known = new(StringComparer.Ordinal)
+    {
+        ["open_command"] = "פותח את הפקודה",
+        ["open_url"] = "פותח קישור",
+        ["create_reminder"] = "קובע חזרה",
+        ["list_reminders"] = "בודק חזרות",
+        ["search_notes"] = "מחפש בהערות מהשיחות",
+        ["get_call_stats"] = "סופר שיחות",
+        ["open_whatsapp"] = "פותח וואטסאפ",
+        ["daily_recap"] = "מסכם את היום",
+        ["control_music"] = "שולט במוזיקה",
+    };
+
+    public static string For(string toolName) => Known.TryGetValue(toolName, out var label) ? label : toolName;
 }

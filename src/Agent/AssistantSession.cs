@@ -36,10 +36,30 @@ sealed class AssistantSession
         }
     }
 
-    public void Record(string question, string answer)
+    /// <summary>Records an exchange plus a one-line digest per tool call, so the
+    /// next turn knows what was just done ("move it to 5" finds the reminder).</summary>
+    public void Record(string question, string answer, IReadOnlyList<string>? toolDigests)
+    {
+        answer = Clip(answer);
+        if (toolDigests is { Count: > 0 })
+            answer += "\n[" + string.Join("; ", toolDigests.TakeLast(4)) + "]";
+        RecordRaw(question, answer);
+    }
+
+    public void Record(string question, string answer) => RecordRaw(question, Clip(answer));
+
+    /// <summary>Clips at a word boundary — never mid-word.</summary>
+    internal static string Clip(string answer)
+    {
+        if (answer.Length <= MaxAnswerChars) return answer;
+        var cut = answer.LastIndexOfAny(new[] { ' ', '\n', '\t' }, MaxAnswerChars);
+        if (cut < MaxAnswerChars / 2) cut = MaxAnswerChars;
+        return answer[..cut].TrimEnd() + "…";
+    }
+
+    void RecordRaw(string question, string answer)
     {
         if (DateTime.UtcNow - _lastExchangeUtc > Ttl) _exchanges.Clear();
-        if (answer.Length > MaxAnswerChars) answer = answer[..MaxAnswerChars] + "…";
         _exchanges.Add((question, answer));
         if (_exchanges.Count > MaxExchanges) _exchanges.RemoveAt(0);
         _lastExchangeUtc = DateTime.UtcNow;
