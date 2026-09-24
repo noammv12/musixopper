@@ -20,6 +20,7 @@ static class ToolRegistry
         new OpenWhatsAppTool(),
         new DailyRecapTool(),
         new ControlMusicTool(),
+        new LookAtScreenTool(),
     };
 
     /// <summary>Serializable request payload for the "tools" field.</summary>

@@ -327,6 +327,48 @@ static class AiChat
         return string.IsNullOrWhiteSpace(turn?.Content) ? (null, error.Length > 0 ? error : "empty reply") : (turn!.Content!.Trim(), "");
     }
 
+    // ---- vision -----------------------------------------------------------
+
+    static IEnumerable<Provider> VisionProviders() => Providers()
+        .Where(p => Vision.VisionPayload.SupportsImages(p.IsGemini ? AiModels.Gemini : AiModels.DeepSeek, p.Model));
+
+    /// <summary>"Gemini · gemini-3.8-flash" — who an image would go to right
+    /// now, for the privacy gate; null when no configured model takes images.</summary>
+    public static string? VisionTarget() =>
+        VisionProviders().FirstOrDefault() is { } p ? $"{p.Name} · {p.Model}" : null;
+
+    /// <summary>
+    /// One image + instruction through the vision-capable providers (text-only
+    /// models are skipped, not sent a 400). Returns the raw reply, or null
+    /// plus a reason ("no model that reads images" when none qualifies).
+    /// </summary>
+    public static async Task<(string? Text, string? Error)> VisionAsync(
+        string systemPrompt, string userText, byte[] jpeg, int maxTokens, CancellationToken ct)
+    {
+        var errors = new List<string>(2);
+        foreach (var provider in VisionProviders())
+        {
+            var messages = new object[]
+            {
+                new Dictionary<string, object?> { ["role"] = "system", ["content"] = systemPrompt },
+                Vision.VisionPayload.UserMessage(userText, jpeg),
+            };
+            var (turn, error) = await RequestChatAsync(provider, BuildBody(provider, messages, 0.1, maxTokens, tools: null),
+                rejectTruncated: true, ct, retryDelayMs: 800, requestTimeoutMs: BackgroundTimeoutMs);
+            if (!string.IsNullOrWhiteSpace(turn?.Content))
+            {
+                LastError = null;
+                return (turn!.Content!.Trim(), null);
+            }
+            errors.Add($"{provider.Name}: {(error.Length > 0 ? error : "empty reply")}");
+            if (ct.IsCancellationRequested) break;
+        }
+        var reason = errors.Count > 0 ? string.Join(" → ", errors) : "no model that reads images";
+        LastError = reason;
+        Log.Write($"AI vision failed: {reason}");
+        return (null, reason);
+    }
+
     // ---- tool calling -----------------------------------------------------
 
     /// <summary>

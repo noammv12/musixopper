@@ -24,6 +24,9 @@ partial class FlyoutWindow
     /// <summary>Set by Shell: re-registers the dock's Ask-Palon hotkey.</summary>
     public Func<bool>? ApplyAssistantHotkey { get; set; }
 
+    /// <summary>Set by Shell: re-registers the opt-in screen-read hotkey.</summary>
+    public Func<bool>? ApplyScreenHotkey { get; set; }
+
     /// <summary>Set by Shell: speaks a short sample line with the current voice.</summary>
     public Func<Task>? PreviewVoice { get; set; }
 
@@ -79,6 +82,21 @@ partial class FlyoutWindow
         _asstHotkeyStatus.TextWrapping = TextWrapping.Wrap;
         _asstHotkeyStatus.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(_asstHotkeyStatus);
+
+        var screenSwitch = new PillSwitch(Settings.ScreenReadHotkey);
+        var screenHint = Ui.Small("Select part of the screen, approve the preview, and Palon reads it. Nothing is captured until you press it.");
+        screenSwitch.Toggled += on =>
+        {
+            Settings.ScreenReadHotkey = on;
+            if (!(ApplyScreenHotkey?.Invoke() ?? true))
+                screenHint.Text = "Ctrl+Alt+Shift+S is taken by another app — use the dock's scan chip instead.";
+        };
+        var screenRow = Ui.ToggleRow("Read the screen with Ctrl+Alt+Shift+S", screenSwitch);
+        screenRow.Margin = Ui.Top(Space.Row);
+        panel.Children.Add(screenRow);
+        screenHint.TextWrapping = TextWrapping.Wrap;
+        screenHint.Margin = Ui.Top(Space.Tight);
+        panel.Children.Add(screenHint);
 
         panel.Children.Add(Ui.Divider(Space.Section, Space.Row));
 
@@ -221,6 +239,7 @@ partial class FlyoutWindow
     {
         ApplyDictationHotkey?.Invoke();
         ApplyAssistantHotkey?.Invoke();
+        ApplyScreenHotkey?.Invoke();
         ApplySnippetHotkeys?.Invoke();
     }
 

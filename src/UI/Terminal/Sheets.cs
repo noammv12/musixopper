@@ -61,11 +61,11 @@ static class Sheets
 
     // ---- new deal ------------------------------------------------------------------
 
-    public static void NewDeal(TerminalWindow host, int? year = null, int? month = null)
+    public static void NewDeal(TerminalWindow host, int? year = null, int? month = null, Vision.DealPrefill? prefill = null)
     {
         var now = DateTime.Now;
-        var y = year ?? now.Year;
-        var m = month ?? now.Month;
+        var y = prefill?.Year ?? year ?? now.Year;
+        var m = prefill?.Month ?? month ?? now.Month;
         var rules = SalesStore.LoadRules();
         var existing = SalesStore.Get(y, m);
         var count = existing?.Deals.Count ?? 0;
@@ -87,6 +87,12 @@ static class Sheets
         Grid.SetColumn(amountFrame, 2);
         pair.Children.Add(amountFrame);
         Gap(body, pair);
+        if (prefill is not null)
+        {
+            name.Text = prefill.ClientName ?? "";
+            if (prefill.AmountUsd is decimal pa) amount.Text = pa.ToString("0.##", CultureInfo.InvariantCulture);
+            Gap(body, PrefillBanner(prefill), 12);
+        }
 
         var (affFrame, aff) = Kit.LabeledField("שותף (לא חובה)", "DAVID ARIEL", 15);
         var why = Kit.T("", 13.5, Tone.TextSoft, wrap: true);
@@ -149,7 +155,9 @@ static class Sheets
                 return;
             }
             var book = SalesStore.Get(y, m) ?? new MonthBook { Year = y, Month = m };
-            var date = y == now.Year && m == now.Month ? now.Date : new DateTime(y, m, DateTime.DaysInMonth(y, m));
+            var date = prefill?.Date is DateTime pd && pd.Year == y && pd.Month == m
+                ? pd
+                : y == now.Year && m == now.Month ? now.Date : new DateTime(y, m, DateTime.DaysInMonth(y, m));
             var deal = new Deal
             {
                 ClientName = name.Text.Trim().Length > 0 ? name.Text.Trim() : "לקוח חדש",
@@ -158,6 +166,7 @@ static class Sheets
                 Source = source,
                 Affiliate = aff.Text.Trim().Length > 0 ? aff.Text.Trim() : null,
                 Date = date,
+                Note = prefill?.Note,
                 CreatedFrom = DealOrigin.Manual,
             };
             book.Deals.Add(deal);
@@ -175,6 +184,34 @@ static class Sheets
 
         close = host.ShowSheet(body, 580);
         name.Focus();
+    }
+
+    /// <summary>"Filled from a receipt — check before saving", plus every
+    /// extraction warning in amber (unverified amount, foreign currency…).</summary>
+    static Border PrefillBanner(Vision.DealPrefill prefill)
+    {
+        var col = new StackPanel();
+        col.Children.Add(Kit.T(prefill.AmountVerified
+            ? "מולא מהקבלה · בחר חשבון ומקור, בדוק ושמור"
+            : "מולא מהקבלה · בדוק כל שדה לפני שמירה", 13, Tone.Text, FontWeights.Medium, wrap: true));
+        if (prefill.Note is { } note)
+        {
+            var n = Kit.T(note, 12, Tone.Muted, wrap: true);
+            n.Margin = new Thickness(0, 4, 0, 0);
+            col.Children.Add(n);
+        }
+        foreach (var warning in prefill.Warnings)
+        {
+            var w = Kit.T("• " + warning, 12.5, Tone.AmberText, wrap: true);
+            w.Margin = new Thickness(0, 4, 0, 0);
+            col.Children.Add(w);
+        }
+        return new Border
+        {
+            CornerRadius = new CornerRadius(16), Padding = new Thickness(14, 10, 14, 10), Child = col,
+            Background = Tone.FillSoft,
+            BorderBrush = prefill.Warnings.Count > 0 ? Tone.B("#66FF9F0A") : Tone.AccentLine, BorderThickness = new Thickness(1),
+        };
     }
 
     // ---- new month ------------------------------------------------------------------

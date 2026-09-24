@@ -27,6 +27,38 @@ sealed class AssistantSession
         _currentNumber = currentNumber;
     }
 
+    // ---- screen memory ---------------------------------------------------------
+    // The last screen the user explicitly sent (verbatim text only, never the
+    // image), shared by every session so "and what's the total there?" works
+    // from voice or Ask for a few minutes after a capture.
+
+    static readonly TimeSpan ScreenTtl = TimeSpan.FromMinutes(10);
+    internal const int MaxScreenChars = 3000;
+    static readonly object ScreenGate = new();
+    static (string Text, DateTime AtLocal)? _screen;
+
+    public static void RememberScreen(string transcript)
+    {
+        var text = (transcript ?? "").Trim();
+        if (text.Length == 0) return;
+        if (text.Length > MaxScreenChars) text = text[..MaxScreenChars] + "…";
+        lock (ScreenGate) _screen = (text, DateTime.Now);
+    }
+
+    public static void ForgetScreen()
+    {
+        lock (ScreenGate) _screen = null;
+    }
+
+    internal static string? ScreenContext(DateTime nowLocal)
+    {
+        lock (ScreenGate)
+        {
+            if (_screen is not { } s || nowLocal - s.AtLocal > ScreenTtl) return null;
+            return $"\nText on the user's screen (from a screenshot they sent at {s.AtLocal:HH:mm}; use it for follow-up questions):\n\"\"\"\n{s.Text}\n\"\"\"";
+        }
+    }
+
     public IReadOnlyList<(string Question, string Answer)> Exchanges
     {
         get
@@ -68,6 +100,7 @@ sealed class AssistantSession
         sb.Append("\nCONTEXT\nNow: ").Append(DateTime.Now.ToString("dddd yyyy-MM-dd HH:mm")).Append(" (local)");
         AppendCallState(sb);
         AppendToday(sb);
+        if (ScreenContext(DateTime.Now) is { } screen) sb.Append(screen);
 
         var commands = CommandStore.Load();
         sb.Append(commands.Count == 0

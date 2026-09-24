@@ -121,6 +121,14 @@ static class Settings
         }
     }
 
+    /// <summary>Ctrl+Alt+Shift+S starts a screen read (region pick → gate).
+    /// Opt-in, off by default — the dock chip and Ask cover it otherwise.</summary>
+    public static bool ScreenReadHotkey
+    {
+        get => Read("ScreenReadHotkey") == "1";
+        set => WriteValue("ScreenReadHotkey", value ? "1" : "0");
+    }
+
     /// <summary>Model picker selection (Notes.AiModels id); unset = Auto.</summary>
     public static string AiModelChoice
     {

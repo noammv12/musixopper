@@ -638,6 +638,7 @@ static class Icons
     public const string Minus = "M5,12 H19";
     public const string Close = "M6,6 L18,18 M18,6 L6,18";
     public const string Check = "M5,12.5 L9.5,17 L19,7.5";
+    public const string Scan = "M4,8 V5.5 A1.5,1.5 0 0 1 5.5,4 H8 M16,4 H18.5 A1.5,1.5 0 0 1 20,5.5 V8 M20,16 V18.5 A1.5,1.5 0 0 1 18.5,20 H16 M8,20 H5.5 A1.5,1.5 0 0 1 4,18.5 V16 M8,10 H16 M8,14 H13";
     public const string Search = "M4.5,11 A6.5,6.5 0 1 1 17.5,11 A6.5,6.5 0 1 1 4.5,11 M20,20 L15.8,15.8";
     public const string Send = "M12,19 V5 M6,11 L12,5 L18,11";
     public const string Bell = "M6,16 V11 A6,6 0 0 1 18,11 V16 L19.5,18 H4.5 Z M10,20.5 A2,2 0 0 0 14,20.5";

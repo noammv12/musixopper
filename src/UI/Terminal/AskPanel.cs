@@ -9,6 +9,7 @@ using Palon.Agent;
 using Palon.Notes;
 using Palon.Sales;
 using Palon.Terminal;
+using Palon.Vision;
 
 namespace Palon.UI;
 
@@ -29,12 +30,15 @@ sealed class AskPanel : Border
     readonly TextBlock _status;
     readonly TextBox _input;
     readonly Grid _suggestions = new();
+    readonly StackPanel _screenRow = new() { Orientation = Orientation.Horizontal };
     readonly StackPanel _busy = new() { Visibility = Visibility.Collapsed };
     readonly TextBlock _question;
     readonly StackPanel _steps = new() { Margin = new Thickness(0, 14, 0, 0) };
     readonly Border _answerCard;
     readonly TextBlock _answer;
     readonly Border _caret;
+    readonly Border _copyText;
+    string _transcript = "";
     readonly DispatcherTimer _type = new() { Interval = TimeSpan.FromMilliseconds(16) };
     readonly DispatcherTimer _settle = new();
     CancellationTokenSource? _cts;
@@ -130,6 +134,19 @@ sealed class AskPanel : Border
         }
         root.Children.Add(_suggestions);
 
+        // Screen reading: explicit buttons, so reading the screen is always the user's own act.
+        _screenRow.HorizontalAlignment = HorizontalAlignment.Center;
+        _screenRow.Margin = new Thickness(0, 14, 0, 0);
+        var read = Kit.Pill("קרא מהמסך", PillKind.Secondary, () => ReadScreen(receipt: false), height: 36, fontSize: 13.5,
+            content: Kit.Row(8, Kit.Icon(Icons.Scan, 16, Tone.Text), Kit.T("קרא מהמסך", 13.5, Tone.Text)));
+        read.ToolTip = "סמן אזור או חלון, אשר, ו-Palon יקרא ויענה (על מה שכתבת בשדה, אם כתבת)";
+        var receipt = Kit.Pill("קבלה ← עסקה", PillKind.Secondary, () => ReadScreen(receipt: true), height: 36, fontSize: 13.5);
+        receipt.ToolTip = "סמן קבלה על המסך — Palon ימלא עסקה חדשה לבדיקה שלך";
+        receipt.Margin = new Thickness(8, 0, 0, 0);
+        _screenRow.Children.Add(read);
+        _screenRow.Children.Add(receipt);
+        root.Children.Add(_screenRow);
+
         _question = Kit.T("", 15, Tone.Text, FontWeights.SemiBold, wrap: true);
         _busy.Margin = new Thickness(0, 18, 0, 0);
         _busy.Children.Add(_question);
@@ -144,6 +161,10 @@ sealed class AskPanel : Border
         var again = Kit.Pill("שאלה אחרת", PillKind.Ghost, Reset, height: 34, fontSize: 13);
         ((TextBlock)again.Child).Foreground = Tone.MutedSoft;
         again.Margin = new Thickness(8, 0, 0, 0);
+        _copyText = Kit.Pill("העתק את הטקסט מהמסך", PillKind.Secondary, () => _host.CopyWithToast(_transcript, "הטקסט הועתק"), height: 34, fontSize: 13);
+        _copyText.Margin = new Thickness(8, 0, 0, 0);
+        _copyText.Visibility = Visibility.Collapsed;
+        actions.Children.Add(_copyText);
         actions.Children.Add(again);
         answerCol.Children.Add(actions);
         _answerCard = new Border
@@ -179,6 +200,7 @@ sealed class AskPanel : Border
         _generation++;
         _busy.Visibility = Visibility.Collapsed;
         _suggestions.Visibility = Visibility.Visible;
+        _screenRow.Visibility = Visibility.Visible;
         _input.Text = "";
         _status.Text = "אני מקשיב. מה תרצה לדעת?";
         _avatar.Mood = PalonMood.Listen;
@@ -191,6 +213,9 @@ sealed class AskPanel : Border
         Cancel();
         _generation++;
         _suggestions.Visibility = Visibility.Collapsed;
+        _screenRow.Visibility = Visibility.Collapsed;
+        _transcript = "";
+        _copyText.Visibility = Visibility.Collapsed;
         _busy.Visibility = Visibility.Visible;
         _answerCard.Visibility = Visibility.Collapsed;
         _question.Text = question;
@@ -309,6 +334,7 @@ sealed class AskPanel : Border
         ["open_whatsapp"] = "פותח וואטסאפ",
         ["daily_recap"] = "מסכם את היום",
         ["control_music"] = "שולט במוזיקה",
+        ["look_at_screen"] = "מחכה שתסמן אזור במסך ותאשר",
     };
 
     /// <summary>Wraps a tool so each call shows up as a step while it runs.</summary>
@@ -381,6 +407,90 @@ sealed class AskPanel : Border
         if (gen != _generation) return;
         foreach (var s in open) CompleteStep(s);
         ShowAnswer(answer);
+    }
+
+    // ---- screen reading ------------------------------------------------------------
+
+    /// <summary>The Ask buttons: capture (region, or a clicked window) → gate → read.</summary>
+    async void ReadScreen(bool receipt)
+    {
+        var typed = _input.Text.Trim();
+        var question = receipt ? "קח את הפרטים מהקבלה" : typed.Length > 0 ? typed : "מה כתוב פה?";
+        _input.Text = "";
+        Begin(question);
+        var gen = _generation;
+        var pick = AddStep("מחכה שתסמן אזור במסך ותאשר");
+        var (shot, error) = await ScreenReader.CaptureAsync(windowMode: false, receipt
+            ? "Palon יחלץ מהקבלה שם, סכום ותאריך וימלא עסקה חדשה — לבדיקה שלך לפני שמירה."
+            : "Palon יקרא את מה שבתמונה ויענה על השאלה שלך.");
+        if (gen != _generation) return;
+        if (shot is null)
+        {
+            if (error is null) Reset();
+            else ShowAnswer(error);
+            return;
+        }
+        CompleteStep(pick);
+        await ReadShot(shot, question, receipt, gen);
+    }
+
+    public void ShowNotice(string question, string text)
+    {
+        Begin(question);
+        ShowAnswer(text);
+    }
+
+    /// <summary>An already-approved capture (from the dock chip or the hotkey): read it here.</summary>
+    public async void ReadApprovedShot(ScreenShot shot, bool receipt)
+    {
+        var question = receipt ? "קח את הפרטים מהקבלה" : "מה כתוב פה?";
+        Begin(question);
+        await ReadShot(shot, question, receipt, _generation);
+    }
+
+    async Task ReadShot(ScreenShot shot, string question, bool receipt, int gen)
+    {
+        var step = AddStep(receipt ? "קורא את הקבלה" : "קורא את התמונה");
+        _cts = new CancellationTokenSource();
+        var ct = _cts.Token;
+        _session ??= new AssistantSession(_host.CallStateSource, _host.CurrentNumberSource);
+        try
+        {
+            if (receipt)
+            {
+                var (data, rError) = await ScreenReader.ReceiptFromShotAsync(shot, ct);
+                if (gen != _generation || ct.IsCancellationRequested) return;
+                CompleteStep(step);
+                if (data is null)
+                {
+                    ShowAnswer(rError ?? "לא הצלחתי לקרוא את הקבלה.");
+                    return;
+                }
+                _session.Record(question, ScreenReader.ReceiptSummary(data));
+                ScreenReader.OpenDealSheet(data); // replaces this overlay with the pre-filled sheet
+                return;
+            }
+            var (read, error) = await ScreenReader.ReadShotAsync(shot, question, ct);
+            if (gen != _generation || ct.IsCancellationRequested) return;
+            CompleteStep(step);
+            if (read is null)
+            {
+                ShowAnswer(error ?? "לא הצלחתי לקרוא את התמונה.");
+                return;
+            }
+            _session.Record(question, read.Answer);
+            _transcript = read.Transcript;
+            ShowAnswer(read.Answer);
+            if (_transcript.Length > 0 && _transcript != read.Answer) _copyText.Visibility = Visibility.Visible;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Screen read failed: {ex}");
+            if (gen == _generation) ShowAnswer("משהו השתבש בקריאת המסך — ראה לוג.");
+        }
     }
 
     void ShowAnswer(string answer)
