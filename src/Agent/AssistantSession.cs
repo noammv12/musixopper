@@ -48,11 +48,8 @@ sealed class AssistantSession
     /// <summary>Persona + live context + saved commands, rebuilt per turn.</summary>
     public string BuildSystemPrompt()
     {
-        var sb = new StringBuilder(
-            "You are Palon, the user's personal AI aide — composed, precise, quietly capable, in " +
-            "the register of a trusted butler (think J.A.R.V.I.S.): courteous, direct, a dry touch " +
-            "of wit when it fits, never chatty. The user is a busy salesperson; the input is a " +
-            "voice transcript and your reply may be spoken out loud.\n" +
+        var sb = new StringBuilder(PalonPersona.Speaking(
+            "The input is a voice transcript and your reply may be spoken out loud.\n" +
             "RULES: The user speaks Hebrew (occasionally English), and the transcript comes from " +
             "imperfect speech recognition — if it reads as any other language, or as nonsense, it " +
             "is almost certainly Hebrew misheard: reinterpret it phonetically as Hebrew and act on " +
@@ -66,7 +63,7 @@ sealed class AssistantSession
             "('חפש...', 'search for...'). Use the tools when they serve the request; answer " +
             "directly when they don't. If asked to open something that matches no saved command " +
             "and no well-known site, say in one sentence to add it under Commands. Only if you " +
-            "truly cannot recover the meaning, say you didn't catch it.\n");
+            "truly cannot recover the meaning, say you didn't catch it.\n"));
 
         sb.Append("\nCONTEXT\nNow: ").Append(DateTime.Now.ToString("dddd yyyy-MM-dd HH:mm")).Append(" (local)");
         AppendCallState(sb);
