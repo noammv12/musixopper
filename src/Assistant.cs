@@ -28,6 +28,7 @@ sealed class Assistant : IDisposable
     readonly AssistantSession _session;
     readonly DispatcherTimer _cap;
     bool _busy;
+    CancellationTokenSource? _runCts; // the in-flight question; Cancel() fires it
     bool _followUp; // current listening round auto-opened after an answer
 
     public bool IsListening { get; private set; }
@@ -104,6 +105,9 @@ sealed class Assistant : IDisposable
     public void Cancel()
     {
         _speaker.Stop();
+        // Reaches the in-flight agent run too: HTTP requests and tools stop,
+        // and no late toast fires for a question the user walked away from.
+        _runCts?.Cancel();
         if (!IsListening) return;
         IsListening = false;
         _followUp = false;
@@ -147,6 +151,9 @@ sealed class Assistant : IDisposable
         var wav = _recorder.Stop();
         Stopped?.Invoke();
         string? mixed = null;
+        using var run = new CancellationTokenSource();
+        _runCts = run;
+        var ct = run.Token;
         try
         {
             if (wav is null) return;
@@ -159,8 +166,9 @@ sealed class Assistant : IDisposable
                 if (mixed is null) return null;
                 if (AudioMixdown.WavDuration(mixed) < MinLength) return "";
                 var transcriber = new ChainTranscriber();
-                return (await transcriber.TranscribeAsync(mixed, Settings.NotesLanguage, CancellationToken.None)).Trim();
+                return (await transcriber.TranscribeAsync(mixed, Settings.NotesLanguage, ct)).Trim();
             });
+            if (ct.IsCancellationRequested) return;
             var transcribeSeconds = clock.Elapsed.TotalSeconds;
 
             if (question is null)
@@ -181,9 +189,10 @@ sealed class Assistant : IDisposable
             if (!AiChat.HasKey) return; // removed mid-flight
 
             clock.Restart();
-            var result = await AgentLoop.RunAsync(_session, question, CancellationToken.None);
+            var result = await AgentLoop.RunAsync(_session, question, ct);
             // The one line that turns "it was slow" into a named stage.
             Log.Write($"Palon timings: transcribe {transcribeSeconds:0.0}s · agent {clock.Elapsed.TotalSeconds:0.0}s");
+            if (result.Failure == AgentFailure.Cancelled || ct.IsCancellationRequested) return; // user walked away — stay quiet
             if (result.Outcome is not { } outcome)
             {
                 if (result.Failure == AgentFailure.ProviderDown)
@@ -191,7 +200,7 @@ sealed class Assistant : IDisposable
                     // Tool path unusable — degrade to the v7 single-shot
                     // intent rather than to silence.
                     Log.Write("Palon agent path unavailable — falling back to single-shot intent");
-                    await LegacyAssistAsync(question);
+                    await LegacyAssistAsync(question, ct);
                 }
                 else
                 {
@@ -209,6 +218,10 @@ sealed class Assistant : IDisposable
             }
             await DeliverAnswerAsync(question, outcome.Text);
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            Log.Write("Palon: question cancelled");
+        }
         catch (Exception ex)
         {
             Log.Write($"Assistant failed: {ex}");
@@ -218,6 +231,7 @@ sealed class Assistant : IDisposable
         {
             TryDelete(wav);
             TryDelete(mixed);
+            if (ReferenceEquals(_runCts, run)) _runCts = null;
             StatusChanged?.Invoke("");
             _busy = false;
         }
@@ -226,10 +240,11 @@ sealed class Assistant : IDisposable
     /// <summary>The v7 path: one JSON-intent round-trip, no tools, no memory.
     /// Kept as the degraded mode so a provider that can't do tool calling
     /// still leaves Palon able to open things and answer.</summary>
-    async Task LegacyAssistAsync(string question)
+    async Task LegacyAssistAsync(string question, CancellationToken ct)
     {
         var commands = CommandStore.Load();
-        var result = await AiChat.AssistAsync(question, commands, CancellationToken.None);
+        var result = await AiChat.AssistAsync(question, commands, ct);
+        if (ct.IsCancellationRequested) return;
         if (result is null)
         {
             Log.Write("Palon intent: unusable model reply");

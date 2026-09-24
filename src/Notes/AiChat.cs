@@ -13,8 +13,11 @@ namespace Palon.Notes;
 /// (Url set), or "answer" (Text set).</summary>
 sealed record AssistResult(string Action, string? CommandId, string? Text, string? Url = null);
 
-/// <summary>One function call the model asked for (OpenAI tools format).</summary>
-sealed record ToolCallRequest(string Id, string Name, string ArgumentsJson);
+/// <summary>One function call the model asked for (OpenAI tools format).
+/// ExtraContent is the provider's opaque per-call payload — on Gemini 3.x
+/// it carries <c>google.thought_signature</c>, which must be echoed back
+/// verbatim on the next request or the call is rejected with a 400.</summary>
+sealed record ToolCallRequest(string Id, string Name, string ArgumentsJson, JsonElement? ExtraContent = null);
 
 /// <summary>One model turn: plain content, tool calls, or both.</summary>
 sealed record ChatTurn(string? Content, IReadOnlyList<ToolCallRequest> ToolCalls);
@@ -303,32 +306,88 @@ static class AiChat
     /// Null when every provider failed (LastError says why) — the caller
     /// falls back to the legacy single-shot intent.
     /// </summary>
-    public static async Task<ChatTurn?> ToolChatAsync(
-        IReadOnlyList<object> messages, object[] tools, double temperature, int maxTokens, CancellationToken ct)
+    public static Task<ChatTurn?> ToolChatAsync(
+        IReadOnlyList<object> messages, object[] tools, double temperature, int maxTokens, CancellationToken ct) =>
+        new ToolConversation().ChatAsync(messages, tools, temperature, maxTokens, ct);
+
+    /// <summary>
+    /// One agent run's view of the provider chain. The first provider that
+    /// answers is pinned for the rest of the run: tool-call ids and Gemini
+    /// thought signatures only make sense to the provider that minted them.
+    /// If the pinned provider dies mid-run, the next one takes over with
+    /// every provider-specific extra stripped (a clean hand-off, never a
+    /// splice of foreign state) and is pinned from then on.
+    /// </summary>
+    public sealed class ToolConversation
     {
-        var errors = new List<string>(2);
-        foreach (var provider in Providers())
+        Provider? _pinned;
+
+        /// <summary>The provider this run is pinned to, once one has answered.</summary>
+        public string? PinnedProvider => _pinned?.Name;
+
+        /// <summary>toolChoiceNone: tools stay declared (the history refers
+        /// to them) but none may be called — the forced final-answer turn.</summary>
+        public async Task<ChatTurn?> ChatAsync(
+            IReadOnlyList<object> messages, object[] tools, double temperature, int maxTokens, CancellationToken ct,
+            bool toolChoiceNone = false)
         {
-            // rejectTruncated: half a tool call is unusable, half an answer
-            // would be displayed — and spoken — verbatim. The short retry
-            // delay keeps a transient failure from stalling a user who is
-            // standing there waiting for the spoken answer.
-            var (turn, error) = await RequestChatAsync(
-                provider, BuildBody(provider, messages, temperature, maxTokens, tools), rejectTruncated: true, ct,
-                retryDelayMs: 500, requestTimeoutMs: InteractiveTimeoutMs);
-            if (turn is not null)
+            var chain = Providers().ToList();
+            if (_pinned is { } pinned)
             {
-                LastError = null;
-                return turn;
+                chain.RemoveAll(p => p.Name == pinned.Name);
+                chain.Insert(0, pinned);
             }
-            errors.Add($"{provider.Name}: {error}");
-            if (ct.IsCancellationRequested) break;
+            var errors = new List<string>(2);
+            foreach (var provider in chain)
+            {
+                var foreign = _pinned is not null && provider.Name != _pinned.Name;
+                var body = BuildBody(provider, foreign ? StripProviderExtras(messages) : messages,
+                    temperature, maxTokens, tools);
+                if (toolChoiceNone && body.ContainsKey("tools")) body["tool_choice"] = "none";
+                // rejectTruncated: half a tool call is unusable, half an answer
+                // would be displayed — and spoken — verbatim. The short retry
+                // delay keeps a transient failure from stalling a user who is
+                // standing there waiting for the spoken answer.
+                var (turn, error) = await RequestChatAsync(
+                    provider, body, rejectTruncated: true, ct,
+                    retryDelayMs: 500, requestTimeoutMs: InteractiveTimeoutMs);
+                if (turn is not null)
+                {
+                    if (foreign) Log.Write($"AI: agent run moved {_pinned!.Name} → {provider.Name} (provider extras stripped)");
+                    _pinned = provider;
+                    LastError = null;
+                    return turn;
+                }
+                errors.Add($"{provider.Name}: {error}");
+                if (ct.IsCancellationRequested) break;
+            }
+            var reason = errors.Count > 0 ? string.Join(" → ", errors) : "no AI key";
+            LastError = reason;
+            if (errors.Count > 0) Log.Write($"AI tool chain failed: {reason}");
+            return null;
         }
-        var reason = errors.Count > 0 ? string.Join(" → ", errors) : "no AI key";
-        LastError = reason;
-        if (errors.Count > 0) Log.Write($"AI tool chain failed: {reason}");
-        return null;
     }
+
+    /// <summary>The message list with every per-call provider payload
+    /// (extra_content) removed — what a different provider gets when it
+    /// takes over a run mid-way. Messages are not mutated.</summary>
+    internal static IReadOnlyList<object> StripProviderExtras(IReadOnlyList<object> messages) => messages
+        .Select(message =>
+        {
+            if (message is not Dictionary<string, object?> dict
+                || !dict.TryGetValue("tool_calls", out var raw)
+                || raw is not object[] calls)
+                return message;
+            return new Dictionary<string, object?>(dict)
+            {
+                ["tool_calls"] = calls
+                    .Select(call => call is Dictionary<string, object?> c && c.ContainsKey("extra_content")
+                        ? c.Where(kv => kv.Key != "extra_content").ToDictionary(kv => kv.Key, kv => kv.Value)
+                        : call)
+                    .ToArray(),
+            };
+        })
+        .ToList();
 
     static Dictionary<string, object> BuildBody(
         Provider provider, object messages, double temperature, int maxTokens, object[]? tools)
@@ -413,7 +472,13 @@ static class AiChat
                         var id = call.TryGetProperty("id", out var idEl) && idEl.GetString() is { Length: > 0 } rawId
                             ? rawId
                             : Guid.NewGuid().ToString("n");
-                        calls.Add(new ToolCallRequest(id, name, argumentsJson));
+                        // Gemini 3.x: extra_content.google.thought_signature
+                        // must round-trip verbatim — keep the whole object.
+                        JsonElement? extra = call.TryGetProperty("extra_content", out var extraEl)
+                            && extraEl.ValueKind == JsonValueKind.Object
+                                ? extraEl.Clone()
+                                : null;
+                        calls.Add(new ToolCallRequest(id, name, argumentsJson, extra));
                     }
                 }
                 if (calls.Count == 0 && string.IsNullOrWhiteSpace(content))
