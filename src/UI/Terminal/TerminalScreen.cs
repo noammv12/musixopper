@@ -7,7 +7,7 @@ using Palon.Terminal;
 namespace Palon.UI;
 
 /// <summary>Today is Now (the one screen); the rest open as side sheets.</summary>
-enum TerminalPage { Today, Callbacks, Month, Clients, Templates, Coaching, Memory, Calls }
+enum TerminalPage { Today, Callbacks, Month, Clients, Templates, Coaching, Memory, Calls, Settings }
 
 /// <summary>
 /// Everything a screen reads, loaded once per render from the stores on

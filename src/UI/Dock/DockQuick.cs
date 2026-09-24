@@ -231,14 +231,12 @@ readonly record struct DockRings(int Calls, int CallsGoal, int Deposits, int Dep
 
     public string Label => $"היום: {Calls} שיחות, {Deposits} הפקדות, {CallbacksDone} חזרות";
 
-    public const int DefaultCallsGoal = 40;
-
     /// <summary>
     /// Deposits goal: the monthly target spread over the month's work days
     /// (at least 1). Callbacks goal: what's done today plus what's still owed today.
     /// </summary>
     public static DockRings Compute(DateTime nowLocal, IEnumerable<DateTime> callStartsLocal, IEnumerable<DateTime> dealDates,
-        int? monthlyTarget, IReadOnlyList<Callback> callbacks)
+        int? monthlyTarget, IReadOnlyList<Callback> callbacks, int callsGoal = DayRings.DefaultCallsGoal)
     {
         var today = nowLocal.Date;
         var calls = callStartsLocal.Count(t => t.Date == today);
@@ -250,7 +248,7 @@ readonly record struct DockRings(int Calls, int CallsGoal, int Deposits, int Dep
         for (var d = new DateTime(today.Year, today.Month, 1); d.Month == today.Month; d = d.AddDays(1))
             if (CallbackPlanner.IsWorkDay(d.DayOfWeek)) workDays++;
         var depGoal = monthlyTarget is int t && t > 0 ? Math.Max(1, (int)Math.Ceiling(t / (double)Math.Max(1, workDays))) : 1;
-        return new DockRings(calls, DefaultCallsGoal, deposits, depGoal, done, Math.Max(1, done + owedToday), counts.Overdue);
+        return new DockRings(calls, callsGoal, deposits, depGoal, done, Math.Max(1, done + owedToday), counts.Overdue);
     }
 }
 

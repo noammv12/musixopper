@@ -133,6 +133,25 @@ static class Settings
         }
     }
 
+    /// <summary>Daily calls-ring goal shared by the Now window and the dock.
+    /// Null/unset = automatic (10% above the recent daily average, 40 with no history).</summary>
+    public static int? CallsGoal
+    {
+        get => int.TryParse(Read("CallsGoal"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) && n > 0 ? n : null;
+        set
+        {
+            if (value is not int n || n <= 0) DeleteValue("CallsGoal");
+            else WriteValue("CallsGoal", n.ToString(CultureInfo.InvariantCulture));
+        }
+    }
+
+    /// <summary>UI sounds. Off by default (reserved — nothing plays yet).</summary>
+    public static bool Sounds
+    {
+        get => Read("Sounds") == "1";
+        set => WriteValue("Sounds", value ? "1" : "0");
+    }
+
     /// <summary>Template ids pinned to the dock's hover row, comma-separated; unset = defaults.</summary>
     public static string? DockPinnedTemplates
     {

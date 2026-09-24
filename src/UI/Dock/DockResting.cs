@@ -229,6 +229,12 @@ sealed partial class DockWindow
 
     void OnTemplatesChanged() => Dispatcher.InvokeAsync(RebuildPins, DispatcherPriority.Background);
 
+    void OnDockSettingsChanged()
+    {
+        OnTemplatesChanged();
+        OnStoresChanged();
+    }
+
     /// <summary>The client the templates greet: the caller, else the last client.</summary>
     string CurrentFirstName()
     {
@@ -359,9 +365,12 @@ sealed partial class DockWindow
         try
         {
             var callbacks = CallbackStore.Load();
-            var calls = Palon.Notes.NotesStore.Load().Select(n => n.StartedUtc.ToLocalTime());
+            // Same source and goal as the Now window's calls ring (CallStatsStore + Settings.CallsGoal).
+            var records = CallStatsStore.Load();
+            var calls = records.Select(c => c.StartedUtc.ToLocalTime());
             var book = SalesStore.Get(now.Year, now.Month);
-            _today = DockRings.Compute(now, calls, book?.Deals.Select(d => d.Date) ?? Enumerable.Empty<DateTime>(), book?.Target, callbacks);
+            _today = DockRings.Compute(now, calls, book?.Deals.Select(d => d.Date) ?? Enumerable.Empty<DateTime>(), book?.Target, callbacks,
+                DayRings.CallsGoal(records, now, Settings.CallsGoal));
         }
         catch (Exception ex)
         {

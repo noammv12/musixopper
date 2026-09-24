@@ -25,8 +25,19 @@ static class BrainSheet
         var x = Kit.IconButton(Icons.Close, 34, () => close());
         x.VerticalAlignment = VerticalAlignment.Top;
         body.Children.Add(Kit.Bar(Kit.Col(0, title, sub), x));
+        var (content, name) = Content(host, () => close());
+        body.Children.Add(content);
 
-        var (nameFrame, name) = Kit.LabeledField("השם שלך (לברכה ב״היום״)", "לדוגמה: דני");
+        close = host.ShowSheet(new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }, 520);
+        name.Focus();
+    }
+
+    /// <summary>The brain's fields (name, keys, model) and a Save — shared by the sheet and
+    /// the Settings side sheet. <paramref name="afterSave"/> runs after the toast.</summary>
+    public static (FrameworkElement Body, TextBox Name) Content(TerminalWindow host, Action? afterSave)
+    {
+        var body = new StackPanel();
+        var (nameFrame, name) = Kit.LabeledField("השם שלך (לברכה ב״עכשיו״)", "לדוגמה: דני");
         name.Text = Settings.RepName ?? "";
         nameFrame.Margin = new Thickness(0, 22, 0, 0);
         body.Children.Add(nameFrame);
@@ -54,14 +65,12 @@ static class BrainSheet
             deepSeek.Commit();
             ModelPicker.NotifyChanged();
             host.Refresh();
-            close();
             host.Toast("נשמר");
+            afterSave?.Invoke();
         }, height: 46, fontSize: 15);
         save.Margin = new Thickness(0, 26, 0, 0);
         body.Children.Add(save);
-
-        close = host.ShowSheet(new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }, 520);
-        name.Focus();
+        return (body, name);
     }
 
     static TextBlock Caption(string text)
