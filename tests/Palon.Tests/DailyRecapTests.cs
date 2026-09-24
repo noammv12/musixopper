@@ -25,10 +25,10 @@ public class DailyRecapTests
             new("old", todayUtc.AddDays(-2), 100, "old note", "old", "ok"),
         };
         var calls = new List<CallRecord> { new(todayUtc, 240, "0501234567"), new(todayUtc.AddDays(-1), 60) };
-        var reminders = new List<Reminder>
+        var reminders = new List<Callback>
         {
-            new("r1", "", "call Danny back", DateTime.UtcNow.AddHours(3), ReminderState.Pending),
-            new("r2", "", "done thing", DateTime.UtcNow.AddHours(-1), ReminderState.Done),
+            new("r1", DateTime.UtcNow.AddHours(3), "call Danny back"),
+            new("r2", DateTime.UtcNow.AddHours(-1), "done thing", CallbackStatus.Done),
         };
 
         var data = DailyRecap.Build(notes, calls, reminders, NowLocal);

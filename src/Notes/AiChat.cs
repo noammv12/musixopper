@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -44,7 +45,12 @@ static class AiChat
         "מישהו לקו לראות האם עידף לה על הבנק והבינו ביחד שכן, הוסבר על הפרטים וביקשה לדבר " +
         "בשבוע הבא כי היא בדיוק מסיימת תהליך גירושים מבעלה.... נשלח ווצאפ ואחזור אליה שבוע הבא.\"\n" +
         "\"סחר באינטראקטיב ישראל בעבר - יותר רלוונטי לקולמקס פרו רוצה לפתוח חשבון ב2,000$ " +
-        "הוסבר על הפרטים ואחזור אליו בימיםה קרובים, נשלח ווצאפ\"";
+        "הוסבר על הפרטים ואחזור אליו בימיםה קרובים, נשלח ווצאפ\"\n" +
+        "Then, only if the call agreed a specific time to call back (either side promising, " +
+        "e.g. \"אחזור אליך מחר ב-11\", \"call me back in an hour\"), add one final line exactly " +
+        "like: CALLBACK: {\"when_iso\":\"yyyy-MM-ddTHH:mm\",\"phrase\":\"<the words used>\"," +
+        "\"reason\":\"<what to do, few words, transcript language>\"} — when_iso in local time, " +
+        "resolved against the call end time given. Vague timing (\"בימים הקרובים\") gets no line.";
 
     const string PolishPrompt =
         "You clean up dictated text. Fix punctuation and casing, remove filler words, false " +
@@ -87,10 +93,14 @@ static class AiChat
 
     /// <summary>The summary, or null plus the per-call failure reason —
     /// returned inline so concurrent AI calls can't garble the reason.</summary>
-    public static Task<(string? Summary, string? Error)> SummarizeAsync(string transcript, CancellationToken ct)
+    public static Task<(string? Summary, string? Error)> SummarizeAsync(
+        string transcript, CancellationToken ct, DateTime? callEndedLocal = null)
     {
         if (transcript.Length > MaxTranscriptChars) transcript = transcript[..MaxTranscriptChars];
-        return ChatCoreAsync(SummaryPrompt, "Transcript:\n" + transcript, 0.3, 400, ct,
+        var header = callEndedLocal is { } ended
+            ? $"Call ended: {ended.ToString("dddd yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)} (local time)\n"
+            : "";
+        return ChatCoreAsync(SummaryPrompt, header + "Transcript:\n" + transcript, 0.3, 400, ct,
             requestTimeoutMs: BackgroundTimeoutMs);
     }
 

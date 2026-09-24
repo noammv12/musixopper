@@ -15,12 +15,12 @@ public class StoreLogicTests
     [InlineData("not a url", "label", false)]                  // malformed link never passes
     [InlineData("ftp://x.co/file", "", false)]                 // wrong scheme
     public void Reminder_validity_accepts_link_or_label(string url, string label, bool valid) =>
-        Assert.Equal(valid, ReminderStore.IsValidReminder(url, label));
+        Assert.Equal(valid, CallbackStore.IsValid(url, label));
 
     [Fact]
     public void Text_only_reminder_has_a_display_label()
     {
-        var reminder = new Reminder("id", "", "call Danny", DateTime.UtcNow, ReminderState.Pending);
+        var reminder = new Callback("id", DateTime.UtcNow, "call Danny");
         Assert.False(reminder.HasUrl);
         Assert.Equal("call Danny", reminder.DisplayLabel);
     }

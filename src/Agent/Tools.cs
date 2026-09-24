@@ -69,38 +69,43 @@ sealed class OpenUrlTool : AgentTool
     }
 }
 
-/// <summary>Creates a call-back reminder — link, text-only, or both. The
-/// model confirms it out loud, so this is not terminal.</summary>
+/// <summary>Creates a callback — who (name/phone), what (label) and when;
+/// link optional. The name stays "create_reminder" so existing prompts and
+/// phrasing keep working. The model confirms it out loud, so not terminal.</summary>
 sealed class CreateReminderTool : AgentTool
 {
     public override string Name => "create_reminder";
     public override string Description =>
-        "Set a reminder that pops up above the taskbar at the given time — e.g. to call someone " +
-        "back. Compute the time from the current time in the context.";
+        "Set a callback/reminder that pops up above the taskbar at the given time — e.g. to call someone " +
+        "back. Compute the time from the current time in the context. Pass the person's name and phone " +
+        "separately when known.";
     public override string ParametersJson => """
         {"type":"object","properties":{
-          "label":{"type":"string","description":"Short text shown when the reminder fires, in the user's language (e.g. the person to call back)."},
+          "label":{"type":"string","description":"What to do or what it's about, in the user's language (e.g. \"send the contract\"). If only a person is known, their name."},
+          "name":{"type":"string","description":"Optional name of the person to call back."},
           "due_at":{"type":"string","description":"Local time to fire, formatted \"yyyy-MM-dd HH:mm\" (24h)."},
           "url":{"type":"string","description":"Optional http(s) link to open from the reminder (CRM page)."},
-          "phone":{"type":"string","description":"Optional phone number — the reminder will open its WhatsApp chat."}
+          "phone":{"type":"string","description":"Optional phone number of the person — shown on the reminder (copyable) and it opens their WhatsApp chat."}
         },"required":["label","due_at"]}
         """;
 
     public override Task<ToolOutcome> ExecuteAsync(JsonElement args, CancellationToken ct)
     {
         var label = (Str(args, "label") ?? "").Trim();
-        if (label.Length == 0)
-            return Task.FromResult(new ToolOutcome("A reminder needs a label."));
+        var name = Str(args, "name")?.Trim();
+        var phone = Str(args, "phone");
+        if (label.Length == 0 && string.IsNullOrEmpty(name) && CallbackStore.NormalizePhone(phone) is null)
+            return Task.FromResult(new ToolOutcome("A reminder needs a label (or a name/phone)."));
         if (!TryParseDueLocal(Str(args, "due_at"), DateTime.Now, out var dueLocal))
             return Task.FromResult(new ToolOutcome("Bad due_at — use \"yyyy-MM-dd HH:mm\" local time, in the future."));
 
         var url = Str(args, "url") ?? "";
-        if (url.Length == 0 && Phones.WaMeUrl(Str(args, "phone")) is { } waMe) url = waMe;
+        if (url.Length == 0 && Phones.WaMeUrl(phone) is { } waMe) url = waMe;
 
-        var reminder = ReminderStore.Add(url, label, dueLocal.ToUniversalTime());
-        return Task.FromResult(reminder is null
+        var callback = CallbackStore.Add(label, dueLocal.ToUniversalTime(), name, phone, url, CallbackSource.Voice);
+        return Task.FromResult(callback is null
             ? new ToolOutcome("Saving the reminder failed (too many pending, or a bad link).")
-            : new ToolOutcome($"Reminder \"{reminder.DisplayLabel}\" set for {dueLocal:ddd d MMM HH:mm}."));
+            : new ToolOutcome($"Reminder \"{callback.DisplayLine}\" set for {dueLocal:ddd d MMM HH:mm}."));
     }
 
     /// <summary>"yyyy-MM-dd HH:mm" (also with 'T') or bare "HH:mm" — today if
@@ -129,24 +134,31 @@ sealed class CreateReminderTool : AgentTool
     }
 }
 
-/// <summary>Lists pending reminders so the model can answer "what's on my plate".</summary>
+/// <summary>Lists open callbacks so the model can answer "what's on my plate" /
+/// "who do I owe a call". Overdue ones are flagged.</summary>
 sealed class ListRemindersTool : AgentTool
 {
     public override string Name => "list_reminders";
-    public override string Description => "List the user's pending reminders with their due times.";
+    public override string Description => "List the user's open callbacks/reminders (who, what, when; overdue flagged).";
     public override string ParametersJson => """{"type":"object","properties":{}}""";
 
     public override Task<ToolOutcome> ExecuteAsync(JsonElement args, CancellationToken ct)
     {
-        var pending = ReminderStore.Load()
-            .Where(r => r.State == ReminderState.Pending)
-            .OrderBy(r => r.DueAtUtc)
-            .Take(10)
+        var open = CallbackStore.Load()
+            .Where(c => c.IsActive)
+            .OrderBy(c => c.DueAtUtc)
             .ToList();
-        if (pending.Count == 0) return Task.FromResult(new ToolOutcome("No pending reminders."));
-        var sb = new StringBuilder("Pending reminders:");
-        foreach (var reminder in pending)
-            sb.Append($"\n- {reminder.DisplayLabel} — {reminder.DueAtUtc.ToLocalTime():ddd d MMM HH:mm}");
+        if (open.Count == 0) return Task.FromResult(new ToolOutcome("No pending reminders."));
+        var now = DateTime.UtcNow;
+        var sb = new StringBuilder($"Open callbacks ({open.Count}):");
+        foreach (var callback in open.Take(10))
+        {
+            sb.Append($"\n- {callback.DisplayLine}");
+            if (callback.HasPhone && !string.IsNullOrEmpty(callback.Name)) sb.Append($" ({callback.Phone})");
+            sb.Append($" — {callback.DueAtUtc.ToLocalTime():ddd d MMM HH:mm}");
+            if (callback.DueAtUtc < now) sb.Append(" (overdue)");
+        }
+        if (open.Count > 10) sb.Append($"\n(+{open.Count - 10} more)");
         return Task.FromResult(new ToolOutcome(sb.ToString()));
     }
 }

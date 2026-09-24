@@ -16,10 +16,10 @@ static class DailyRecap
     const int MaxReminders = 5;
 
     public static string BuildData() =>
-        Build(NotesStore.Load(), CallStatsStore.Load(), ReminderStore.Load(), DateTime.Now);
+        Build(NotesStore.Load(), CallStatsStore.Load(), CallbackStore.Load(), DateTime.Now);
 
     internal static string Build(
-        List<CallNote> notes, List<CallRecord> calls, List<Reminder> reminders, DateTime nowLocal)
+        List<CallNote> notes, List<CallRecord> calls, List<Callback> reminders, DateTime nowLocal)
     {
         var sb = new StringBuilder();
         var today = calls.Where(c => c.StartedUtc.ToLocalTime().Date == nowLocal.Date).ToList();
@@ -46,15 +46,15 @@ static class DailyRecap
         }
 
         var pending = reminders
-            .Where(r => r.State == ReminderState.Pending)
+            .Where(r => r.IsActive)
             .OrderBy(r => r.DueAtUtc)
             .Take(MaxReminders)
             .ToList();
         if (pending.Count > 0)
         {
-            sb.Append("\n\nPending reminders:");
+            sb.Append("\n\nOpen callbacks:");
             foreach (var reminder in pending)
-                sb.Append($"\n- {reminder.DisplayLabel} — {reminder.DueAtUtc.ToLocalTime():ddd d MMM HH:mm}");
+                sb.Append($"\n- {reminder.DisplayLine} — {reminder.DueAtUtc.ToLocalTime():ddd d MMM HH:mm}");
         }
         return sb.ToString();
     }

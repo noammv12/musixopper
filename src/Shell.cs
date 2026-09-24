@@ -15,7 +15,7 @@ sealed class Shell : IDisposable
     readonly TrayHost _tray;
     readonly FlyoutWindow _flyout;
     readonly DockWindow _dock;
-    readonly ReminderScheduler _reminders;
+    readonly CallbackScheduler _reminders;
     readonly CallStatsTracker _stats;
     readonly NotesPipeline _notes;
     readonly Dictation _dictation;
@@ -48,8 +48,8 @@ sealed class Shell : IDisposable
         _dock.SyncState(_engine.State); // StateChanged won't fire until the state moves
 
         _stats = new CallStatsTracker(_engine);
-        _reminders = new ReminderScheduler(_engine);
-        _reminders.ReminderDue += (reminder, missed) => _dock.ShowReminder(reminder, missed);
+        _reminders = new CallbackScheduler(_engine);
+        _reminders.CallbackDue += (reminder, missed) => _dock.ShowReminder(reminder, missed);
         _dock.ReminderOpenRequested += _reminders.Open;
         _dock.ReminderSnoozeRequested += _reminders.Snooze;
         _dock.ReminderDismissRequested += _reminders.Dismiss;
