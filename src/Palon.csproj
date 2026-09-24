@@ -33,6 +33,7 @@
     <Using Remove="System.Drawing" />
     <!-- WPF drops the implicit System.IO using on Windows; drop it everywhere so Linux compile checks match. -->
     <Using Remove="System.IO" />
+    <Using Remove="System.Net.Http" />
   </ItemGroup>
 
   <ItemGroup Condition="!$([MSBuild]::IsOSPlatform('Windows'))">
