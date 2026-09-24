@@ -161,7 +161,8 @@ sealed class TerminalWindow : Window
     readonly Grid _curtain = new();
     readonly Grid _overlay = new();
     readonly Grid _toastLayer = new();
-    readonly Dictionary<TerminalPage, TerminalScreen> _screens = new();
+    // Side-sheet screens are built on first open, not all at window open.
+    readonly LazyRegistry<TerminalPage, TerminalScreen> _screens = new();
     readonly Dictionary<TerminalPage, Border> _railItems = new();
     readonly DispatcherTimer _clock;
     readonly DispatcherTimer _refresh;
@@ -277,16 +278,16 @@ sealed class TerminalWindow : Window
         Content = _root;
 
         _now = MakeScreen(TerminalPage.Today, () => new NowScreen(this));
-        _screens[TerminalPage.Today] = _now;
+        _screens.Set(TerminalPage.Today, _now);
         _stage.Child = _now;
-        _screens[TerminalPage.Callbacks] = MakeScreen(TerminalPage.Callbacks, () => new CallbacksScreen(this));
-        _screens[TerminalPage.Month] = MakeScreen(TerminalPage.Month, () => new MonthScreen(this));
-        _screens[TerminalPage.Clients] = MakeScreen(TerminalPage.Clients, () => new ClientsScreen(this));
-        _screens[TerminalPage.Templates] = MakeScreen(TerminalPage.Templates, () => new TemplatesScreen(this));
-        _screens[TerminalPage.Coaching] = MakeScreen(TerminalPage.Coaching, () => new CoachingScreen(this));
-        _screens[TerminalPage.Memory] = MakeScreen(TerminalPage.Memory, () => new MemoryScreen(this));
-        _screens[TerminalPage.Calls] = MakeScreen(TerminalPage.Calls, () => new CallsScreen(this));
-        _screens[TerminalPage.Settings] = MakeScreen(TerminalPage.Settings, () => new SettingsScreen(this));
+        _screens.Register(TerminalPage.Callbacks, () => MakeScreen(TerminalPage.Callbacks, () => new CallbacksScreen(this)));
+        _screens.Register(TerminalPage.Month, () => MakeScreen(TerminalPage.Month, () => new MonthScreen(this)));
+        _screens.Register(TerminalPage.Clients, () => MakeScreen(TerminalPage.Clients, () => new ClientsScreen(this)));
+        _screens.Register(TerminalPage.Templates, () => MakeScreen(TerminalPage.Templates, () => new TemplatesScreen(this)));
+        _screens.Register(TerminalPage.Coaching, () => MakeScreen(TerminalPage.Coaching, () => new CoachingScreen(this)));
+        _screens.Register(TerminalPage.Memory, () => MakeScreen(TerminalPage.Memory, () => new MemoryScreen(this)));
+        _screens.Register(TerminalPage.Calls, () => MakeScreen(TerminalPage.Calls, () => new CallsScreen(this)));
+        _screens.Register(TerminalPage.Settings, () => MakeScreen(TerminalPage.Settings, () => new SettingsScreen(this)));
 
         _clock = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
         _clock.Tick += (_, _) => UpdateClock();

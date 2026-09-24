@@ -165,6 +165,10 @@ Everything under `%LOCALAPPDATA%\Palon\`: `log.txt`, `notes\` (index + daily Mar
 - Turning "Pause music during calls" off mid-call deliberately does *not* resume the music into your call.
 - Troubleshooting transcription: if it fails to start, install the Microsoft VC++ 2022 x64 redistributable; check `%LOCALAPPDATA%\Palon\log.txt`.
 
+## Performance check
+
+Palon writes one `perf:` line to `%LOCALAPPDATA%\Palon\log.txt` every 5 minutes (working set, private bytes, GC heap, gen-2 collections, threads, live Palon avatars and whether their frame clock is running). Run `Palon.exe perf` from a console to print the latest ones — handy to attach when reporting slowness. A steadily climbing `ws`/`gc2` while idle points to a leak; `avatarClock=on` with the Now window minimized would be a bug.
+
 ## Building from source
 
 ```
