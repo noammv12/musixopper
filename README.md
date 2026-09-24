@@ -1,8 +1,10 @@
 # Palon.AI ⚫
 
-**Your personal sales aide.** Palon pauses your music when a call starts and brings it back after, writes your call notes, reminds you who to call back, types what you dictate into any app — and when you ask him something out loud, he answers back in a composed British-butler register, or just does it: opens your CRM, sets the reminder, digs the answer out of your call notes.
+**Your personal sales aide.** Palon pauses your music when a call starts and brings it back after, writes your call notes, books the callbacks you promised, types what you dictate into any app — and when you ask him something, he answers back in a composed British-butler register, or just does it: opens your CRM, sets the callback, digs the answer out of your call notes.
 
-Built for people who live between calls: sales, support, recruiting. One black-and-silver dock pill above the taskbar; everything happens there.
+**v9** adds the **Terminal** (a full workspace: today, callbacks, your month & deals, clients, message templates, coaching, memory), a rebuilt **dock** with an after-call card, **Palon himself** as a small animated character, **memory** of you and your clients, **screen reading**, **Salesforce logging** through Palon's own Edge window, and a **model switcher**. See [`docs/FIRST_RUN.md`](docs/FIRST_RUN.md) for a first-run checklist.
+
+Built for people who live between calls: sales, support, recruiting. One black-and-silver dock pill above the taskbar for the moment; the Terminal for everything else.
 
 ## Install
 
@@ -28,6 +30,43 @@ A small capsule floats just above the taskbar (drag it left/right — the spot i
 - Auto-hides during presentations and fullscreen apps; never steals focus from what you're typing.
 
 The settings card (flyout) is draggable too — grab any empty spot on it. It never grows taller than your screen; long panels scroll.
+
+## The Terminal
+
+Tray → **Terminal**, the Terminal chip on the dock, or *Terminal…* in the flyout. A Hebrew-first (RTL) workspace on an acrylic glass backdrop, with Palon on its side dock. Pages (**Ctrl+1…7**): **Today** (greeting, what's due, last calls with *ל-Salesforce*), **Callbacks**, **Month**, **Clients** (every number you've talked to, with notes and callbacks), **Templates**, **Coaching**, **Memory**. **Ctrl+K** opens **Ask** — the same agent as the voice hotkey, typed, with live progress chips, inline approval for anything that acts, and cancel. Click the brand to open the **brain sheet** (which model answers, keys, Test buttons).
+
+**Palon the character:** a small vector figure (dock, Today, Ask) whose mood follows what he's doing — listening, thinking, talking, a little hop when you close a deal. Purely local animation.
+
+**Model switcher:** pick *Auto* (Gemini first, DeepSeek as fallback), Gemini 3.8 / 3.5 Flash, DeepSeek V4.1 Flash or V4 Pro. A picked model's provider goes first; the other stays the fallback. One agent run stays pinned to the provider that first answered.
+
+## Month & deals
+
+**Month** tracks the month's deposits against your target and the bonus rules: deals with region (ישראל/פרו), CLUB tier, source, amount, approved. **ייבוא מאקסל** imports your monthly sheet (`.xlsx` or `.csv`, columns A–I: name, date, ישראל/פרו, CLUB, source, amount, approved, FTD bonus — recomputed, note), with a preview and row warnings before anything is saved; export writes an Excel-ready CSV. Work days (Sun–Thu) drive the pace line. Local only (`sales.json`).
+
+## Templates
+
+Your WhatsApp messages as templates with `{name}`-style fields, copied from the Terminal or the after-call card. Palon keeps a small log of what you copied (and your edits inside Palon) and, over time, **proposes** an edit to a template or a new one from a message you keep writing by hand — you accept, tweak or reject; templates are versioned so a change can be undone.
+
+## Coaching
+
+Every summarized call also yields local talk/listen numbers (from the separate mic and caller tracks, measured before the audio is deleted) and — in the same AI call as the summary — the objections the client raised, the questions they asked, and whether a next step was agreed, each backed by a **verbatim quote** that is checked against the transcript (anything not found is dropped). The **Coaching** page shows the week against the last, your best call and why, and phrases that correlate with deposits once there are enough calls (8+). Everything stays on your PC (`coaching.json`).
+
+## Memory
+
+Palon remembers two things, both **encrypted with DPAPI** under `%LOCALAPPDATA%\Palon\memory\`:
+
+- **About you** — say or type "תזכור ש…" ("remember that…") and it's saved; "תשכח ש…" forgets. From your Ask conversations he may also *suggest* things to remember — suggestions are never saved until you accept them on the **Memory** page.
+- **About clients** — facts heard on calls (a spouse's name, when they get paid, the broker they use), each with the quote it came from, attached to the client's number. They surface in the caller brief and in Ask ("מה אני יודע על דני?").
+
+The Memory page lists everything with edit / forget / undo, and a **pause** switch that stops all new memory. A toast tells you whenever Palon remembers or forgets something outside the Terminal.
+
+## Screen reading
+
+**קרא מהמסך** in Ask (or the dock chip, or the opt-in **Ctrl+Alt+Shift+S**): drag a region, and a **privacy gate** shows the exact image that would be sent and to which model — nothing leaves your PC until you press Send. Palon answers about it (with Copy for the extracted text), or, for a receipt, pre-fills a new deal for you to check before saving. Needs a vision-capable model (the Gemini models; DeepSeek is text-only and is skipped).
+
+## Salesforce (via Palon's Edge)
+
+*Log to Salesforce* on the after-call card or Today writes the call (note + the callback you booked) into Salesforce by driving **a dedicated Edge window** Palon opens with a private profile (`%LOCALAPPDATA%\Palon\edge-profile`) and local remote debugging (loopback only, random port). You sign in to Salesforce there once. First time: open a **test contact**, use **למד את Palon** (teach mode) to show him the clicks once, try a **dry run**, then approve real writes. Every write is **plan → your approval → execute → verify**, never deletes, and is undoable from the audit list; a quiet nightly rehearsal on the test record tells you if a taught skill broke. If your company sets the Edge policy `RemoteDebuggingAllowed=0`, Palon detects it and says so — Salesforce logging is then unavailable (everything else works).
 
 ## Ask Palon 💬
 
@@ -75,12 +114,12 @@ Flyout → **Detect calls by**:
 
 1. During a call, Palon records your mic + the caller's audio.
 2. When you hang up, he transcribes the call. **With a Groq API key** (free at console.groq.com) transcription runs on Groq's whisper-large-v3-turbo — excellent Hebrew, done in seconds. **Without a key** it runs locally with the offline Whisper model (~466 MB one-time download). With both, Groq is first and local is the automatic fallback.
-3. With an AI key he writes **3 bullets + the next step**; without one you get the transcript only. Best free option: a **Gemini** key (aistudio.google.com — free Flash tier, ~1,500 calls/day; default model `gemini-3.8-flash`); a **DeepSeek** key works as the paid fallback (default model `deepseek-flash`). (Both ids can be overridden in the registry values `GeminiModel` / `DeepSeekModel`; blank means the default.) If a summary fails, the toast names the reason instead of failing silently.
+3. With an AI key he writes **3 bullets + the next step**; without one you get the transcript only. Cheapest option: a **Gemini** key (aistudio.google.com — has a free tier, but its daily quota on the newest Flash models is small, so check your quota page; default model `gemini-3.8-flash`); a **DeepSeek** key works as the paid fallback (default model `deepseek-flash`). (Both ids can be overridden in the registry values `GeminiModel` / `DeepSeekModel`; blank means the default.) If a summary fails, the toast names the reason instead of failing silently.
 4. The note pops up in the dock, lands at the top of the notes panel with a Copy button, and is appended to a daily Markdown file (`%LOCALAPPDATA%\Palon\notes\`). With `%NUMBER%` handlers, notes are tagged with the caller's number.
 5. **✨ Follow-up** on each note card drafts a short WhatsApp-style follow-up message from the call — Copy it, or when the caller's number is known, **Open in WhatsApp** lands it straight in their chat, prefilled.
 6. The panel's health line — "Last note … · Last call Palon saw …" — turns "notes stopped working" into a named cause: if Palon isn't seeing calls at all, your softphone handlers are pointing at the wrong exe, and the line links straight to the setup.
 
-**Privacy:** recording is OFF by default. Audio is deleted right after processing — only text is kept, on your PC. Keys are stored encrypted (Windows DPAPI, bound to your Windows account). With a Groq key, call audio is uploaded to Groq for transcription; only text goes to your AI provider (Gemini/DeepSeek — note Gemini's free tier may use prompts to improve Google's products). When you ask Palon something that needs your notes or stats, the matching snippets go to the AI provider as tool results — same consent as summaries. **Recording calls may require consent where you are — check your local law and company policy before enabling.**
+**Privacy:** recording is OFF by default. **Gemini free tier:** Google's terms allow unpaid-tier prompts and outputs to be used to improve its products and read by human reviewers — call transcripts are your clients' personal data, so for real calls prefer a **paid** Gemini key (billing enabled) or DeepSeek. Audio is deleted right after processing — only text is kept, on your PC. Keys are stored encrypted (Windows DPAPI, bound to your Windows account). With a Groq key, call audio is uploaded to Groq for transcription; only text goes to your AI provider (Gemini/DeepSeek — note Gemini's free tier may use prompts to improve Google's products). When you ask Palon something that needs your notes or stats, the matching snippets go to the AI provider as tool results — same consent as summaries. **Recording calls may require consent where you are — check your local law and company policy before enabling.**
 
 The log at `%LOCALAPPDATA%\Palon\log.txt` narrates every step — if a note doesn't appear, the reason is in there.
 
@@ -95,11 +134,11 @@ Press **Ctrl+Alt+Space** (or the 🎙 chip), speak, press again — the text is 
 
 Your repeat texts as chips in the dock. **Click** pastes into the app you're working in (the dock never takes focus); **right-click** copies. Manage up to 15 via **…** → Snippets; optionally **Paste with Ctrl+Alt+1–9** (off by default — skip it if you type with AltGr). Caveats: elevated (admin) apps ignore injected paste (text stays on the clipboard); some terminals bind paste to Ctrl+Shift+V.
 
-## Reminders
+## Callbacks
 
-Reminders are **callbacks**: who (name and/or phone, optional), what (a note — what to do or what was discussed), when, and an optional link. ⏰ chip: fill what you know and pick a time: `30m / 1h / 3h / Tomorrow 9:00 / Custom`. Or just tell Palon ("תזכיר לי לחזור לדני בשלוש"). The list groups them — Overdue / Today / Tomorrow / Later this week / Later — with ✓ done and ✕ cancel. When due, the dock expands with **Open** (or **Done**) / **Copy #** (when there's a number) / **10m** / **✕**. Missed callbacks fire on next launch, marked "Missed".
+Reminders are now **callbacks**: who (name and/or phone, optional), what (a note — what to do or what was discussed), when, and an optional link. ⏰ chip: fill what you know and pick a time: `30m / 1h / 3h / Tomorrow 9:00 / Custom`. Or just tell Palon ("תזכיר לי לחזור לדני בשלוש"). The list groups them — Overdue / Today / Tomorrow / Later this week / Later — with ✓ done and ✕ cancel. When due, the dock expands with **Open** (or **Done**) / **Copy #** (when there's a number) / **10m** / **✕**. Missed callbacks fire on next launch, marked "Missed".
 
-After a call, if the summary hears a callback promise ("אחזור אליך מחר ב-11", "call me back in an hour") the note carries a *proposed* callback, resolved against the call's end time — nothing is created until you accept it. Your old reminders.json is migrated automatically on first launch (the original is kept as `reminders.v1.bak.json`).
+After a call, if the summary hears a callback promise ("אחזור אליך מחר ב-11", "call me back in an hour") the note carries a *proposed* callback, resolved against the call's end time — nothing is created until you accept it. Accept it from the after-call card in one tap. Your old reminders.json is migrated automatically on first launch (the original is kept as `reminders.v1.bak.json`).
 
 ## Call stats
 
@@ -107,7 +146,11 @@ The flyout shows "Today: 14 calls · 1h 12m" under the status; **Stats…** open
 
 ## Network use
 
-Palon talks to the network only when *you* opt in: the one-time voice-model download from `huggingface.co`, transcription requests to `api.groq.com` (Groq key), AI requests to `generativelanguage.googleapis.com` (Gemini key, model `gemini-3.8-flash` by default) and/or `api.deepseek.com` (DeepSeek key, `deepseek-flash` by default) — call summaries, follow-up drafts, dictation polish when enabled, and Ask-Palon questions with their tool results — and, for his speaking voice, the text of his replies goes to Microsoft's Edge speech service (or to `api.elevenlabs.io` with an ElevenLabs key). Switch the voice to "Windows only" and speech never leaves your PC. Nothing else, ever.
+Palon talks to the network only when *you* opt in: the one-time voice-model download from `huggingface.co`, transcription requests to `api.groq.com` (Groq key), AI requests to `generativelanguage.googleapis.com` (Gemini key, model `gemini-3.8-flash` by default) and/or `api.deepseek.com` (DeepSeek key, `deepseek-flash` by default) — call summaries, follow-up drafts, dictation polish when enabled, and Ask-Palon questions with their tool results — and, for his speaking voice, the text of his replies goes to Microsoft's Edge speech service (or to `api.elevenlabs.io` with an ElevenLabs key). Switch the voice to "Windows only" and speech never leaves your PC. In v9 also: screen-read images go to your vision model **only after you press Send** on the gate; memory and coaching ride inside the summary call (no extra requests, except one background suggestion call after Ask conversations while memory is on); Salesforce traffic is Edge talking to your Salesforce — Palon itself only speaks to that Edge over `127.0.0.1`. Nothing else, ever.
+
+### What's stored locally
+
+Everything under `%LOCALAPPDATA%\Palon\`: `log.txt`, `notes\` (index + daily Markdown), `reminders.json` (callbacks), `calls.json` (stats), `sales.json`, `templates.json` + `template_learning.json`, `coaching.json`, `memory\profile.dat` + `memory\clients.dat` (DPAPI-encrypted), `salesforce\` (taught skills, audit, rehearsal), `edge-profile\` (Palon's Edge, including your Salesforce login), `snippets.json`, `commands.json`, and the offline Whisper model. Keys and settings live in the registry (`HKCU\Software\Palon`), keys DPAPI-encrypted. Call audio is deleted after processing.
 
 ## Upgrading from Bridget (or Saley)
 
@@ -115,7 +158,7 @@ Palon talks to the network only when *you* opt in: the one-time voice-model down
 
 ## Good to know
 
-- Once a day Palon quietly checks GitHub for a newer release; when there is one, a small "v8.x available →" link appears in the flyout footer. No auto-update — the link just opens the release page.
+- Once a day Palon quietly checks GitHub for a newer release; when there is one, a small "v9.x available →" link appears in the flyout footer. No auto-update — the link just opens the release page.
 - Only media on the same Windows PC can be controlled — not a phone or another device.
 - Turning "Pause music during calls" off mid-call deliberately does *not* resume the music into your call.
 - Troubleshooting transcription: if it fails to start, install the Microsoft VC++ 2022 x64 redistributable; check `%LOCALAPPDATA%\Palon\log.txt`.
@@ -128,6 +171,6 @@ dotnet publish src/Palon.csproj -c Release -r win-x64 --self-contained -p:Publis
 
 Requires the .NET 8 SDK on Windows (the project also compiles on Linux for CI-style checks — no XAML, so WPF is only a framework reference there). Tests live in `tests/Palon.Tests` (`dotnet test`, Windows). CI publishes on every push, runs the tests, and verifies the output stays a single exe (`.github/workflows/build.yml`); tagging `v*` attaches the exe to a GitHub release. The app icon is generated by `assets/make_icon.py`; the whisper.cpp natives ship embedded in the exe and extract to `%LOCALAPPDATA%\Palon\whisper-runtime\` on first use.
 
-### How Ask Palon works (v8 architecture)
+### How Ask Palon works (agent architecture)
 
-Ask Palon is a tool-calling agent, not an intent router. `src/Agent/` holds the pieces: each capability is one `AgentTool` (name + JSON-Schema parameters + code) registered in `ToolRegistry`; `AgentLoop` sends the persona (from `PalonPersona`, the one voice every AI-written text shares — dictation polish excepted, it stays a neutral cleaner), a short session memory, and live context (time, call state, the current caller's last note, today's stats) to the model with the tool specs, executes the calls it makes, and feeds results back until an answer emerges — terminal tools like "open" end the turn immediately, because the window opening is its own feedback. Gemini and DeepSeek both speak the OpenAI function-calling format; if the tool path fails, Palon degrades to the v7 single-shot JSON intent rather than to silence. Adding a capability = adding one tool class.
+Ask Palon is a tool-calling agent, not an intent router. `src/Agent/` holds the pieces: each capability is one `AgentTool` (name + JSON-Schema parameters + code) registered in `ToolRegistry`; `AgentLoop` sends the persona (from `PalonPersona`, the one voice every AI-written text shares — dictation polish excepted, it stays a neutral cleaner), a short session memory, and live context (time, call state, the current caller's last note, today's stats) to the model with the tool specs, executes the calls it makes, and feeds results back until an answer emerges — terminal tools like "open" end the turn immediately, because the window opening is its own feedback. Gemini and DeepSeek both speak the OpenAI function-calling format; if the tool path fails, Palon degrades to the v7 single-shot JSON intent rather than to silence. Adding a capability = adding one tool class. Since v9 tools carry a policy tier (read-only tools run freely; anything that acts outside Palon asks first), multi-step requests can show a plan for approval, and a run pins the provider that answered (Gemini's `thought_signature` is echoed back between rounds).
