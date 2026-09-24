@@ -56,3 +56,127 @@ static class Radius
     public const double Card = 10;    // cards and chips
     public const double Panel = 12;   // the flyout root, dock pill max
 }
+
+/// <summary>
+/// The Terminal's black→silver palette. Pure black ground, glass that is a
+/// few percent of white, one silver accent, and semantic color only where
+/// it means something (done/deposits green, overdue red, calls amber, the
+/// warm tier ramp). Brushes are frozen singletons — share, never mutate.
+/// </summary>
+static class Tone
+{
+    public static readonly SolidColorBrush Ground = B("#FF000000");
+    public static readonly SolidColorBrush GroundSolid = B("#FF0B0B0D");
+    public static readonly SolidColorBrush Text = B("#FFF5F5F7");
+    public static readonly SolidColorBrush TextSoft = B("#FFD1D1D6");
+    public static readonly SolidColorBrush Body = B("#FFB4B4BA");
+    public static readonly SolidColorBrush Muted = B("#FF8E8E93");
+    public static readonly SolidColorBrush MutedSoft = B("#FFA1A1A6");
+    public static readonly SolidColorBrush Faint = B("#FF6E6E73");
+    public static readonly SolidColorBrush Accent = B("#FFD8D8DD");
+    public static readonly SolidColorBrush AccentSoft = B("#21D8D8DD");  // 13%
+    public static readonly SolidColorBrush AccentLine = B("#47D8D8DD");  // 28%
+    public static readonly SolidColorBrush Primary = B("#FFF5F5F7");
+    public static readonly SolidColorBrush PrimaryHover = B("#FFFFFFFF");
+    public static readonly SolidColorBrush OnPrimary = B("#FF000000");
+    public static readonly SolidColorBrush Fill = B("#17FFFFFF");        // 9%  secondary button
+    public static readonly SolidColorBrush FillHover = B("#29FFFFFF");   // 16%
+    public static readonly SolidColorBrush FillSoft = B("#0FFFFFFF");    // 6%  tracks, chips
+    public static readonly SolidColorBrush FillSelected = B("#24FFFFFF"); // 14% segmented thumb
+    public static readonly SolidColorBrush RowHover = B("#0BFFFFFF");    // 4.5%
+    public static readonly SolidColorBrush Track = B("#14FFFFFF");       // 8%
+    public static readonly SolidColorBrush Hairline = B("#16FFFFFF");
+    public static readonly SolidColorBrush GlassStroke = B("#16FFFFFF"); // 8.5%
+    public static readonly SolidColorBrush GlassStrokeHover = B("#24FFFFFF");
+    public static readonly SolidColorBrush Scrim = B("#99000000");
+    public static readonly SolidColorBrush Green = B("#FF32D74B");
+    public static readonly SolidColorBrush GreenText = B("#FF5CE07A");
+    public static readonly SolidColorBrush Red = B("#FFFF453A");
+    public static readonly SolidColorBrush RedText = B("#FFFF6961");
+    public static readonly SolidColorBrush Amber = B("#FFFF9F0A");
+    public static readonly SolidColorBrush AmberText = B("#FFFFB340");
+    public static readonly SolidColorBrush Graphite = B("#FF5A5A60");
+    public static readonly SolidColorBrush Dim = B("#FF48484A");
+
+    /// <summary>Top-lit glass: 5.5% white fading to 2%.</summary>
+    public static readonly LinearGradientBrush Glass = G("#0EFFFFFF", "#05FFFFFF");
+    /// <summary>The machined rim: brighter on the top edge, like the design's inset highlight.</summary>
+    public static readonly LinearGradientBrush GlassRim = G3("#30FFFFFF", "#16FFFFFF", "#0CFFFFFF");
+    /// <summary>Sheets, the dock, the Ask panel — deeper, more opaque glass.</summary>
+    public static readonly LinearGradientBrush GlassDeep = G("#F028282F", "#F5121216");
+    public static readonly LinearGradientBrush GlassDeepRim = G3("#40FFFFFF", "#1FFFFFFF", "#14FFFFFF");
+    /// <summary>The page ground: a faint graphite glow from the top, then black.</summary>
+    public static readonly RadialGradientBrush Aurora = Radial();
+
+    public static SolidColorBrush Tier(string tier) => tier switch
+    {
+        "Bronze" => TierBronze,
+        "Silver" => TierSilver,
+        "Gold" => TierGold,
+        "VIP" => Text,
+        _ => MutedSoft,
+    };
+
+    static readonly SolidColorBrush TierBronze = B("#FFE3A36F");
+    static readonly SolidColorBrush TierSilver = B("#FFD6DAE0");
+    static readonly SolidColorBrush TierGold = B("#FFF4CD5C");
+
+    public static Color C(string hex) => (Color)ColorConverter.ConvertFromString(hex);
+
+    public static SolidColorBrush B(string hex)
+    {
+        var b = new SolidColorBrush(C(hex));
+        b.Freeze();
+        return b;
+    }
+
+    static LinearGradientBrush G(string top, string bottom)
+    {
+        var b = new LinearGradientBrush(C(top), C(bottom), new Point(0, 0), new Point(0, 1));
+        b.Freeze();
+        return b;
+    }
+
+    static LinearGradientBrush G3(string top, string mid, string bottom)
+    {
+        var b = new LinearGradientBrush(new GradientStopCollection
+        {
+            new GradientStop(C(top), 0), new GradientStop(C(mid), 0.08), new GradientStop(C(bottom), 1),
+        }, new Point(0, 0), new Point(0, 1));
+        b.Freeze();
+        return b;
+    }
+
+    static RadialGradientBrush Radial()
+    {
+        var b = new RadialGradientBrush(new GradientStopCollection
+        {
+            new GradientStop(C("#FF151518"), 0), new GradientStop(C("#FF000000"), 0.55),
+        })
+        {
+            Center = new Point(0.5, -0.1), GradientOrigin = new Point(0.5, -0.1), RadiusX = 1.2, RadiusY = 0.9,
+        };
+        b.Freeze();
+        return b;
+    }
+}
+
+/// <summary>The Terminal's larger type roles — a workspace, not a flyout.</summary>
+static class Display
+{
+    public const double Hero = 34;     // screen titles — SemiBold
+    public const double Greeting = 30; // Today's hello — SemiBold
+    public const double Sheet = 22;    // sheet titles — SemiBold
+    public const double Section = 17;  // card titles — SemiBold
+    public const double Body = 15;     // rows
+    public const double Meta = 13;     // secondary lines
+    public const double Tiny = 12.5;   // captions, pills
+    public const double NumXL = 58;    // the Month ring — Light
+    public const double NumL = 44;     // the Today ring — Light
+    public const double NumM = 40;     // pay/deposit widgets — Light
+
+    public const double CardRadius = 32;
+    public const double ListRadius = 28;
+    public const double RowRadius = 18;
+    public const double Gap = 20;
+}

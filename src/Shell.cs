@@ -36,6 +36,9 @@ sealed class Shell : IDisposable
 
         _tray.OpenRequested += () => _flyout.ShowFlyout();
         _tray.NotesRequested += () => _flyout.ShowNotes();
+        _tray.TerminalRequested += () => TerminalWindow.ShowSingleton();
+        _flyout.TerminalRequested += () => TerminalWindow.ShowSingleton();
+        TerminalWindow.Configure(() => _engine.State, () => _engine.CurrentNumber);
         _tray.QuitRequested += Quit;
         _flyout.QuitRequested += Quit;
         _dock.OpenFlyoutRequested += () => _flyout.ShowSnippets();

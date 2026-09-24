@@ -4,7 +4,7 @@ namespace Palon;
 
 /// <summary>
 /// The tray icon: left-click opens the flyout, right-click gives a
-/// two-item fallback menu. Everything else lives in the flyout.
+/// small fallback menu. Everything else lives in the flyout.
 /// </summary>
 sealed class TrayHost : IDisposable
 {
@@ -13,6 +13,7 @@ sealed class TrayHost : IDisposable
 
     public event Action? OpenRequested;
     public event Action? NotesRequested;
+    public event Action? TerminalRequested;
     public event Action? QuitRequested;
 
     public TrayHost()
@@ -20,11 +21,14 @@ sealed class TrayHost : IDisposable
         var menu = new ContextMenuStrip();
         var open = new ToolStripMenuItem("Open Palon");
         open.Click += (_, _) => OpenRequested?.Invoke();
+        var terminal = new ToolStripMenuItem("Terminal");
+        terminal.Click += (_, _) => TerminalRequested?.Invoke();
         var notes = new ToolStripMenuItem("Notes");
         notes.Click += (_, _) => NotesRequested?.Invoke();
         var quit = new ToolStripMenuItem("Quit");
         quit.Click += (_, _) => QuitRequested?.Invoke();
         menu.Items.Add(open);
+        menu.Items.Add(terminal);
         menu.Items.Add(notes);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(quit);

@@ -119,10 +119,23 @@ sealed class AssistantSession
             var open = callbacks.Count(c => c.IsActive);
             if (open > 0)
                 sb.Append($"\nOpen callbacks: {open} ({counts.Overdue} overdue, {counts.DueToday} more due today; list_reminders for details).");
+            AppendMonth(sb);
         }
         catch (Exception ex)
         {
             Log.Write($"Session context: stats lookup failed: {ex.Message}");
         }
+    }
+
+    /// <summary>This month's deposits vs. target and expected pay — so
+    /// "how many a day do I need?" is answerable from the Terminal's Ask.</summary>
+    static void AppendMonth(StringBuilder sb)
+    {
+        var now = DateTime.Now;
+        if (Sales.SalesStore.Get(now.Year, now.Month) is not { } book) return;
+        var s = Sales.SalesStats.Compute(book, Sales.SalesStore.LoadRules(), now);
+        sb.Append($"\nThis month: {s.Count} first-time deposits");
+        if (s.Target is int t) sb.Append($" of a {t} target ({s.Remaining} to go, {s.RemainingWorkDays} work days left, {s.RequiredPerDay:0.#}/day needed, pace {s.PacePerDay:0.#}/day)");
+        sb.Append($"; deposits total ${s.SumDeposits:#,0}; expected pay ₪{s.ExpectedPayIls:#,0} (confirmed ₪{s.ConfirmedPayIls:#,0}).");
     }
 }
