@@ -114,8 +114,11 @@ sealed class AssistantSession
             if (today.Count > 0)
                 sb.Append($"\nToday so far: {today.Count} call(s), " +
                           $"{TimeSpan.FromSeconds(today.Sum(c => (long)c.DurationSec)):h\\:mm\\:ss} on the line.");
-            var pending = ReminderStore.Load().Count(r => r.State == ReminderState.Pending);
-            if (pending > 0) sb.Append($"\nPending reminders: {pending} (list_reminders for details).");
+            var callbacks = CallbackStore.Load();
+            var counts = CallbackPlanner.Counts(callbacks, DateTime.Now);
+            var open = callbacks.Count(c => c.IsActive);
+            if (open > 0)
+                sb.Append($"\nOpen callbacks: {open} ({counts.Overdue} overdue, {counts.DueToday} more due today; list_reminders for details).");
         }
         catch (Exception ex)
         {

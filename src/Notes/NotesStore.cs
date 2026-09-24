@@ -12,7 +12,8 @@ sealed record CallNote(
     string Transcript,
     string State,                 // "ok" | "transcript-only" | "recovered"
     string? Number = null,        // caller's number when the softphone passed one
-    string? SummaryError = null); // why the summary is missing, when one was expected
+    string? SummaryError = null,  // why the summary is missing, when one was expected
+    CallbackProposal? ProposedCallback = null); // a callback promise heard on the call, for the user to accept
 
 /// <summary>
 /// Call notes persistence: a JSON index of the last 50 notes for the UI,
@@ -77,6 +78,28 @@ static class NotesStore
         Changed?.Invoke();
     }
 
+    /// <summary>Replaces a note in the index by id (e.g. a proposal accepted);
+    /// the daily Markdown is append-only and left as written.</summary>
+    public static void Update(CallNote note)
+    {
+        try
+        {
+            var notes = Load();
+            var index = notes.FindIndex(n => n.Id == note.Id);
+            if (index < 0) return;
+            notes[index] = note;
+            var tmp = IndexPath + ".tmp";
+            File.WriteAllText(tmp, JsonSerializer.Serialize(new Envelope { Notes = notes }, JsonOptions));
+            File.Move(tmp, IndexPath, overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Notes update failed: {ex.Message}");
+            return;
+        }
+        Changed?.Invoke();
+    }
+
     static void AppendDaily(CallNote note)
     {
         var local = note.StartedUtc.ToLocalTime();
@@ -88,6 +111,8 @@ static class NotesStore
         if (note.Summary is { } summary)
         {
             sb.AppendLine(summary);
+            if (note.ProposedCallback is { } proposal)
+                sb.AppendLine($"Callback heard: \"{proposal.Phrase}\" → {proposal.WhenUtc.ToLocalTime():ddd d MMM HH:mm}");
             sb.AppendLine();
         }
         sb.AppendLine("Transcript:");

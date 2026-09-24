@@ -64,6 +64,7 @@ sealed class DockWindow : Window
     readonly TextBlock _reminderLabel;
     readonly TextBlock _reminderCount;
     TextBlock _reminderOpenLabel = null!;
+    Border _reminderCopyButton = null!;
     readonly StackPanel _dictationContent;
     readonly Ellipse _dictationDot;
     readonly StackPanel _wavePanel;
@@ -124,12 +125,12 @@ sealed class DockWindow : Window
     bool _dictationActive;
     bool _assistantActive;
     string _assistantStatus = "";
-    public event Action<Reminder>? ReminderOpenRequested;
-    public event Action<Reminder>? ReminderSnoozeRequested;
-    public event Action<Reminder>? ReminderDismissRequested;
+    public event Action<Callback>? ReminderOpenRequested;
+    public event Action<Callback>? ReminderSnoozeRequested;
+    public event Action<Callback>? ReminderDismissRequested;
 
-    readonly Queue<(Reminder Reminder, bool Missed)> _reminderQueue = new();
-    (Reminder Reminder, bool Missed)? _currentReminder;
+    readonly Queue<(Callback Reminder, bool Missed)> _reminderQueue = new();
+    (Callback Reminder, bool Missed)? _currentReminder;
 
     public DockWindow()
     {
@@ -240,6 +241,9 @@ sealed class DockWindow : Window
         _reminderOpenLabel = (TextBlock)openButton.Child;
         openButton.Margin = new Thickness(12, 0, 0, 0);
         openButton.MouseLeftButtonUp += (_, _) => ActOnCurrentReminder(r => ReminderOpenRequested?.Invoke(r));
+        // Copy # stays on the notification — copy, dial, then Done.
+        _reminderCopyButton = ReminderButton("Copy #", primary: false);
+        _reminderCopyButton.MouseLeftButtonUp += (_, _) => CopyCurrentReminderNumber();
         var snoozeButton = ReminderButton("10m", primary: false);
         snoozeButton.MouseLeftButtonUp += (_, _) => ActOnCurrentReminder(r => ReminderSnoozeRequested?.Invoke(r));
         var dismissButton = ReminderButton("✕", primary: false);
@@ -250,6 +254,7 @@ sealed class DockWindow : Window
         _reminderContent.Children.Add(_reminderLabel);
         _reminderContent.Children.Add(_reminderCount);
         _reminderContent.Children.Add(openButton);
+        _reminderContent.Children.Add(_reminderCopyButton);
         _reminderContent.Children.Add(snoozeButton);
         _reminderContent.Children.Add(dismissButton);
 
@@ -946,7 +951,7 @@ sealed class DockWindow : Window
 
     // ---- reminders -------------------------------------------------------------
 
-    public void ShowReminder(Reminder reminder, bool missed)
+    public void ShowReminder(Callback reminder, bool missed)
     {
         if (!CheckAccess())
         {
@@ -975,7 +980,21 @@ sealed class DockWindow : Window
         SetState(DockState.Reminder);
     }
 
-    void ActOnCurrentReminder(Action<Reminder> action)
+    void CopyCurrentReminderNumber()
+    {
+        if (_currentReminder is not { Reminder.Phone: { Length: > 0 } phone }) return;
+        try
+        {
+            Clipboard.SetText(phone);
+            ((TextBlock)_reminderCopyButton.Child).Text = "Copied ✓";
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Callback copy failed: {ex.Message}"); // clipboard held by another app
+        }
+    }
+
+    void ActOnCurrentReminder(Action<Callback> action)
     {
         if (_currentReminder is not { } current) return;
         _currentReminder = null;
@@ -996,7 +1015,9 @@ sealed class DockWindow : Window
         _reminderOpenLabel.Text = current.Reminder.HasUrl ? "Open" : "Done";
         // The label is user text (often Hebrew) glued to an LTR prefix —
         // isolate it so the separators keep their place.
-        _reminderLabel.Text = (current.Missed ? "Missed · " : "") + Bidi.Isolate(current.Reminder.DisplayLabel);
+        _reminderLabel.Text = (current.Missed ? "Missed · " : "") + Bidi.Isolate(current.Reminder.DisplayLine);
+        _reminderCopyButton.Visibility = current.Reminder.HasPhone ? Visibility.Visible : Visibility.Collapsed;
+        ((TextBlock)_reminderCopyButton.Child).Text = "Copy #";
         _reminderCount.Text = _reminderQueue.Count > 0 ? $"+{_reminderQueue.Count}" : "";
         if (_state == DockState.Reminder)
             AnimatePillTo(MeasureWidth(_reminderContent), ExpandedHeight, Motion.Fast, Motion.Out);

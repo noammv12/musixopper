@@ -95,7 +95,9 @@ Your repeat texts as chips in the dock. **Click** pastes into the app you're wor
 
 ## Reminders
 
-⏰ chip: type what to do — a link is optional now — and pick a time: `30m / 1h / 3h / Tomorrow 9:00 / Custom`. Or just tell Palon ("תזכיר לי לחזור לדני בשלוש"). When due, the dock expands with **Open / 10m / ✕** (text-only reminders show **Done** instead of Open). Missed reminders fire on next launch, marked "Missed".
+Reminders are **callbacks**: who (name and/or phone, optional), what (a note — what to do or what was discussed), when, and an optional link. ⏰ chip: fill what you know and pick a time: `30m / 1h / 3h / Tomorrow 9:00 / Custom`. Or just tell Palon ("תזכיר לי לחזור לדני בשלוש"). The list groups them — Overdue / Today / Tomorrow / Later this week / Later — with ✓ done and ✕ cancel. When due, the dock expands with **Open** (or **Done**) / **Copy #** (when there's a number) / **10m** / **✕**. Missed callbacks fire on next launch, marked "Missed".
+
+After a call, if the summary hears a callback promise ("אחזור אליך מחר ב-11", "call me back in an hour") the note carries a *proposed* callback, resolved against the call's end time — nothing is created until you accept it. Your old reminders.json is migrated automatically on first launch (the original is kept as `reminders.v1.bak.json`).
 
 ## Call stats
 

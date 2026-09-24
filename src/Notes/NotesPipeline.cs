@@ -193,10 +193,19 @@ sealed class NotesPipeline : IDisposable
 
                     string? summary = null;
                     string? summaryError = null;
+                    CallbackProposal? proposal = null;
                     if (AiChat.HasKey)
                     {
                         StatusChanged?.Invoke("Summarizing…");
-                        (summary, summaryError) = await AiChat.SummarizeAsync(transcript, CancellationToken.None);
+                        // Relative promises ("מחר ב-11") resolve against when the call ended.
+                        var endedLocal = (session.EndedUtc ?? session.StartedUtc + session.Duration).ToLocalTime();
+                        (summary, summaryError) = await AiChat.SummarizeAsync(transcript, CancellationToken.None, endedLocal);
+                        if (summary is not null)
+                        {
+                            (summary, proposal) = CallbackProposals.Extract(summary, endedLocal);
+                            if (proposal is not null)
+                                Log.Write($"Notes: callback heard → {proposal.WhenUtc.ToLocalTime():ddd HH:mm}");
+                        }
                     }
 
                     var durationSec = (int)Math.Max(session.Duration.TotalSeconds, audioLength.TotalSeconds);
@@ -208,7 +217,8 @@ sealed class NotesPipeline : IDisposable
                         transcript,
                         recovered ? "recovered" : summary is null ? "transcript-only" : "ok",
                         number,
-                        summary is null ? summaryError : null);
+                        summary is null ? summaryError : null,
+                        proposal);
                     NotesStore.Add(note);
                     NoteReady?.Invoke(note);
                 }

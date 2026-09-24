@@ -5,12 +5,14 @@ using System.Windows.Threading;
 
 namespace Palon.UI;
 
-/// <summary>The flyout's Reminders panel: quick-add + pending list.</summary>
+/// <summary>The flyout's Reminders panel: quick-add + open callbacks, grouped.</summary>
 partial class FlyoutWindow
 {
     readonly StackPanel _remindersPanel;
     TextBox _reminderUrlBox = null!;
     TextBox _reminderLabelBox = null!;
+    TextBox _reminderNameBox = null!;
+    TextBox _reminderPhoneBox = null!;
     TextBox _reminderCustomTimeBox = null!;
     StackPanel _reminderList = null!;
     TextBlock _reminderStatus = null!;
@@ -32,23 +34,39 @@ partial class FlyoutWindow
 
         panel.Children.Add(BackLink());
         panel.Children.Add(Ui.Title("Reminders"));
-        var subtitle = Ui.Small("Type what to do (or paste the lead's link), pick a time — Palon pops it above the taskbar when it's time to call.");
+        var subtitle = Ui.Small("Who to call and what about (a link is optional), pick a time — Palon pops it above the taskbar when it's time to call.");
         subtitle.TextWrapping = TextWrapping.Wrap;
         subtitle.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(subtitle);
 
+        var whoCaption = Ui.Caption("Who (optional — name, phone)");
+        whoCaption.Margin = new Thickness(2, Space.Section, 0, 0);
+        panel.Children.Add(whoCaption);
+        var whoRow = new Grid { Margin = Ui.Top(Space.Tight) };
+        whoRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        whoRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        _reminderNameBox = Ui.TextBox("");
+        _reminderNameBox.MaxLength = 60;
+        whoRow.Children.Add(_reminderNameBox);
+        _reminderPhoneBox = Ui.TextBox("");
+        _reminderPhoneBox.MaxLength = 32;
+        _reminderPhoneBox.Margin = Ui.Left(Space.Row);
+        Grid.SetColumn(_reminderPhoneBox, 1);
+        whoRow.Children.Add(_reminderPhoneBox);
+        panel.Children.Add(whoRow);
+
         var urlCaption = Ui.Caption("Link (optional — CRM, WhatsApp, anything)");
-        urlCaption.Margin = new Thickness(2, Space.Section, 0, 0);
+        urlCaption.Margin = new Thickness(2, Space.Row, 0, 0);
         panel.Children.Add(urlCaption);
         _reminderUrlBox = Ui.TextBox("");
         _reminderUrlBox.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(_reminderUrlBox);
 
-        var labelCaption = Ui.Caption("Label (what it's about)");
+        var labelCaption = Ui.Caption("Note (what to do / what was discussed)");
         labelCaption.Margin = new Thickness(2, Space.Row, 0, 0);
         panel.Children.Add(labelCaption);
         _reminderLabelBox = Ui.TextBox("");
-        _reminderLabelBox.MaxLength = 40;
+        _reminderLabelBox.MaxLength = 500;
         _reminderLabelBox.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(_reminderLabelBox);
 
@@ -99,7 +117,7 @@ partial class FlyoutWindow
 
         SelectTimeChip(_timeSelection);
         // Keep the list live while dock/scheduler actions mutate the store.
-        ReminderStore.Changed += () => Dispatcher.InvokeAsync(() =>
+        CallbackStore.Changed += () => Dispatcher.InvokeAsync(() =>
         {
             if (_remindersPanel.Visibility == Visibility.Visible) RebuildReminderList();
         });
@@ -145,11 +163,17 @@ partial class FlyoutWindow
     void AddReminder()
     {
         var url = _reminderUrlBox.Text.Trim();
-        if (!ReminderStore.IsValidReminder(url, _reminderLabelBox.Text))
+        var phone = _reminderPhoneBox.Text.Trim();
+        if (phone.Length > 0 && CallbackStore.NormalizePhone(phone) is null)
+        {
+            ShowReminderStatus("That doesn't look like a phone number.");
+            return;
+        }
+        if (!CallbackStore.IsValid(url, _reminderLabelBox.Text, _reminderNameBox.Text, phone))
         {
             ShowReminderStatus(url.Length > 0
                 ? "That doesn't look like a link — paste a full http(s) address."
-                : "Give it a label (or paste a link) so you'll know what it's about.");
+                : "Add a name, number or note so you'll know who to call.");
             return;
         }
 
@@ -172,13 +196,15 @@ partial class FlyoutWindow
             dueUtc = local.ToUniversalTime();
         }
 
-        if (ReminderStore.Add(url, _reminderLabelBox.Text, dueUtc) is null)
+        if (CallbackStore.Add(_reminderLabelBox.Text, dueUtc, _reminderNameBox.Text, phone, url) is null)
         {
             ShowReminderStatus("Couldn't save the reminder (too many pending?).");
             return;
         }
         _reminderUrlBox.Text = "";
         _reminderLabelBox.Text = "";
+        _reminderNameBox.Text = "";
+        _reminderPhoneBox.Text = "";
         ShowReminderStatus("Reminder set ✓");
         RebuildReminderList();
     }
@@ -198,53 +224,75 @@ partial class FlyoutWindow
     void RebuildReminderList()
     {
         _reminderList.Children.Clear();
-        var pending = ReminderStore.Load()
-            .Where(r => r.State == ReminderState.Pending)
-            .OrderBy(r => r.DueAtUtc)
-            .ToList();
+        var groups = CallbackPlanner.Group(CallbackStore.Load(), DateTime.Now);
 
-        if (pending.Count == 0)
+        if (groups.Count == 0)
         {
             _reminderList.Children.Add(Ui.EmptyState("Nothing pending — set one and it pops above the taskbar on time."));
             return;
         }
 
-        foreach (var reminder in pending)
+        foreach (var (group, items) in groups)
         {
-            var row = new Grid { Margin = Ui.Top(Space.Row) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-            var label = Ui.AlignByScript(Ui.Text(reminder.DisplayLabel, Font.Body, "TextPrimaryBrush", FontWeights.SemiBold));
-            label.TextTrimming = TextTrimming.CharacterEllipsis; // RTL flow puts the ellipsis at the run's logical end
-            label.VerticalAlignment = VerticalAlignment.Center;
-            row.Children.Add(label);
-
-            var due = Ui.Small(FormatDue(reminder.DueAtUtc));
-            due.VerticalAlignment = VerticalAlignment.Center;
-            due.Margin = Ui.Left(Space.Row);
-            Grid.SetColumn(due, 1);
-            row.Children.Add(due);
-
-            var delete = Ui.Link("✕", Font.Small);
-            delete.Margin = Ui.Left(Space.Row);
-            delete.VerticalAlignment = VerticalAlignment.Center;
-            delete.MouseLeftButtonUp += (_, _) =>
-            {
-                ReminderStore.Remove(reminder.Id);
-                RebuildReminderList();
-            };
-            Grid.SetColumn(delete, 2);
-            row.Children.Add(delete);
-
-            _reminderList.Children.Add(row);
+            var header = Ui.Caption($"{CallbackPlanner.GroupTitle(group)} · {items.Count}");
+            header.Margin = new Thickness(2, Space.Row, 0, 0);
+            _reminderList.Children.Add(header);
+            foreach (var reminder in items) _reminderList.Children.Add(ReminderRow(reminder));
         }
+    }
+
+    /// <summary>One callback: "name · note", due, ✓ done, ✕ cancel.</summary>
+    Grid ReminderRow(Callback reminder)
+    {
+        var row = new Grid { Margin = Ui.Top(Space.Row) };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var label = Ui.AlignByScript(Ui.Text(reminder.DisplayLine, Font.Body, "TextPrimaryBrush", FontWeights.SemiBold));
+        label.TextTrimming = TextTrimming.CharacterEllipsis; // RTL flow puts the ellipsis at the run's logical end
+        label.VerticalAlignment = VerticalAlignment.Center;
+        if (reminder.HasPhone) label.ToolTip = reminder.Phone;
+        row.Children.Add(label);
+
+        var due = Ui.Small(FormatDue(reminder.DueAtUtc));
+        due.VerticalAlignment = VerticalAlignment.Center;
+        due.Margin = Ui.Left(Space.Row);
+        Grid.SetColumn(due, 1);
+        row.Children.Add(due);
+
+        var done = Ui.Link("✓", Font.Small);
+        done.ToolTip = "Done";
+        done.Margin = Ui.Left(Space.Row);
+        done.VerticalAlignment = VerticalAlignment.Center;
+        done.MouseLeftButtonUp += (_, _) =>
+        {
+            CallbackStore.Mutate(reminder.Id, c => CallbackPlanner.MarkDone(c, DateTime.UtcNow));
+            RebuildReminderList();
+        };
+        Grid.SetColumn(done, 2);
+        row.Children.Add(done);
+
+        var cancel = Ui.Link("✕", Font.Small);
+        cancel.ToolTip = "Cancel";
+        cancel.Margin = Ui.Left(Space.Row);
+        cancel.VerticalAlignment = VerticalAlignment.Center;
+        cancel.MouseLeftButtonUp += (_, _) =>
+        {
+            CallbackStore.Mutate(reminder.Id, c => CallbackPlanner.Cancel(c, DateTime.UtcNow));
+            RebuildReminderList();
+        };
+        Grid.SetColumn(cancel, 3);
+        row.Children.Add(cancel);
+
+        return row;
     }
 
     static string FormatDue(DateTime dueUtc)
     {
         var delta = dueUtc - DateTime.UtcNow;
+        if (delta < -TimeSpan.FromMinutes(1)) return dueUtc.ToLocalTime().ToString("ddd HH:mm"); // overdue: when it was
         if (delta < TimeSpan.Zero) return "now";
         if (delta < TimeSpan.FromMinutes(60)) return $"in {Math.Max(1, (int)delta.TotalMinutes)}m";
         if (delta < TimeSpan.FromHours(24)) return $"in {delta.TotalHours:0.#}h";
