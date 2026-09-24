@@ -43,6 +43,7 @@ sealed class AssistantSession
         _exchanges.Add((question, answer));
         if (_exchanges.Count > MaxExchanges) _exchanges.RemoveAt(0);
         _lastExchangeUtc = DateTime.UtcNow;
+        Memory.ProfileReflector.Submit(question, answer);
     }
 
     /// <summary>Persona + live context + saved commands, rebuilt per turn.</summary>
@@ -63,7 +64,13 @@ sealed class AssistantSession
             "('חפש...', 'search for...'). Use the tools when they serve the request; answer " +
             "directly when they don't. If asked to open something that matches no saved command " +
             "and no well-known site, say in one sentence to add it under Commands. Only if you " +
-            "truly cannot recover the meaning, say you didn't catch it.\n"));
+            "truly cannot recover the meaning, say you didn't catch it.\n" +
+            MemoryRules));
+
+        // "About you" goes in whole (capped), in its own block — client
+        // facts never share it.
+        var aboutYou = SafeAboutYou();
+        if (aboutYou.Length > 0) sb.Append('\n').Append(aboutYou).Append('\n');
 
         sb.Append("\nCONTEXT\nNow: ").Append(DateTime.Now.ToString("dddd yyyy-MM-dd HH:mm")).Append(" (local)");
         AppendCallState(sb);
@@ -76,6 +83,25 @@ sealed class AssistantSession
         foreach (var command in commands)
             sb.Append($"\n- id={command.Id} label=\"{command.Label}\"");
         return sb.ToString();
+    }
+
+    internal const string MemoryRules =
+        "MEMORY: When the user says 'תזכור ש…'/'remember…' about themselves, or corrects how you do " +
+        "something, call remember_about_me. 'תשכח ש…'/'forget…' → forget_about_me. Facts about a client " +
+        "(a caller, a prospect) are never saved with remember_about_me — ask recall_client for what past " +
+        "calls taught about a client.\n";
+
+    static string SafeAboutYou()
+    {
+        try
+        {
+            return Memory.ProfileBook.RenderForPrompt(Memory.MemoryStore.Profile);
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Session context: profile unavailable: {ex.Message}");
+            return "";
+        }
     }
 
     void AppendCallState(StringBuilder sb)
@@ -97,6 +123,8 @@ sealed class AssistantSession
             var body = lastNote.Summary ?? lastNote.Transcript;
             if (body.Length > 350) body = body[..350] + "…";
             sb.Append($"\nLast note about this caller ({lastNote.StartedUtc.ToLocalTime():d MMM}): {body}");
+            var clientBlock = Memory.FactBook.RenderClientBlock(number, Memory.FactBook.ForClient(Memory.MemoryStore.Facts, null, number));
+            if (clientBlock.Length > 0) sb.Append('\n').Append(clientBlock);
         }
         catch (Exception ex)
         {

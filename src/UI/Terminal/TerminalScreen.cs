@@ -6,7 +6,7 @@ using Palon.Terminal;
 
 namespace Palon.UI;
 
-enum TerminalPage { Today, Callbacks, Month, Clients, Templates, Coaching }
+enum TerminalPage { Today, Callbacks, Month, Clients, Templates, Coaching, Memory }
 
 /// <summary>
 /// Everything a screen reads, loaded once per render from the stores on

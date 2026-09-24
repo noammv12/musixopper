@@ -645,4 +645,5 @@ static class Icons
     public const string Maximize = "M6,6 H18 V18 H6 Z";
     public const string Edit = "M4,20 H8 L19,9 A2.1,2.1 0 0 0 15,5 L4,16 Z";
     public const string Coach = "M4,19 H20 M6,19 V14 M10,19 V10 M14,19 V12 M18,19 V6 M5,10 L10,6 L14,8 L19,3";
+    public const string Memory = "M9,4.5 A3,3 0 0 0 6,7.5 A3,3 0 0 0 4,10.5 A3,3 0 0 0 5,13 A3,3 0 0 0 6,17 A3,3 0 0 0 12,18.5 V5.5 A3,3 0 0 0 9,4.5 Z M15,4.5 A3,3 0 0 1 18,7.5 A3,3 0 0 1 20,10.5 A3,3 0 0 1 19,13 A3,3 0 0 1 18,17 A3,3 0 0 1 12,18.5 M12,5.5 A3,3 0 0 1 15,4.5";
 }

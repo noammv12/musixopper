@@ -35,7 +35,9 @@ static class AiChat
     const int MaxTranscriptChars = 100_000;
     const int MaxDictationChars = 8_000;
 
-    static readonly string SummaryPrompt = PalonPersona.Ghostwriting(
+    static readonly string SummaryPrompt = PalonPersona.Ghostwriting(SummaryBody + CoachSpec);
+
+    const string SummaryBody =
         "You write the quick note a salesperson jots down for themselves right after a " +
         "sales call, from its transcript. Reply in the language the transcript is mostly " +
         "in (Hebrew transcript → Hebrew note). One short flowing paragraph, 1–3 sentences, " +
@@ -51,11 +53,16 @@ static class AiChat
         "\"סחר באינטראקטיב ישראל בעבר - יותר רלוונטי לקולמקס פרו רוצה לפתוח חשבון ב2,000$ " +
         "הוסבר על הפרטים ואחזור אליו בימיםה קרובים, נשלח ווצאפ\"\n" +
         "Then, only if the call agreed a specific time to call back (either side promising, " +
-        "e.g. \"אחזור אליך מחר ב-11\", \"call me back in an hour\"), add one final line exactly " +
+        "e.g. \"אחזור אליך מחר ב-11\", \"call me back in an hour\"), add one line (the first trailer) exactly " +
         "like: CALLBACK: {\"when_iso\":\"yyyy-MM-ddTHH:mm\",\"phrase\":\"<the words used>\"," +
         "\"reason\":\"<what to do, few words, transcript language>\"} — when_iso in local time, " +
-        "resolved against the call end time given. Vague timing (\"בימים הקרובים\") gets no line.\n" +
-        CoachSpec);
+        "resolved against the call end time given. Vague timing (\"בימים הקרובים\") gets no line.\n";
+
+    /// <summary>Same prompt with the memory FACTS trailer between CALLBACK and COACH.
+    /// Trailer order: CALLBACK, FACTS, COACH — each on its own line, each optional
+    /// (parsers are line-based, so any order still parses).</summary>
+    static readonly string SummaryPromptWithFacts = PalonPersona.Ghostwriting(
+        SummaryBody + Palon.Memory.FactBook.SummaryInstruction.TrimStart('\n') + "\n" + CoachSpec);
 
     /// <summary>The coaching trailer, asked in the same summary call (no extra request).</summary>
     const string CoachSpec =
@@ -114,15 +121,22 @@ static class AiChat
 
     /// <summary>The summary, or null plus the per-call failure reason —
     /// returned inline so concurrent AI calls can't garble the reason.</summary>
+    /// <param name="withFacts">Also ask for the client-memory FACTS trailer
+    /// (same call — memory never costs an extra request).</param>
+    /// <param name="knownFacts">The client's known facts with integer ids, for "replaces".</param>
     public static Task<(string? Summary, string? Error)> SummarizeAsync(
-        string transcript, CancellationToken ct, DateTime? callEndedLocal = null)
+        string transcript, CancellationToken ct, DateTime? callEndedLocal = null,
+        bool withFacts = false, string? knownFacts = null)
     {
         if (transcript.Length > MaxTranscriptChars) transcript = transcript[..MaxTranscriptChars];
         var header = callEndedLocal is { } ended
             ? $"Call ended: {ended.ToString("dddd yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)} (local time)\n"
             : "";
-        // Room for the note, the CALLBACK line and the COACH JSON.
-        return ChatCoreAsync(SummaryPrompt, header + "Transcript:\n" + transcript, 0.3, 1200, ct,
+        if (withFacts && !string.IsNullOrEmpty(knownFacts)) header += knownFacts + "\n\n";
+        // Room for the note, the CALLBACK line and the COACH JSON (1200); FACTS adds
+        // up to 6 facts with verbatim Hebrew quotes (~60-80 tokens each) → 1700.
+        return ChatCoreAsync(withFacts ? SummaryPromptWithFacts : SummaryPrompt,
+            header + "Transcript:\n" + transcript, 0.3, withFacts ? 1700 : 1200, ct,
             requestTimeoutMs: BackgroundTimeoutMs);
     }
 
@@ -140,6 +154,10 @@ static class AiChat
     /// local numbers and the short note only (no transcript).</summary>
     public static Task<string?> BestCallWhyAsync(string facts, CancellationToken ct) =>
         ChatAsync(BestCallPrompt, facts, 0.4, 120, ct);
+
+    /// <summary>A background memory-inference call (pure JSON reply), or null.</summary>
+    public static Task<string?> MemoryJsonAsync(string systemPrompt, string userContent, CancellationToken ct) =>
+        ChatAsync(systemPrompt, userContent, 0.0, 500, ct, rejectTruncated: true, requestTimeoutMs: BackgroundTimeoutMs);
 
     /// <summary>One-shot element pick for Salesforce step recovery: a short,
     /// deterministic reply ({"ref":"eN"} or {"ref":null}); null on failure.</summary>

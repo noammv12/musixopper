@@ -104,6 +104,20 @@ sealed class Shell : IDisposable
         _assistant.StatusChanged += status => _dock.SetAssistantStatus(status);
         _assistant.Level += _dock.SetVoiceLevel;
         _assistant.ToastRequested += message => _dock.ShowToast(message, paused: false, showIcon: false, important: true);
+        // Memory saved/forgotten from a conversation outside the Terminal:
+        // the dock says so; a click opens the Memory screen to edit or undo.
+        Memory.MemoryStore.Remembered += (item, _) =>
+        {
+            Application.Current?.Dispatcher.InvokeAsync(() => { if (!TerminalWindow.IsForeground)
+                _dock.ShowToast($"Palon זוכר: {item.Text}", paused: false,
+                    onClick: () => TerminalWindow.ShowSingleton(TerminalPage.Memory), showIcon: false, important: true); });
+        };
+        Memory.MemoryStore.Forgotten += (item, _) =>
+        {
+            Application.Current?.Dispatcher.InvokeAsync(() => { if (!TerminalWindow.IsForeground)
+                _dock.ShowToast($"Palon שכח: {item.Text}", paused: false,
+                    onClick: () => TerminalWindow.ShowSingleton(TerminalPage.Memory), showIcon: false, important: true); });
+        };
         _assistant.Answered += (question, answer) =>
         {
             _flyout.SetLastExchange(question, answer);

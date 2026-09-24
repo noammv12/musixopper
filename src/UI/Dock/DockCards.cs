@@ -366,7 +366,7 @@ sealed partial class DockWindow
         });
         var notes = DockKit.Button("הערות", DockKit.Kind.Secondary, () => OpenNotesRequested?.Invoke());
 
-        foreach (var pick in DockText.Picks(CallbackPlanner.QuickPicks(now), note.ProposedCallback, now))
+        foreach (var pick in DockText.Picks(RuledPicks(now, note.Number), note.ProposedCallback, now))
             chipRow.Children.Add(PickChip(pick, () => Book(pick)));
 
         var card = new StackPanel();
@@ -696,6 +696,21 @@ sealed partial class DockWindow
             Swap(confirm, actions);
             RefitCard();
             RefreshDayStats();
+        }
+    }
+
+    /// <summary>Standard chips, moved to obey the user's time-window rules for this caller.</summary>
+    static List<QuickPick> RuledPicks(DateTime now, string? number)
+    {
+        var picks = CallbackPlanner.QuickPicks(now);
+        try
+        {
+            return Palon.Memory.TimeRules.Apply(picks, Palon.Memory.MemoryStore.RulesFor(null, number));
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Dock picks: rule check failed: {ex.Message}");
+            return picks;
         }
     }
 

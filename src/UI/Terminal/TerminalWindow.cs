@@ -151,6 +151,7 @@ sealed class TerminalWindow : Window
         _screens[TerminalPage.Clients] = new ClientsScreen(this);
         _screens[TerminalPage.Templates] = new TemplatesScreen(this);
         _screens[TerminalPage.Coaching] = new CoachingScreen(this);
+        _screens[TerminalPage.Memory] = new MemoryScreen(this);
 
         _clock = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
         _clock.Tick += (_, _) => UpdateClock();
@@ -169,6 +170,9 @@ sealed class TerminalWindow : Window
         TemplatesStore.Changed += OnStoreChanged;
         TemplateLearningStore.Changed += OnStoreChanged;
         CallStatsStore.Changed += OnStoreChanged;
+        Memory.MemoryStore.Changed += OnStoreChanged;
+        Memory.MemoryStore.Remembered += OnRemembered;
+        Memory.MemoryStore.Forgotten += OnForgotten;
 
         PreviewKeyDown += OnKey;
         SourceInitialized += (_, _) => ApplyBackdrop();
@@ -187,6 +191,9 @@ sealed class TerminalWindow : Window
             _toastTimer.Stop();
             _ask?.Cancel();
             CallbackStore.Changed -= OnStoreChanged;
+            Memory.MemoryStore.Changed -= OnStoreChanged;
+            Memory.MemoryStore.Remembered -= OnRemembered;
+            Memory.MemoryStore.Forgotten -= OnForgotten;
             NotesStore.Changed -= OnStoreChanged;
             SalesStore.Changed -= OnStoreChanged;
             TemplatesStore.Changed -= OnStoreChanged;
@@ -457,6 +464,7 @@ sealed class TerminalWindow : Window
         Add(TerminalPage.Clients, "לקוחות", Icons.Clients);
         Add(TerminalPage.Templates, "תבניות", Icons.Templates);
         Add(TerminalPage.Coaching, "אימון", Icons.Coach);
+        Add(TerminalPage.Memory, "זיכרון", Icons.Memory);
 
         row.Children.Add(new Border { Width = 1, Height = 40, Margin = new Thickness(14, 0, 4, 14), Background = Tone.B("#24FFFFFF"), VerticalAlignment = VerticalAlignment.Bottom });
 
@@ -603,7 +611,8 @@ sealed class TerminalWindow : Window
 
     /// <summary>The bottom-center glass pill with a popping green check.
     /// With an action ("בטל"), it stays long enough to use it.</summary>
-    public void Toast(string message, string? actionLabel = null, Action? action = null)
+    public void Toast(string message, string? actionLabel = null, Action? action = null,
+        string? secondLabel = null, Action? second = null)
     {
         _toastTimer.Stop();
         _toastLayer.Children.Clear();
@@ -631,6 +640,17 @@ sealed class TerminalWindow : Window
             }, height: 30, fontSize: 13.5);
             undo.Margin = new Thickness(12, 0, -8, 0);
             row.Children.Add(undo);
+        }
+        if (secondLabel is not null && second is not null)
+        {
+            var extra = Kit.Pill(secondLabel, PillKind.Ghost, () =>
+            {
+                _toastAction = null;
+                HideToast();
+                second();
+            }, height: 30, fontSize: 13.5);
+            extra.Margin = new Thickness(12, 0, -8, 0);
+            row.Children.Add(extra);
         }
         var pill = new Border
         {
@@ -667,6 +687,27 @@ sealed class TerminalWindow : Window
         };
         pill.BeginAnimation(OpacityProperty, fade);
     }
+
+    /// <summary>True while the Terminal is the window the user is looking at —
+    /// memory toasts then show here (with Undo/Edit) instead of on the dock.</summary>
+    internal static bool IsForeground => _instance is { IsActive: true };
+
+    void OnRemembered(Memory.ProfileItem item, string changeId) => Dispatcher.InvokeAsync(() =>
+    {
+        if (!IsActive) return;
+        Toast($"נשמר בזיכרון: {ClipText(item.Text)}", "בטל", () => Memory.MemoryStore.Undo(changeId), "ערוך", () =>
+        {
+            Navigate(TerminalPage.Memory);
+            (_screens[TerminalPage.Memory] as MemoryScreen)?.EditById(item.Id);
+        });
+    });
+
+    void OnForgotten(Memory.ProfileItem item, string changeId) => Dispatcher.InvokeAsync(() =>
+    {
+        if (IsActive) Toast($"נמחק מהזיכרון: {ClipText(item.Text)}", "בטל", () => Memory.MemoryStore.Undo(changeId));
+    });
+
+    static string ClipText(string s) => s.Length > 48 ? s[..48].TrimEnd() + "…" : s;
 
     public void CopyWithToast(string text, string message)
     {

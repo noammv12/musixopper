@@ -207,14 +207,24 @@ sealed class NotesPipeline : IDisposable
                     string? summaryError = null;
                     CallbackProposal? proposal = null;
                     Coaching.CoachData? coach = null;
+                    Memory.FactsPayload? facts = null;
+                    IReadOnlyList<string> idMap = Array.Empty<string>();
+                    var memoryOn = false;
                     if (AiChat.HasKey)
                     {
                         StatusChanged?.Invoke("Summarizing…");
                         // Relative promises ("מחר ב-11") resolve against when the call ended.
                         var endedLocal = (session.EndedUtc ?? session.StartedUtc + session.Duration).ToLocalTime();
-                        (summary, summaryError) = await AiChat.SummarizeAsync(transcript, CancellationToken.None, endedLocal);
+                        memoryOn = !Memory.MemoryStore.Paused;
+                        var (knownFacts, factIds) = memoryOn ? Memory.MemoryStore.KnownFactsFor(number) : ("", new List<string>());
+                        idMap = factIds;
+                        (summary, summaryError) = await AiChat.SummarizeAsync(transcript, CancellationToken.None, endedLocal,
+                            withFacts: memoryOn, knownFacts: knownFacts);
                         if (summary is not null)
                         {
+                            // Trailers are line-based and order-independent; each parser
+                            // strips only its own line, so one failing never loses the others.
+                            (summary, facts) = Memory.FactBook.Extract(summary);
                             string? coachLine;
                             (summary, coachLine) = Coaching.CoachExtract.Split(summary);
                             coach = await ReadCoachAsync(coachLine, transcript);
@@ -225,8 +235,9 @@ sealed class NotesPipeline : IDisposable
                     }
 
                     var durationSec = (int)Math.Max(session.Duration.TotalSeconds, audioLength.TotalSeconds);
+                    var noteId = Guid.NewGuid().ToString("n");
                     var note = new CallNote(
-                        Guid.NewGuid().ToString("n"),
+                        noteId,
                         session.StartedUtc,
                         durationSec,
                         summary,
@@ -248,6 +259,8 @@ sealed class NotesPipeline : IDisposable
                         Log.Write($"Coaching metrics failed: {ex.Message}"); // never costs the note
                     }
                     NotesStore.Add(note);
+                    if (memoryOn && facts is not null)
+                        Memory.MemoryStore.ApplyCallFacts(number, facts, idMap, noteId, session.StartedUtc);
                     NoteReady?.Invoke(note);
                 }
                 catch (Exception ex)
