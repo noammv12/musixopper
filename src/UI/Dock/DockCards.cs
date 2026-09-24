@@ -2,7 +2,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
+using System.Windows.Controls.Primitives;
 using Palon.Notes;
+using Palon.Terminal;
 
 namespace Palon.UI;
 
@@ -374,7 +376,13 @@ sealed partial class DockWindow
         card.Children.Add(confirm);
         var salesforce = DockKit.Button("ל-Salesforce", DockKit.Kind.Secondary, () => DockActions.LogToSalesforce(note, chosen));
         salesforce.ToolTip = "תיעוד השיחה ב-Salesforce: תצוגה מקדימה, אישור, שמירה ובדיקה";
-        card.Children.Add(ButtonRow(copy, notes, salesforce));
+        var buttons = ButtonRow(copy, notes, salesforce);
+        if (TemplateButton(note) is { } template)
+        {
+            template.Margin = new Thickness(0, 0, 8, 8);
+            buttons.Children.Insert(1, template);
+        }
+        card.Children.Add(buttons);
         DockKit.Clickable(undoButton, Undo);
         return card;
 
@@ -433,6 +441,118 @@ sealed partial class DockWindow
             RefitCard();
             RefreshDayStats();
         }
+    }
+
+    /// <summary>
+    /// "העתק תבנית": the template the Terminal would suggest for this call
+    /// (same keyword logic), filled with the client's first name. The small
+    /// chevron opens a popover to copy any other template instead. Every copy
+    /// is logged for template learning.
+    /// </summary>
+    Border? TemplateButton(CallNote note)
+    {
+        List<MessageTemplate> templates;
+        string? who;
+        try
+        {
+            templates = TemplatesStore.Load();
+            who = ClientIndex.NameForPhone(CallbackStore.Load(), note.Number);
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Dock templates load failed: {ex.Message}");
+            return null;
+        }
+        if (templates.Count == 0) return null;
+        var first = TemplateFill.FirstName(who);
+        var suggested = TemplateFill.Suggest(templates, (note.Summary ?? "") + "\n" + note.Transcript);
+
+        var button = DockKit.Button("העתק תבנית", DockKit.Kind.Secondary, null, DockKit.IconCopy);
+        button.ToolTip = suggested is null ? "בחר תבנית להעתקה" : $"{suggested.Title}{(first.Length > 0 ? $" · עם השם {first}" : "")}";
+        var flash = DockKit.Flasher(button, "העתק תבנית");
+        var chevron = DockKit.Text("▾", Font.Lead, DockPalette.Muted);
+        chevron.Margin = new Thickness(8, 0, 0, 0);
+        chevron.ToolTip = "תבנית אחרת";
+        ((StackPanel)button.Child).Children.Add(chevron);
+
+        void Copy(MessageTemplate t)
+        {
+            var text = TemplateFill.Fill(t, first);
+            var ok = TryCopy(text);
+            flash(ok ? "הועתק ✓" : "נכשל");
+            if (ok) TemplateLearningStore.LogCopy(t, who, note.Number, text, null, "dock");
+            ResumeCardIdle();
+        }
+
+        // The chevron (or no suggestion) opens the picker; the rest copies the suggestion.
+        var chevronHit = false;
+        button.PreviewMouseLeftButtonDown += (_, e) => chevronHit = chevron.IsMouseOver;
+        DockKit.Clickable(button, () =>
+        {
+            var pick = chevronHit || suggested is null;
+            chevronHit = false;
+            if (pick) OpenTemplatePicker(button, templates, suggested, first, Copy);
+            else Copy(suggested!);
+        });
+        return button;
+    }
+
+    void OpenTemplatePicker(FrameworkElement anchor, List<MessageTemplate> templates, MessageTemplate? suggested,
+        string first, Action<MessageTemplate> onPick)
+    {
+        PauseCardIdle();
+        var popup = new Popup
+        {
+            PlacementTarget = anchor,
+            Placement = PlacementMode.Bottom,
+            VerticalOffset = 6,
+            AllowsTransparency = true,
+            StaysOpen = false,
+            PopupAnimation = PopupAnimation.Fade,
+        };
+        var list = new StackPanel();
+        var head = DockKit.Text(first.Length > 0 ? $"איזו תבנית? · השם {first} ייכנס לבד" : "איזו תבנית?", Font.Body, DockPalette.Muted);
+        head.FlowDirection = FlowDirection.RightToLeft;
+        head.Margin = new Thickness(10, 4, 10, 6);
+        list.Children.Add(head);
+        foreach (var t in templates)
+        {
+            var fits = t.Id == suggested?.Id;
+            var title = DockKit.Text(t.Title, Font.Lead, null, fits ? FontWeights.SemiBold : FontWeights.Normal);
+            title.FlowDirection = FlowDirection.RightToLeft;
+            var tag = DockKit.Text(fits ? "מתאימה לשיחה" : t.Tag, Font.Body, fits ? DockPalette.HeardText : DockPalette.Faint);
+            tag.FlowDirection = FlowDirection.RightToLeft;
+            var col = new StackPanel();
+            col.Children.Add(title);
+            col.Children.Add(tag);
+            var row = new Border
+            {
+                CornerRadius = new CornerRadius(10), Padding = new Thickness(10, 6, 10, 7), Background = DockPalette.Ghost,
+                Cursor = System.Windows.Input.Cursors.Hand, Child = col,
+            };
+            row.MouseEnter += (_, _) => row.Background = DockPalette.GhostHover;
+            row.MouseLeave += (_, _) => row.Background = DockPalette.Ghost;
+            var picked = t;
+            DockKit.Clickable(row, () =>
+            {
+                popup.IsOpen = false;
+                onPick(picked);
+            });
+            list.Children.Add(row);
+        }
+        popup.Child = new Border
+        {
+            Width = 250,
+            CornerRadius = new CornerRadius(16),
+            Background = Tone.GlassDeep,
+            BorderBrush = DockPalette.Secondary,
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(6),
+            FlowDirection = FlowDirection.RightToLeft,
+            Child = new ScrollViewer { Content = list, MaxHeight = 320, VerticalScrollBarVisibility = ScrollBarVisibility.Auto },
+        };
+        popup.Closed += (_, _) => ResumeCardIdle();
+        popup.IsOpen = true;
     }
 
     static Border PickChip(DockPick pick, Action onPick)

@@ -262,7 +262,11 @@ sealed class TodayScreen : TerminalScreen
         {
             var first = TemplateFill.FirstName(who);
             var t = Kit.Pill("תבנית", PillKind.Accent, () =>
-                Host.CopyWithToast(TemplateFill.Fill(tpl, first), first.Length > 0 ? $"{tpl.Title} הועתקה עם השם {first}" : $"{tpl.Title} הועתקה"), height: 30, fontSize: 12.5);
+            {
+                var filled = TemplateFill.Fill(tpl, first);
+                Host.CopyWithToast(filled, first.Length > 0 ? $"{tpl.Title} הועתקה עם השם {first}" : $"{tpl.Title} הועתקה");
+                TemplateLearningStore.LogCopy(tpl, who, note.Number, filled, null, "today");
+            }, height: 30, fontSize: 12.5);
             t.Margin = new Thickness(6, 0, 0, 0);
             t.ToolTip = tpl.Title;
             buttons.Children.Add(t);

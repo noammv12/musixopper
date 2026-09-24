@@ -19,6 +19,42 @@ sealed class MessageTemplate
     public TemplateMode Mode { get; set; } = TemplateMode.Prepend;
     public string Head { get; set; } = "";
     public string Text { get; set; } = "";
+    /// <summary>Bumped on every saved change to the wording; sends are logged
+    /// against it so edit mining compares like with like.</summary>
+    public int Version { get; set; } = 1;
+    /// <summary>Earlier versions, oldest first.</summary>
+    public List<TemplateRevision> History { get; set; } = new();
+
+    public MessageTemplate Clone() => new()
+    {
+        Id = Id, Title = Title, Tag = Tag, Region = Region, Mode = Mode, Head = Head, Text = Text,
+        Version = Version, History = History.ToList(),
+    };
+}
+
+/// <summary>A past version of a template, kept so any change can be undone.</summary>
+sealed record TemplateRevision(int Version, string Title, string Text, DateTime SavedUtc, string Reason = "");
+
+static class TemplateVersions
+{
+    public const int MaxHistory = 30;
+
+    /// <summary>Pure. Saving over <paramref name="old"/>: when the wording or
+    /// title changed, the old one goes to history and the version goes up.</summary>
+    public static MessageTemplate Next(MessageTemplate? old, MessageTemplate updated, DateTime nowUtc, string reason = "")
+    {
+        var t = updated.Clone();
+        if (old is null) return t;
+        t.History = old.History.ToList();
+        t.Version = old.Version;
+        if (old.Text != t.Text || old.Title != t.Title)
+        {
+            t.History.Add(new TemplateRevision(old.Version, old.Title, old.Text, nowUtc, reason));
+            if (t.History.Count > MaxHistory) t.History.RemoveRange(0, t.History.Count - MaxHistory);
+            t.Version = old.Version + 1;
+        }
+        return t;
+    }
 }
 
 /// <summary>A filled template split around the inserted name, so the
@@ -110,6 +146,7 @@ static class TemplatesStore
             var envelope = JsonSerializer.Deserialize<Envelope>(File.ReadAllText(FilePath), JsonOptions);
             if (envelope?.Templates is null) throw new JsonException("no templates array");
             envelope.Templates.RemoveAll(t => t is null);
+            foreach (var t in envelope.Templates) t.History ??= new();
             return envelope.Templates;
         }
         catch (Exception ex)
@@ -121,10 +158,10 @@ static class TemplatesStore
 
     public static List<MessageTemplate> Load() => Read() ?? TemplateSeeds.Create();
 
-    public static bool Save(MessageTemplate template) => Mutate(list =>
+    public static bool Save(MessageTemplate template, string reason = "") => Mutate(list =>
     {
         var i = list.FindIndex(t => t.Id == template.Id);
-        if (i >= 0) list[i] = template;
+        if (i >= 0) list[i] = TemplateVersions.Next(list[i], template, DateTime.UtcNow, reason);
         else list.Add(template);
     });
 

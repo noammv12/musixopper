@@ -107,3 +107,11 @@ Log-odds with a Dirichlet prior (Monroe et al. 2008), at least 8 occurrences; be
 - **MVP:** profile Markdown blocks + memory_edit tool + undo; client facts with bitemporal invalidation in SQLite FTS5; Silero metrics; objection schema; paid-key/consent gate.
 - **v2:** debounced inferred suggestions; e5 hybrid retrieval; template clustering and outcome stats.
 - **v3:** coaching drills.
+
+## C) Template learning — as built (v1)
+- Log: `%LOCALAPPDATA%\Palon\template_learning.json` (`TemplateLearningStore`). Every copy from Dock ("העתק תבנית"), Today and Templates is logged with template id + version, client name/phone, time, and the final text when it was changed in Palon's "שנה והעתק" / "הודעה חופשית" sheet. Edits made later inside WhatsApp are not visible.
+- Outcomes: deposit = a deal in SalesStore for the same client (name match: equal or same first two words) within 14 days; next call = a CallStats record with the same number (last 9 digits) within 14 days. WhatsApp replies are not observable. Sends from the Templates screen carry only the typed first name and no phone, so they rarely link.
+- Edit mining: name-neutral line LCS diff (own implementation, no DiffPlex), hashed signature per template version; 3+ identical edits → proposal card with a red/green diff (accept / edit first / reject). Decisions are remembered by key, never re-suggested.
+- Free-text clustering: word-set Jaccard ≥ 0.5, single link, 3+ → "new template?" card with the most typical message, name removed.
+- Stats on a template card only after 20 uses: uses · deposits within 14d · rate (Wilson lower bound in tooltip).
+- Templates carry `Version` + `History` (last 30); the editor lists earlier versions with restore.

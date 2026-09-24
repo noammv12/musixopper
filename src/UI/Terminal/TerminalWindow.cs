@@ -166,6 +166,7 @@ sealed class TerminalWindow : Window
         NotesStore.Changed += OnStoreChanged;
         SalesStore.Changed += OnStoreChanged;
         TemplatesStore.Changed += OnStoreChanged;
+        TemplateLearningStore.Changed += OnStoreChanged;
         CallStatsStore.Changed += OnStoreChanged;
 
         PreviewKeyDown += OnKey;
@@ -188,6 +189,7 @@ sealed class TerminalWindow : Window
             NotesStore.Changed -= OnStoreChanged;
             SalesStore.Changed -= OnStoreChanged;
             TemplatesStore.Changed -= OnStoreChanged;
+            TemplateLearningStore.Changed -= OnStoreChanged;
             CallStatsStore.Changed -= OnStoreChanged;
         };
     }
