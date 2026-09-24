@@ -310,8 +310,8 @@ static class AgenticRouter
 
     static readonly Dictionary<string, string> PageTitles = new()
     {
-        ["today"] = "היום", ["callbacks"] = "חזרות", ["month"] = "החודש", ["clients"] = "לקוחות",
-        ["templates"] = "תבניות", ["coaching"] = "אימון", ["memory"] = "זיכרון", ["settings"] = "הגדרות",
+        ["today"] = "עכשיו", ["callbacks"] = "חזרות", ["month"] = "החודש", ["clients"] = "לקוחות",
+        ["templates"] = "תבניות", ["coaching"] = "אימון", ["memory"] = "זיכרון", ["settings"] = "הגדרות", ["calls"] = "שיחות",
     };
 
     static CommandPreview? Open(ParsedCommand p, WorkSnapshot s)
@@ -408,9 +408,10 @@ static class AgenticRouter
         {
             var (text, error) = await FollowUpDrafts.GetOrCreateAsync(s, card, p.Text, ct);
             if (text is null) return error;
-            AgenticHost.CopyText(text);
-            AgenticHost.ShowText?.Invoke($"הודעה ל{card.Name}", text);
-            return text;
+            var copied = AgenticHost.CopyText(text);
+            if (AgenticHost.ShowText is null) return text;
+            AgenticHost.ShowText($"הודעה ל{card.Name}", text);
+            return copied ? "ההודעה הועתקה — מוכנה להדבקה" : null;
         });
     }
 

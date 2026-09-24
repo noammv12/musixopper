@@ -62,6 +62,13 @@ sealed class ClientsScreen : TerminalScreen
         Children.Add(_page);
     }
 
+    /// <summary>Opens on one client (the command bar's "open Dana" → the search pre-filled).</summary>
+    public void ShowClient(string name)
+    {
+        _search.Text = name;
+        _search.CaretIndex = name.Length;
+    }
+
     public override string Title => "לקוחות";
 
     public override void Render(TermData d, bool entrance)

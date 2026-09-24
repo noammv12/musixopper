@@ -28,6 +28,7 @@ sealed partial class NowScreen : TerminalScreen
     readonly Border _heroGlow;
     readonly TextBlock _speech;
     readonly StackPanel _nudges = new();
+    readonly ContentControl _result = new() { Focusable = false };
     readonly StackPanel _heroExtras = new();
     readonly DispatcherTimer _typer = new() { Interval = TimeSpan.FromMilliseconds(28) };
     readonly DispatcherTimer _moodSettle = new();
@@ -103,6 +104,8 @@ sealed partial class NowScreen : TerminalScreen
         hero.Children.Add(_speech);
         _heroExtras.Margin = new Thickness(0, 14, 0, 0);
         hero.Children.Add(_heroExtras);
+        _result.Margin = new Thickness(0, 10, 0, 0);
+        hero.Children.Add(_result);
         _nudges.Margin = new Thickness(0, 10, 0, 0);
         hero.Children.Add(_nudges);
         var heroCell = new Grid();
@@ -201,7 +204,8 @@ sealed partial class NowScreen : TerminalScreen
         var calls = CallStatsStore.Load();
         var handled = _state.Handled.Keys.ToHashSet();
         _cards = NowStack.Build(d.Callbacks, d.Notes, templates, handled, d.Now);
-        _dayRings = DayRings.Build(calls, d.Callbacks, d.Book, d.Stats, d.Now);
+        _cards = _cards.Concat(PlanCards(d, templates, handled)).Take(NowStack.MaxCards).ToList();
+        _dayRings = DayRings.Build(calls, d.Callbacks, d.Book, d.Stats, d.Now, Settings.CallsGoal);
         var animate = Fx.Allowed(Host);
 
         RenderPay(d, entrance && animate);
@@ -216,6 +220,29 @@ sealed partial class NowScreen : TerminalScreen
         {
             _ritualsChecked = true;
             Dispatcher.BeginInvoke(DispatcherPriority.Background, () => OpeningRituals(d));
+        }
+    }
+
+    /// <summary>The brain's plan items that belong on the stack (see NowStack.FromPlan).</summary>
+    IEnumerable<NowCard> PlanCards(TermData d, IReadOnlyList<Terminal.MessageTemplate> templates, ISet<string> handled)
+    {
+        try
+        {
+            var snapshot = AgenticRouter.Snapshot();
+            var plan = NextSteps.Plan(snapshot);
+            var notes = d.Notes.ToDictionary(n => n.Id);
+            return NowStack.FromPlan(plan, templates, handled, _cards,
+                item => item.NoteId is { } id && notes.TryGetValue(id, out var n)
+                    ? BuyingSignals.Detect(n).Select(BuyingSignals.TemplateFor).FirstOrDefault(t => t is not null)
+                    : null,
+                item => item.NoteId is { } id && snapshot.NamedClients.FirstOrDefault(c => c.Name == item.Who) is { } card
+                    ? FollowUpDrafts.Cached(card.Key, id)?.Text
+                    : null);
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Now plan cards failed: {ex.Message}");
+            return Array.Empty<NowCard>();
         }
     }
 
@@ -294,6 +321,52 @@ sealed partial class NowScreen : TerminalScreen
         _moodSettle.Stop();
         _moodSettle.Interval = TimeSpan.FromMilliseconds(soft ? 1200 : 1800);
         _moodSettle.Start();
+    }
+
+    // ---- result card (AgenticHost.ShowText) ----------------------------------------------
+
+    /// <summary>A longer answer from the brain (a draft, a brief, a search, a client summary):
+    /// a glass card under Palon with Copy and close. One at a time — a new one replaces it.</summary>
+    public void ShowResult(string title, string body)
+    {
+        var card = Fx.Glass2(22, new Thickness(16, 14, 16, 14));
+        var col = new StackPanel();
+        var head = Kit.T(title, 12.5, Tone.TextSoft, FontWeights.SemiBold);
+        head.VerticalAlignment = VerticalAlignment.Center;
+        var close = Kit.IconButton(Icons.Close, 24, () => CloseResult(card), icon: 11);
+        System.Windows.Automation.AutomationProperties.SetName(close, "סגור");
+        col.Children.Add(Kit.Bar(head, close));
+        var text = new TextBox
+        {
+            Text = body, IsReadOnly = true, TextWrapping = TextWrapping.Wrap, BorderThickness = new Thickness(0),
+            Background = Brushes.Transparent, Foreground = Tone.Text, FontFamily = Font.Family, FontSize = 14,
+            Template = Kit.BareTextBoxTemplate(multiline: true), FocusVisualStyle = null,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, MaxHeight = 260, Margin = new Thickness(0, 6, 0, 0),
+            // Mixed Hebrew/English text: let each paragraph pick its own direction.
+            FlowDirection = Bidi.HasRtl(body) ? FlowDirection.RightToLeft : FlowDirection.LeftToRight,
+        };
+        col.Children.Add(text);
+        var copy = Kit.Pill("העתק", PillKind.Secondary, () => Host.CopyWithToast(body, "הועתק"), height: 32, fontSize: 13);
+        copy.HorizontalAlignment = HorizontalAlignment.Left;
+        copy.Margin = new Thickness(0, 10, 0, 0);
+        col.Children.Add(copy);
+        card.Child = col;
+        _result.Content = card;
+        Say(title, quiet: true, holdMs: 6000);
+        if (Fx.Allowed(Host)) Kit.Rise(new[] { card });
+    }
+
+    void CloseResult(Border card)
+    {
+        if (!ReferenceEquals(_result.Content, card)) return;
+        if (!Fx.Allowed(Host))
+        {
+            _result.Content = null;
+            return;
+        }
+        var fade = Feel.To(0, 200, Motion.Out);
+        fade.Completed += (_, _) => { if (ReferenceEquals(_result.Content, card)) _result.Content = null; };
+        card.BeginAnimation(OpacityProperty, fade);
     }
 
     // ---- nudges (NudgeHub) -------------------------------------------------------------

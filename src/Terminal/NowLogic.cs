@@ -7,7 +7,7 @@ namespace Palon.Terminal;
 // rings, the pay streak, the rituals' timing, the command bar's palette and
 // Palon's contextual line. No WPF, no disk — everything here is unit-tested.
 
-enum NowKind { Callback, Heard, Salesforce, FollowUp }
+enum NowKind { Callback, Heard, Salesforce, FollowUp, NextStep, Draft }
 
 /// <summary>
 /// One card in the Now action stack. Only things the user asked for (a callback
@@ -107,6 +107,49 @@ static class NowStack
         return cards.Take(MaxCards).ToList();
     }
 
+    /// <summary>
+    /// Cards from the brain's plan (NextSteps.Plan) that the stack doesn't already hold — only
+    /// work tied to something said or prepared, never "call X now": an agreed next step with
+    /// nothing booked, a buying signal with a template to send, a follow-up Palon already drafted.
+    /// Promises, overdue callbacks and heard proposals are skipped (the callback/heard cards own them).
+    /// </summary>
+    public static List<NowCard> FromPlan(
+        IEnumerable<Palon.Agentic.PlanItem> plan,
+        IReadOnlyList<MessageTemplate> templates,
+        ISet<string> handled,
+        IReadOnlyCollection<NowCard> existing,
+        Func<Palon.Agentic.PlanItem, string?> templateIdFor,
+        Func<Palon.Agentic.PlanItem, string?> draftFor)
+    {
+        var cards = new List<NowCard>();
+        var taken = existing.Select(c => c.NoteId).OfType<string>().ToHashSet();
+        foreach (var item in plan)
+        {
+            if (item.NoteId is not { } noteId || taken.Contains(noteId)) continue;
+            NowCard? card = null;
+            switch (item.Kind)
+            {
+                case Palon.Agentic.PlanKind.UnbookedNextStep:
+                    card = new NowCard("step:" + noteId, NowKind.NextStep, "סוכם צעד הבא · אין חזרה ביומן", item.Who,
+                        item.Why, Array.Empty<string>(), "קבע חזרה למחר", new[] { "לא צריך" }, NoteId: noteId);
+                    break;
+                case Palon.Agentic.PlanKind.BuyingSignal when templateIdFor(item) is { } tid && templates.FirstOrDefault(t => t.Id == tid) is { } tpl:
+                    card = new NowCard("signal:" + noteId, NowKind.FollowUp, "סימן קנייה · " + item.Why, item.Who,
+                        $"{tpl.Title} · מוכנה עם השם", Array.Empty<string>(), "העתק " + tpl.Title, new[] { "לא עכשיו" },
+                        NoteId: noteId, TemplateId: tpl.Id);
+                    break;
+                case Palon.Agentic.PlanKind.SilentLead when draftFor(item) is { Length: > 0 } draft:
+                    card = new NowCard("draft:" + noteId, NowKind.Draft, "הודעת המשך מוכנה", item.Who, item.Why,
+                        Lines(draft, 2), "העתק הודעה", new[] { "לא צריך" }, NoteId: noteId);
+                    break;
+            }
+            if (card is null || handled.Contains(card.Id)) continue;
+            taken.Add(noteId);
+            cards.Add(card);
+        }
+        return cards;
+    }
+
     static string Who(IEnumerable<Callback> callbacks, CallNote note) =>
         ClientIndex.NameForPhone(callbacks, note.Number) ?? note.Number ?? "שיחה";
 
@@ -131,10 +174,12 @@ static class DayRings
 {
     public const int DefaultCallsGoal = 40;
 
-    /// <summary>Calls goal: 10% above the average of the last 5 prior days with calls,
-    /// rounded up to 5 — so the ring stretches the rep a little, never absurdly.</summary>
-    public static int CallsGoal(IEnumerable<CallRecord> calls, DateTime nowLocal)
+    /// <summary>Calls goal: the user's own (Settings.CallsGoal) when set; otherwise 10% above
+    /// the average of the last 5 prior days with calls, rounded up to 5 — so the ring stretches
+    /// the rep a little, never absurdly. Shared by the Now window and the dock.</summary>
+    public static int CallsGoal(IEnumerable<CallRecord> calls, DateTime nowLocal, int? manual = null)
     {
+        if (manual is int m && m > 0) return m;
         var days = calls.Select(c => c.StartedUtc.ToLocalTime().Date)
             .Where(d => d < nowLocal.Date)
             .GroupBy(d => d).OrderByDescending(g => g.Key).Take(5)
@@ -145,12 +190,12 @@ static class DayRings
     }
 
     public static IReadOnlyList<DayRing> Build(
-        IEnumerable<CallRecord> calls, IEnumerable<Callback> callbacks, MonthBook? book, MonthStats? stats, DateTime nowLocal)
+        IEnumerable<CallRecord> calls, IEnumerable<Callback> callbacks, MonthBook? book, MonthStats? stats, DateTime nowLocal, int? callsGoalSetting = null)
     {
         var callList = calls.ToList();
         var today = nowLocal.Date;
         var callsToday = callList.Count(c => c.StartedUtc.ToLocalTime().Date == today);
-        var callsGoal = CallsGoal(callList, nowLocal);
+        var callsGoal = CallsGoal(callList, nowLocal, callsGoalSetting);
 
         var cbs = callbacks.ToList();
         var cleared = cbs.Count(c => c.Status == CallbackStatus.Done && c.CompletedUtc?.ToLocalTime().Date == today);
@@ -277,6 +322,17 @@ static class NowRituals
     }
 
     /// <summary>The three numbered lines of the morning briefing.</summary>
+    /// <summary>The morning curtain's lines from the agentic brief (Rituals.Brief + NextSteps):
+    /// the headline, the pace, then up to two concrete opportunities ("who — why"). At most 4.</summary>
+    public static List<string> BriefItems(Palon.Agentic.DailyBriefData brief)
+    {
+        var items = new List<string> { brief.Headline.TrimEnd('.') };
+        if (brief.Pace is { Length: > 0 } pace) items.Add(pace.TrimEnd('.'));
+        if (brief.TargetMissing) items.Add("חודש חדש — כדאי להגדיר יעד");
+        foreach (var o in brief.Opportunities.Take(2)) items.Add($"{o.Who} — {o.Why}");
+        return items.Take(4).ToList();
+    }
+
     public static List<string> MorningItems(CallbackCounts counts, MonthStats? stats, IReadOnlyList<NowCard> stack)
     {
         var items = new List<string>();
@@ -310,6 +366,8 @@ static class NowLines
                 NowKind.Callback => top.Overdue ? $"ביקשת להזכיר לך: {who} מחכה לחזרה." : $"הגיע הזמן לחזרה שקבעת ל{who}.",
                 NowKind.Heard => top.Quote is { } q ? $"שמעתי את {who}: {q}. לקבוע?" : $"שמעתי ש{who} מחכה לחזרה. לקבוע?",
                 NowKind.Salesforce => $"סיכמתי את השיחה עם {who}. לרשום ב-Salesforce?",
+                NowKind.NextStep => $"סיכמתם צעד הבא עם {who}, ואין חזרה ביומן. לקבוע?",
+                NowKind.Draft => $"ניסחתי ל{who} הודעת המשך. להעתיק?",
                 _ => $"הכנתי ל{who} תבנית עם השם. להעתיק?",
             };
         }

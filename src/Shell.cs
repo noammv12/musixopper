@@ -312,10 +312,41 @@ sealed class Shell : IDisposable
         try
         {
             Palon.Agentic.AgenticHost.IsOnCall = () => _engine.State == CallState.OnCall;
-            Palon.Agentic.AgenticHost.OpenPage = (key, _) => Application.Current?.Dispatcher.InvokeAsync(() =>
-                TerminalWindow.ShowSingleton(Enum.TryParse<TerminalPage>(key, ignoreCase: true, out var page) ? page : null));
+            Palon.Agentic.AgenticHost.OpenPage = (key, arg) => Application.Current?.Dispatcher.InvokeAsync(() =>
+            {
+                TerminalWindow.ShowSingleton();
+                if (Enum.TryParse<TerminalPage>(key, ignoreCase: true, out var page)) TerminalWindow.Instance?.Navigate(page, arg);
+            });
             Palon.Agentic.AgenticHost.LogToSalesforce = (note, callback) =>
                 Application.Current?.Dispatcher.InvokeAsync(() => SalesforceSheets.Open(note, callback));
+            // Longer answers (drafts, briefs, searches, client summaries) land as a result card
+            // next to Palon on Now — opening the window when it's closed.
+            Palon.Agentic.AgenticHost.ShowText = (title, body) => Application.Current?.Dispatcher.InvokeAsync(() =>
+            {
+                if (TerminalWindow.Instance is not { IsVisible: true }) TerminalWindow.ShowSingleton();
+                TerminalWindow.Instance?.Now?.ShowResult(title, body);
+            });
+            // Reversible commands: Undo on Now's toast when it's in front, else on the dock.
+            Palon.Agentic.CommandRouter.UndoOffered += (label, undo) => Application.Current?.Dispatcher.InvokeAsync(() =>
+            {
+                if (TerminalWindow.IsForeground && TerminalWindow.Instance is { } w)
+                {
+                    w.OfferUndo(label, undo);
+                    return;
+                }
+                _dock.ShowToast($"{label} · לחץ לביטול", paused: false, onClick: async () =>
+                {
+                    try
+                    {
+                        _dock.ShowToast(await undo(), paused: false, showIcon: false);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Write($"Undo failed: {ex.Message}");
+                    }
+                }, showIcon: false, important: true);
+            });
+            SettingsScreen.ApplyQuickHotkey = _dock.ApplyQuickCallbackHotkey;
             Palon.Agentic.AgenticRouter.Install();
             Palon.Agentic.NudgeEngine.Start();
         }

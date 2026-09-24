@@ -422,6 +422,11 @@ sealed class CommandBar : StackPanel
         ShowPanel();
         _now.BarMood(PalonMood.Think);
         string? result;
+        // A reversible command raises CommandRouter.UndoOffered; Shell shows that toast (with Undo)
+        // here, so the plain "done" toast would only flash over it.
+        var undoOffered = false;
+        void OnUndo(string _, Func<Task<string>> __) => undoOffered = true;
+        CommandRouter.UndoOffered += OnUndo;
         try
         {
             result = await p.Execute(cts.Token);
@@ -439,11 +444,16 @@ sealed class CommandBar : StackPanel
             _panelBody.Children.Add(Kit.T("זה לא הצליח — ראה לוג.", 14, Tone.RedText));
             return;
         }
+        finally
+        {
+            CommandRouter.UndoOffered -= OnUndo;
+        }
         if (gen != _generation) return;
         _box.Text = "";
         HidePanel();
         _now.BarMood(null);
-        _host.Toast(result ?? "בוצע");
+        // Null = the result is already on screen (a result card, an opened page).
+        if (!undoOffered && result is not null) _host.Toast(result.Length > 90 ? result[..90].TrimEnd() + "…" : result);
         _now.Cheer();
         _host.Refresh();
     }

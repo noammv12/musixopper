@@ -286,6 +286,7 @@ sealed class TerminalWindow : Window
         _screens[TerminalPage.Coaching] = MakeScreen(TerminalPage.Coaching, () => new CoachingScreen(this));
         _screens[TerminalPage.Memory] = MakeScreen(TerminalPage.Memory, () => new MemoryScreen(this));
         _screens[TerminalPage.Calls] = MakeScreen(TerminalPage.Calls, () => new CallsScreen(this));
+        _screens[TerminalPage.Settings] = MakeScreen(TerminalPage.Settings, () => new SettingsScreen(this));
 
         _clock = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
         _clock.Tick += (_, _) => UpdateClock();
@@ -447,6 +448,17 @@ sealed class TerminalWindow : Window
         OpenSide(page);
     }
 
+    /// <summary>Navigate plus an optional argument (a client name for Clients).</summary>
+    public void Navigate(TerminalPage page, string? arg)
+    {
+        Navigate(page);
+        if (page == TerminalPage.Clients && !string.IsNullOrWhiteSpace(arg) && _screens[page] is ClientsScreen clients)
+            clients.ShowClient(arg);
+    }
+
+    /// <summary>The Now screen (for agentic presentation: result cards, nudges).</summary>
+    internal NowScreen? Now => _now as NowScreen;
+
     // ---- side sheets -------------------------------------------------------------
 
     static string SideKicker(TerminalPage page) => page switch
@@ -458,6 +470,7 @@ sealed class TerminalWindow : Window
         TerminalPage.Coaching => "מה עובד לך",
         TerminalPage.Memory => "מה Palon זוכר",
         TerminalPage.Calls => "השיחות האחרונות",
+        TerminalPage.Settings => "Palon שלך",
         _ => "",
     };
 
@@ -769,7 +782,7 @@ sealed class TerminalWindow : Window
         Add("שיחות · Ctrl 8", NowIcons.Wave, () => ToggleSide(TerminalPage.Calls), TerminalPage.Calls);
         col.Children.Add(new Border { Height = 1, Margin = new Thickness(8, 8, 8, 2), Background = Tone.Hairline });
         Add("Salesforce", NowIcons.Cloud, () => SalesforceSheets.Settings(this), null);
-        Add("המוח של Palon", Icons.Gear, () => BrainSheet.Show(this), null);
+        Add("הגדרות · Ctrl 9", Icons.Gear, () => ToggleSide(TerminalPage.Settings), TerminalPage.Settings);
 
         var pill = Kit.Glass(28, new Thickness(8));
         pill.Child = col;
@@ -956,6 +969,21 @@ sealed class TerminalWindow : Window
         pill.BeginAnimation(OpacityProperty, fade);
     }
 
+    /// <summary>An agentic command that can be reversed (CommandRouter.UndoOffered):
+    /// the toast with "בטל"; the undo's own line confirms once reversed.</summary>
+    public void OfferUndo(string label, Func<Task<string>> undo) => Toast(label, "בטל", async () =>
+    {
+        try
+        {
+            Toast(await undo());
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Undo failed: {ex.Message}");
+            Toast("הביטול לא הצליח — ראה לוג");
+        }
+    });
+
     /// <summary>True while the Terminal is the window the user is looking at —
     /// memory toasts then show here (with Undo/Edit) instead of on the dock.</summary>
     internal static bool IsForeground => _instance is { IsActive: true };
@@ -1018,7 +1046,8 @@ sealed class TerminalWindow : Window
                 Key.D5 => TerminalPage.Templates,
                 Key.D6 => TerminalPage.Coaching,
                 Key.D7 => TerminalPage.Memory,
-                Key.D8 => (TerminalPage?)TerminalPage.Calls,
+                Key.D8 => TerminalPage.Calls,
+                Key.D9 => (TerminalPage?)TerminalPage.Settings,
                 _ => null,
             };
             if (page is TerminalPage p && !OverlayOpen && !CurtainOpen)

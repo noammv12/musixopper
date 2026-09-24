@@ -268,6 +268,8 @@ public class DockQuickTests
         Assert.False(DockCard.DockWorthy(N("b", NudgeKind.Insight)));
         Assert.False(DockCard.DockWorthy(N("c", NudgeKind.Suggestion)));
         Assert.True(DockCard.DockWorthy(new Nudge("d", NudgeKind.Suggestion, "t", "כן", () => Task.CompletedTask, Now)));
+        // The dock's own callback-due card covers a missed callback — never both.
+        Assert.False(DockCard.DockWorthy(N("missed:cb1:202609241000", NudgeKind.Reminder)));
     }
 
     [Fact]

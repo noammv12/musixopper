@@ -32,6 +32,11 @@ static class DockActions
 
     /// <summary>"Log to Salesforce" for a finished call (note + the callback the user booked, if any).</summary>
     public static Action<CallNote, DateTime?> LogToSalesforce { get; set; } = (_, _) => { };
+
+    /// <summary>Raised by the Settings sheet when a dock-visible setting changed (pins, calls goal).</summary>
+    public static event Action? SettingsChanged;
+
+    public static void NotifySettingsChanged() => SettingsChanged?.Invoke();
 }
 
 enum DockCardKind { AfterCall, CallbackDue, Nudge }
@@ -53,8 +58,10 @@ sealed record DockCard(DockCardKind Kind, CallNote? Note = null, Callback? Callb
     /// <summary>The dock shows only high-priority nudges: reminders, and
     /// suggestions that offer an action. Insights live in the Now window.</summary>
     public static bool DockWorthy(Palon.Agentic.Nudge nudge) =>
-        nudge.Kind == Palon.Agentic.NudgeKind.Reminder
-        || (nudge.Kind == Palon.Agentic.NudgeKind.Suggestion && nudge.Act is not null);
+        // A missed callback already has the dock's own callback-due card (CallbackScheduler) — never both.
+        !nudge.Id.StartsWith("missed:", StringComparison.Ordinal) &&
+        (nudge.Kind == Palon.Agentic.NudgeKind.Reminder
+        || (nudge.Kind == Palon.Agentic.NudgeKind.Suggestion && nudge.Act is not null));
 
     public static DockCard ForNote(CallNote note) => new(DockCardKind.AfterCall, Note: note);
     public static DockCard ForCallback(Callback callback, bool missed) => new(DockCardKind.CallbackDue, Callback: callback, Missed: missed);

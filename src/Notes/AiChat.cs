@@ -97,6 +97,11 @@ static class AiChat
         "the next steps that were promised, then pending reminders if any. Plain text — no emoji, " +
         "no headings, no bullets.");
 
+    static readonly string BriefPrompt = PalonPersona.Speaking(
+        "You turn the user's morning brief (plain facts) into Palon's spoken opener. Reply in the brief's language " +
+        "(Hebrew → Hebrew). One or two short sentences, warm and concrete — mention the single most important thing. " +
+        "Never invent facts that are not in the brief. Plain text — no emoji, no lists.");
+
     static readonly string FollowUpPrompt = PalonPersona.Ghostwriting(
         "You draft the short follow-up message a salesperson sends right after a call, " +
         "WhatsApp style. Write in the language of the notes (Hebrew notes → Hebrew " +
@@ -176,6 +181,10 @@ static class AiChat
     /// <summary>The end-of-day recap, or null when unavailable.</summary>
     public static Task<string?> RecapAsync(string activityData, CancellationToken ct) =>
         ChatAsync(RecapPrompt, activityData, 0.4, 500, ct);
+
+    /// <summary>Palon's spoken morning opener from the local brief text, or null when unavailable.</summary>
+    public static Task<string?> BriefAsync(string briefText, CancellationToken ct) =>
+        ChatAsync(BriefPrompt, briefText, 0.5, 160, ct);
 
     /// <summary>A paste-ready follow-up message, or null when unavailable.</summary>
     public static Task<string?> FollowUpAsync(string noteText, CancellationToken ct)

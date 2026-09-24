@@ -17,6 +17,40 @@ public class NowStackTests
         new(id, startLocal.ToUniversalTime(), seconds, summary, transcript, "ok", "0505550186", ProposedCallback: heard);
 
     [Fact]
+    public void PlanCards_OnlyPreparedWork_NeverGenericCalls()
+    {
+        var plan = new[]
+        {
+            new Palon.Agentic.PlanItem(Palon.Agentic.PlanKind.Promise, Now, "דני", null, "חזרה", "", CallbackId: "c1", NoteId: "n0"),
+            new Palon.Agentic.PlanItem(Palon.Agentic.PlanKind.UnbookedNextStep, null, "מאיה", null, "סוכם: לשלוח חוזה", "", NoteId: "n1"),
+            new Palon.Agentic.PlanItem(Palon.Agentic.PlanKind.BuyingSignal, null, "רון", null, "שאל על מינימום", "", NoteId: "n2"),
+            new Palon.Agentic.PlanItem(Palon.Agentic.PlanKind.SilentLead, null, "גל", null, "שקט 5 ימים", "", NoteId: "n3"),
+            new Palon.Agentic.PlanItem(Palon.Agentic.PlanKind.SilentLead, null, "נועה", null, "שקט 6 ימים", "", NoteId: "n4"),
+        };
+        var tpl = Templates[0];
+        var cards = NowStack.FromPlan(plan, Templates, new HashSet<string>(), Array.Empty<NowCard>(),
+            i => i.NoteId == "n2" ? tpl.Id : null,
+            i => i.NoteId == "n3" ? "היי גל, רציתי לבדוק" : null);
+        Assert.Equal(new[] { "step:n1", "signal:n2", "draft:n3" }, cards.Select(c => c.Id));
+        Assert.Equal(tpl.Id, cards[1].TemplateId);
+    }
+
+    [Fact]
+    public void PlanCards_SkipHandledAndNotesAlreadyOnTheStack()
+    {
+        var plan = new[] { new Palon.Agentic.PlanItem(Palon.Agentic.PlanKind.UnbookedNextStep, null, "מאיה", null, "סוכם", "", NoteId: "n1") };
+        var existing = new[] { new NowCard("tpl:n1", NowKind.FollowUp, "", "מאיה", "", Array.Empty<string>(), "", Array.Empty<string>(), NoteId: "n1") };
+        Assert.Empty(NowStack.FromPlan(plan, Templates, new HashSet<string>(), existing, _ => null, _ => null));
+        Assert.Empty(NowStack.FromPlan(plan, Templates, new HashSet<string> { "step:n1" }, Array.Empty<NowCard>(), _ => null, _ => null));
+    }
+
+    [Fact]
+    public void CallsGoal_UserSettingWins()
+    {
+        Assert.Equal(25, DayRings.CallsGoal(Array.Empty<CallRecord>(), Now, 25));
+    }
+
+    [Fact]
     public void Stack_HoldsOnlyDueCallbacks_NotFutureOnes()
     {
         var cards = NowStack.Build(new[]

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Windows;
+using Palon.Agentic;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -43,6 +44,7 @@ sealed partial class NowScreen
         NowKind.Callback => NowIcons.Phone,
         NowKind.Heard => NowIcons.Wave,
         NowKind.Salesforce => NowIcons.Cloud,
+        NowKind.NextStep => NowIcons.Phone,
         _ => NowIcons.Send,
     };
 
@@ -285,6 +287,25 @@ sealed partial class NowScreen
                     Handle(c, null);
                     if (secondary is null) SalesforceSheets.LogCall(Host, note, null);
                     return;
+                case NowKind.NextStep when secondary is null:
+                {
+                    var when = CallbackPlanner.NextWorkMorning(DateTime.Now);
+                    var phone = note?.Number;
+                    var cb = Host.Quietly(() => CallbackStore.Add(c.Sub, when.ToUniversalTime(), name: c.Who.Any(char.IsAsciiDigit) ? null : c.Who,
+                        phone: phone, url: Phones.WaMeUrl(phone) ?? "", source: CallbackSource.Manual, callNoteId: c.NoteId));
+                    Handle(c, cb is null ? "לא הצלחתי לקבוע — ראה לוג" : $"קבעתי · {He.When(when, DateTime.Now)}");
+                    if (cb is not null) Host.Toast($"חזרה ל{c.Who} · {He.When(when, DateTime.Now)}", "בטל", () => CallbackStore.Remove(cb.Id));
+                    return;
+                }
+                case NowKind.Draft when secondary is null:
+                {
+                    var snapshot = AgenticRouter.Snapshot();
+                    var text = snapshot.NamedClients.FirstOrDefault(x => x.Name == c.Who) is { } card && c.NoteId is { } nid
+                        ? FollowUpDrafts.Cached(card.Key, nid)?.Text : null;
+                    if (text is not null) Host.CopyWithToast(text, $"ההודעה ל{c.Who} הועתקה · מוכנה להדבקה");
+                    Handle(c, null);
+                    return;
+                }
                 case NowKind.FollowUp:
                     if (secondary is null && c.TemplateId is { } tid && TemplatesStore.Load().FirstOrDefault(t => t.Id == tid) is { } tpl)
                         CopyTemplate(tpl, c.Who, "now-card", note?.Number);

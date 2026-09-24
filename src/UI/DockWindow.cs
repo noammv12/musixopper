@@ -210,6 +210,8 @@ sealed partial class DockWindow : Window
         CallbackStore.Changed += OnCallbacksChanged;
         Palon.Sales.SalesStore.Changed += OnStoresChanged;
         Palon.Notes.NotesStore.Changed += OnStoresChanged;
+        CallStatsStore.Changed += OnStoresChanged;
+        DockActions.SettingsChanged += OnDockSettingsChanged;
         TemplatesStore.Changed += OnTemplatesChanged;
         Palon.Agentic.NudgeHub.Raised += OnNudgeRaised;
         Palon.Agentic.NudgeHub.Dismissed += OnNudgeDismissed;
@@ -463,6 +465,8 @@ sealed partial class DockWindow : Window
         CallbackStore.Changed -= OnCallbacksChanged;
         Palon.Sales.SalesStore.Changed -= OnStoresChanged;
         Palon.Notes.NotesStore.Changed -= OnStoresChanged;
+        CallStatsStore.Changed -= OnStoresChanged;
+        DockActions.SettingsChanged -= OnDockSettingsChanged;
         TemplatesStore.Changed -= OnTemplatesChanged;
         Palon.Agentic.NudgeHub.Raised -= OnNudgeRaised;
         Palon.Agentic.NudgeHub.Dismissed -= OnNudgeDismissed;

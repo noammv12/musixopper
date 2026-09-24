@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using Palon.Notes;
 using Palon.Terminal;
 
 namespace Palon.UI;
@@ -127,7 +128,14 @@ sealed partial class NowScreen
         col.Children.Add(date);
         var hello = new TextBlock { FontFamily = Font.Family, FontSize = 42, FontWeight = FontWeights.SemiBold, Foreground = Tone.Text, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 6, 0, 0), MinHeight = 56 };
         col.Children.Add(hello);
-        var items = NowRituals.MorningItems(d.Counts, d.Stats, _cards);
+        var persona = Kit.T("", 16, Tone.MutedSoft, wrap: true);
+        persona.TextAlignment = TextAlignment.Center;
+        persona.MaxWidth = 520;
+        persona.HorizontalAlignment = HorizontalAlignment.Center;
+        persona.Margin = new Thickness(0, 10, 0, 0);
+        persona.Visibility = Visibility.Collapsed;
+        col.Children.Add(persona);
+        var (items, brief) = MorningBrief(d);
         var list = new StackPanel { Margin = new Thickness(0, 22, 0, 0) };
         var rows = new List<FrameworkElement>();
         for (var i = 0; i < items.Count; i++)
@@ -136,7 +144,8 @@ sealed partial class NowScreen
             var n = Kit.Mono((i + 1).ToString("00"), 13, Tone.Faint);
             n.VerticalAlignment = VerticalAlignment.Center;
             row.Children.Add(n);
-            var t = Kit.T(items[i], 17, Tone.TextSoft);
+            var t = Kit.T(items[i], 17, Tone.TextSoft, wrap: true);
+            t.MaxWidth = 500;
             t.Margin = new Thickness(14, 0, 0, 0);
             row.Children.Add(t);
             list.Children.Add(row);
@@ -177,8 +186,51 @@ sealed partial class NowScreen
             hello.Text = text;
             avatar.Mood = PalonMood.Idle;
         }
-        close = Host.ShowCurtain(col, dark: false, onClosed: () => Say(HeroLine()));
+        var personaCts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+        close = Host.ShowCurtain(col, dark: false, onClosed: () =>
+        {
+            personaCts.Cancel();
+            Say(HeroLine());
+        });
+        if (brief is not null && AiChat.HasKey) _ = PersonaLine(brief, persona, personaCts.Token);
         Dispatcher.BeginInvoke(DispatcherPriority.Input, () => go.Focus());
+    }
+
+    /// <summary>The morning lines from the agentic brief (Rituals.Brief + NextSteps.Plan);
+    /// the older local list when the brain can't build one.</summary>
+    (List<string> Items, Agentic.DailyBriefData? Brief) MorningBrief(TermData d)
+    {
+        try
+        {
+            var brief = Agentic.Rituals.Brief(Agentic.AgenticRouter.Snapshot(), Settings.RepName, Agentic.NudgeRules.TipOfTheDay(DateTime.Now));
+            return (NowRituals.BriefItems(brief), brief);
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Morning brief failed, using the local list: {ex.Message}");
+            return (NowRituals.MorningItems(d.Counts, d.Stats, _cards), null);
+        }
+    }
+
+    /// <summary>Palon's own opener (AI, persona voice) — fades in under the greeting when it arrives;
+    /// the local lines already say everything, so a slow or failed call just shows nothing.</summary>
+    async Task PersonaLine(Agentic.DailyBriefData brief, TextBlock target, CancellationToken ct)
+    {
+        try
+        {
+            var line = await AiChat.BriefAsync(brief.ToText(DateTime.Now), ct);
+            if (ct.IsCancellationRequested || string.IsNullOrWhiteSpace(line)) return;
+            target.Text = line.Trim();
+            target.Visibility = Visibility.Visible;
+            if (Fx.Allowed(Host)) Kit.Rise(new[] { target });
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or HttpRequestException or TaskCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Morning persona line failed: {ex.Message}");
+        }
     }
 
     // ---- end of day ------------------------------------------------------------------------------
@@ -231,6 +283,33 @@ sealed partial class NowScreen
             rowEls.Add(row);
         }
         col.Children.Add(rows);
+        // What's still open (unaccepted promises, agreed steps with nothing booked) from the brain's recap.
+        Agentic.DayRecapData? recap = null;
+        try
+        {
+            recap = Agentic.Rituals.Recap(Agentic.AgenticRouter.Snapshot());
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Recap data failed: {ex.Message}");
+        }
+        if (recap is not null && (recap.Highlight is not null || recap.OpenLoops.Count > 0))
+        {
+            var lines = new List<UIElement>();
+            if (recap.Highlight is { } hl) lines.Add(Kit.T(hl, 14, Tone.Text, wrap: true));
+            if (recap.OpenLoops.Count > 0)
+            {
+                lines.Add(Kit.T("נשאר פתוח", 12.5, Tone.Muted, FontWeights.Medium));
+                foreach (var loop in recap.OpenLoops.Take(3)) lines.Add(Kit.T($"• {loop.Who} — {loop.Why}", 13.5, Tone.TextSoft, wrap: true));
+            }
+            var open = new Border
+            {
+                Margin = new Thickness(0, 18, 0, 0), Padding = new Thickness(16, 12, 16, 12), CornerRadius = new CornerRadius(16), Background = Tone.FillSoft,
+                Child = Kit.Col(4, lines.ToArray()),
+            };
+            col.Children.Add(open);
+            rowEls.Add(open);
+        }
         var tipText = d.Book is { } book && d.Stats is { } stats ? MonthView.Insights(book, stats, d.Rules).FirstOrDefault() : null;
         if (tipText is not null)
         {

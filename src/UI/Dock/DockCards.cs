@@ -98,6 +98,9 @@ sealed partial class DockWindow
         Dispatcher.InvokeAsync(() =>
         {
             if (OnCall) return; // nothing new appears on a call
+            // The Now window is in front and already shows it next to Palon — one surface at a time.
+            // (Dismissing on either surface goes through NudgeHub, so both stay in sync.)
+            if (TerminalWindow.IsForeground) return;
             _cards.Enqueue(DockCard.ForNudge(nudge));
             TryShowCard();
         });

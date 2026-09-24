@@ -108,12 +108,13 @@ static class CommandParser
 
     static readonly (string Key, string[] Words)[] Pages =
     {
-        ("today", new[] { "היום", "היום שלי", "בית", "ראשי", "today", "home" }),
+        ("today", new[] { "היום", "היום שלי", "עכשיו", "בית", "ראשי", "today", "now", "home" }),
         ("callbacks", new[] { "חזרות", "תזכורות", "יומן", "callbacks", "reminders" }),
         ("month", new[] { "חודש", "החודש", "מכירות", "עסקאות", "הפקדות", "יעד", "month", "sales", "deals", "target" }),
         ("clients", new[] { "לקוחות", "clients", "customers" }),
         ("templates", new[] { "תבניות", "templates" }),
-        ("coaching", new[] { "אימון", "קואצינג", "קואצ'ינג", "שיחות", "coaching", "coach" }),
+        ("coaching", new[] { "אימון", "קואצינג", "קואצ'ינג", "coaching", "coach" }),
+        ("calls", new[] { "שיחות", "השיחות", "שיחות אחרונות", "calls" }),
         ("memory", new[] { "זיכרון", "זכרון", "memory" }),
         ("settings", new[] { "הגדרות", "settings", "preferences" }),
     };

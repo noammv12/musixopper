@@ -166,6 +166,8 @@ public class CommandParserTests
     [InlineData("פתח לקוחות", "clients")]
     [InlineData("פתח זיכרון", "memory")]
     [InlineData("פתח Gmail", "cmd:c2")]
+    [InlineData("פתח שיחות", "calls")]
+    [InlineData("פתח הגדרות", "settings")]
     [InlineData("פתח את דני", "client")]
     public void Open(string text, string target)
     {
