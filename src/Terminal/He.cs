@@ -39,7 +39,11 @@ static class He
     /// <summary>"חמישי 24.9 · 14:20" — the menu bar clock.</summary>
     public static string MenuClock(DateTime now) => $"{Day(now.DayOfWeek)} {DayMonth(now)} · {Clock(now)}";
 
-    /// <summary>Greeting by hour, no name: the app never asked for one.</summary>
+    /// <summary>Greeting by hour, with the rep's name when one is set.</summary>
+    public static string Greeting(DateTime now, string? name) =>
+        string.IsNullOrWhiteSpace(name) ? Greeting(now) : $"{Greeting(now)}, {name.Trim()}";
+
+    /// <summary>Greeting by hour, no name.</summary>
     public static string Greeting(DateTime now) => now.Hour switch
     {
         >= 5 and < 12 => "בוקר טוב",

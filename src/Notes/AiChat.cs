@@ -213,17 +213,41 @@ static class AiChat
 
     sealed record Provider(string Name, string Url, string Model, string Key, bool IsGemini);
 
+    const string GeminiUrl = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+    const string DeepSeekUrl = "https://api.deepseek.com/chat/completions";
+
+    static Provider MakeProvider(AiRoute route, string key) => route.Provider == AiModels.Gemini
+        ? new Provider("Gemini", GeminiUrl, route.Model, key, IsGemini: true)
+        : new Provider("DeepSeek", DeepSeekUrl, route.Model, key, IsGemini: false);
+
+    /// <summary>
+    /// A tiny request against one provider with the given key, for the
+    /// settings Test button: latency on success, the error otherwise.
+    /// </summary>
+    public static async Task<(bool Ok, long Ms, string? Error)> TestKeyAsync(string provider, string key, CancellationToken ct)
+    {
+        var model = AiModels.Resolve(Settings.AiModelChoice, provider == AiModels.Gemini, provider == AiModels.DeepSeek,
+            Settings.GeminiModel, Settings.DeepSeekModel)[0];
+        var p = MakeProvider(model, key.Trim());
+        var messages = new object[] { new { role = "user", content = "ping. answer: ok" } };
+        var started = Environment.TickCount64;
+        var (turn, error) = await RequestChatAsync(p, BuildBody(p, messages, 0, 8, tools: null), rejectTruncated: false, ct,
+            retryDelayMs: 300, requestTimeoutMs: InteractiveTimeoutMs);
+        var ms = Environment.TickCount64 - started;
+        return turn is not null ? (true, ms, null) : (false, ms, error.Length > 0 ? error : "no reply");
+    }
+
     static IEnumerable<Provider> Providers()
     {
-        // Gemini first: its free tier absorbs the daily volume; DeepSeek is
-        // the paid fallback. Either alone also works.
-        var all = new List<Provider>(2);
-        if (Settings.GeminiKey is { } gemini)
-            all.Add(new Provider("Gemini",
-                "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-                Settings.GeminiModel, gemini, IsGemini: true));
-        if (Settings.DeepSeekKey is { } deepSeek)
-            all.Add(new Provider("DeepSeek", "https://api.deepseek.com/chat/completions", Settings.DeepSeekModel, deepSeek, IsGemini: false));
+        // Auto: Gemini first (its free tier absorbs the daily volume),
+        // DeepSeek the paid fallback. A picked model makes its provider
+        // primary; the other stays the fallback. Either alone also works.
+        var geminiKey = Settings.GeminiKey;
+        var deepSeekKey = Settings.DeepSeekKey;
+        var all = AiModels.Resolve(Settings.AiModelChoice, geminiKey is not null, deepSeekKey is not null,
+                Settings.GeminiModel, Settings.DeepSeekModel)
+            .Select(r => MakeProvider(r, r.Provider == AiModels.Gemini ? geminiKey! : deepSeekKey!))
+            .ToList();
         // Benched providers go last, not away: they still get a turn when
         // they're all we have, and any success un-benches them. Materialized
         // eagerly — a lazy Concat would re-check cooldowns mid-walk and hand

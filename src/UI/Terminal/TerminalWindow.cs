@@ -285,6 +285,9 @@ sealed class TerminalWindow : Window
         var brand = Kit.T("Palon", 13, Tone.Text, FontWeights.SemiBold);
         brand.FlowDirection = FlowDirection.LeftToRight;
         brand.VerticalAlignment = VerticalAlignment.Center;
+        brand.Cursor = System.Windows.Input.Cursors.Hand;
+        brand.ToolTip = "המוח של Palon";
+        Kit.Clickable(brand, () => BrainSheet.Show(this));
         g.Children.Add(brand);
 
         _menuTitle = Kit.T("", 13, Tone.MutedSoft);
@@ -301,6 +304,13 @@ sealed class TerminalWindow : Window
         _menuClock = Kit.Num("", 13, Tone.Text);
         _menuClock.FlowDirection = FlowDirection.RightToLeft;
         var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        var model = ModelPicker.Pill(this, compact: true);
+        model.Margin = new Thickness(0, 0, 8, 0);
+        right.Children.Add(model);
+        var gear = Kit.IconButton(Icons.Gear, 26, () => BrainSheet.Show(this), icon: 14);
+        gear.ToolTip = "המוח של Palon";
+        gear.Margin = new Thickness(0, 0, 16, 0);
+        right.Children.Add(gear);
         right.Children.Add(_menuDot);
         right.Children.Add(_menuStatus);
         foreach (var t in new[] { _menuProgress, _menuPay, _menuClock })

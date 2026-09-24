@@ -633,6 +633,7 @@ static class Icons
     public const string Month = "M4,20.5 H20 M5,11 H8.2 V17.5 H5 Z M10.4,5.5 H13.6 V17.5 H10.4 Z M15.8,8.5 H19 V17.5 H15.8 Z";
     public const string Clients = "M5.5,8 A3.5,3.5 0 1 1 12.5,8 A3.5,3.5 0 1 1 5.5,8 M2.5,20 A6.5,6.5 0 0 1 15.5,20 M16,4.5 A3.5,3.5 0 0 1 16,11.5 M18,14.5 A6.5,6.5 0 0 1 21.5,20";
     public const string Templates = "M14,3 H7 A2,2 0 0 0 5,5 V19 A2,2 0 0 0 7,21 H17 A2,2 0 0 0 19,19 V8 Z M14,3 V8 H19 M9,13 H15 M9,17 H13";
+    public const string Gear = "M9,12 A3,3 0 1 1 15,12 A3,3 0 1 1 9,12 M12,2.8 V5.2 M12,18.8 V21.2 M2.8,12 H5.2 M18.8,12 H21.2 M5.5,5.5 L7.2,7.2 M16.8,16.8 L18.5,18.5 M5.5,18.5 L7.2,16.8 M16.8,7.2 L18.5,5.5";
     public const string Plus = "M12,5 V19 M5,12 H19";
     public const string Minus = "M5,12 H19";
     public const string Close = "M6,6 L18,18 M18,6 L6,18";

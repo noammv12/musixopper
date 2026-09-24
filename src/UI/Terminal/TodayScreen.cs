@@ -82,7 +82,7 @@ sealed class TodayScreen : TerminalScreen
         _avatar.VerticalAlignment = VerticalAlignment.Center;
         top.Children.Add(_avatar);
         var words = new StackPanel { Margin = new Thickness(22, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-        words.Children.Add(Kit.T(He.Greeting(d.Now), Display.Greeting, Tone.Text, FontWeights.SemiBold));
+        words.Children.Add(Kit.T(He.Greeting(d.Now, Settings.RepName), Display.Greeting, Tone.Text, FontWeights.SemiBold));
         var brief = Kit.T(MonthView.Brief(d.Counts, d.Stats), 15.5, Tone.Body, wrap: true);
         brief.LineHeight = 25;
         brief.Margin = new Thickness(0, 8, 0, 0);
