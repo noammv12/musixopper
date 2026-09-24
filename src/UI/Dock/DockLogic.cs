@@ -29,6 +29,9 @@ static class DockActions
     public static event Action? Changed;
 
     public static bool HasTerminal => _openTerminal is not null;
+
+    /// <summary>"Log to Salesforce" for a finished call (note + the callback the user booked, if any).</summary>
+    public static Action<CallNote, DateTime?> LogToSalesforce { get; set; } = (_, _) => { };
 }
 
 enum DockCardKind { AfterCall, CallbackDue }

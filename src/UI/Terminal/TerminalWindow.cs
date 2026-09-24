@@ -21,6 +21,9 @@ namespace Palon.UI;
 sealed class TerminalWindow : Window
 {
     static TerminalWindow? _instance;
+
+    /// <summary>The open Terminal, if any (for sheets opened from outside, e.g. the dock).</summary>
+    internal static TerminalWindow? Instance => _instance;
     static Func<CallState> _callState = () => CallState.Idle;
     static Func<string?> _currentNumber = () => null;
 
@@ -319,6 +322,9 @@ sealed class TerminalWindow : Window
             t.VerticalAlignment = VerticalAlignment.Center;
             right.Children.Add(t);
         }
+        var salesforce = Kit.Pill("Salesforce", PillKind.Ghost, () => SalesforceSheets.Settings(this), height: 26, fontSize: 12);
+        salesforce.Margin = new Thickness(18, 0, 0, 0);
+        right.Children.Add(salesforce);
         var min = Kit.IconButton(Icons.Minimize, 28, () => WindowState = WindowState.Minimized, icon: 14);
         min.Margin = new Thickness(18, 0, 0, 0);
         var max = Kit.IconButton(Icons.Maximize, 28, ToggleMaximize, icon: 12);

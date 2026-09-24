@@ -40,6 +40,7 @@ sealed class Shell : IDisposable
         _flyout.TerminalRequested += () => TerminalWindow.ShowSingleton();
         TerminalWindow.Configure(() => _engine.State, () => _engine.CurrentNumber);
         DockActions.OpenTerminal = () => TerminalWindow.ShowSingleton();
+        DockActions.LogToSalesforce = (note, callback) => SalesforceSheets.Open(note, callback);
         _tray.QuitRequested += Quit;
         _flyout.QuitRequested += Quit;
         _dock.OpenFlyoutRequested += () => _flyout.ShowSnippets();

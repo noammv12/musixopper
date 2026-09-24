@@ -372,7 +372,9 @@ sealed partial class DockWindow
         card.Children.Add(well);
         card.Children.Add(picks);
         card.Children.Add(confirm);
-        card.Children.Add(ButtonRow(copy, notes));
+        var salesforce = DockKit.Button("ל-Salesforce", DockKit.Kind.Secondary, () => DockActions.LogToSalesforce(note, chosen));
+        salesforce.ToolTip = "תיעוד השיחה ב-Salesforce: תצוגה מקדימה, אישור, שמירה ובדיקה";
+        card.Children.Add(ButtonRow(copy, notes, salesforce));
         DockKit.Clickable(undoButton, Undo);
         return card;
 
