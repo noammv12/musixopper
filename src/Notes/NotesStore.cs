@@ -13,7 +13,9 @@ sealed record CallNote(
     string State,                 // "ok" | "transcript-only" | "recovered"
     string? Number = null,        // caller's number when the softphone passed one
     string? SummaryError = null,  // why the summary is missing, when one was expected
-    CallbackProposal? ProposedCallback = null); // a callback promise heard on the call, for the user to accept
+    CallbackProposal? ProposedCallback = null, // a callback promise heard on the call, for the user to accept
+    Coaching.CallMetrics? Metrics = null,      // local talk/listen numbers (computed before the audio was deleted)
+    Coaching.CoachData? Coach = null);         // verified objections/questions/next step from the summary call
 
 /// <summary>
 /// Call notes persistence: a JSON index of the last 50 notes for the UI,

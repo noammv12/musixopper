@@ -73,6 +73,46 @@ static class AudioMixdown
         }
     }
 
+    /// <summary>
+    /// Voice activity per channel for coaching, read straight from the
+    /// separate tracks (mic = the user, loopback = the client) before the
+    /// audio is deleted. Segments are on a shared timeline (the earlier
+    /// track's start = 0). A missing or unreadable track yields null.
+    /// </summary>
+    public static (List<Coaching.Segment>? Mic, List<Coaching.Segment>? Sys) VoiceActivity(RecordingSession session)
+    {
+        var starts = new List<DateTime>();
+        if (session.MicPath is { } m && File.Exists(m)) starts.Add(session.MicStartUtc);
+        if (session.SysPath is { } s && File.Exists(s)) starts.Add(session.SysStartUtc);
+        if (starts.Count == 0) return (null, null);
+        var earliest = starts.Min();
+        return (Track(session.MicPath, session.MicStartUtc - earliest), Track(session.SysPath, session.SysStartUtc - earliest));
+    }
+
+    static List<Coaching.Segment>? Track(string? path, TimeSpan offset)
+    {
+        if (path is null || !File.Exists(path)) return null;
+        try
+        {
+            using var reader = new WaveFileReader(path);
+            ISampleProvider samples = reader.ToSampleProvider();
+            if (samples.WaveFormat.Channels > 1) samples = new MonoAverageSampleProvider(samples);
+            if (samples.WaveFormat.SampleRate != Coaching.Vad.SampleRate)
+                samples = new WdlResamplingSampleProvider(samples, Coaching.Vad.SampleRate);
+            var vad = new Coaching.Vad();
+            var buffer = new float[Coaching.Vad.SampleRate]; // 1 s at a time — a 45-min call never sits in memory
+            int read;
+            while ((read = samples.Read(buffer, 0, buffer.Length)) > 0) vad.Push(buffer.AsSpan(0, read));
+            var o = offset.TotalSeconds;
+            return vad.Finish().Select(x => new Coaching.Segment(x.Start + o, x.End + o)).ToList();
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Coaching VAD: unreadable track {Path.GetFileName(path)}: {ex.Message}");
+            return null;
+        }
+    }
+
     /// <summary>Converts a single WAV to the 16 kHz mono PCM16 Whisper format.</summary>
     public static string? SingleTo16kMono(string wavPath, string outPath)
     {

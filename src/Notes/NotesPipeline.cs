@@ -180,6 +180,18 @@ sealed class NotesPipeline : IDisposable
                         return;
                     }
 
+                    // Coaching: per-channel voice activity from the separate
+                    // tracks, now — the audio is deleted after this attempt.
+                    List<Coaching.Segment>? micVad = null, sysVad = null;
+                    try
+                    {
+                        (micVad, sysVad) = AudioMixdown.VoiceActivity(session);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Write($"Coaching VAD failed: {ex.Message}");
+                    }
+
                     StatusChanged?.Invoke("Transcribing your last call…");
                     var transcript = (await Transcriber.TranscribeAsync(mixed, Settings.NotesLanguage, CancellationToken.None)).Trim();
                     Log.Write($"Notes: transcript {transcript.Length} chars");
@@ -194,6 +206,7 @@ sealed class NotesPipeline : IDisposable
                     string? summary = null;
                     string? summaryError = null;
                     CallbackProposal? proposal = null;
+                    Coaching.CoachData? coach = null;
                     if (AiChat.HasKey)
                     {
                         StatusChanged?.Invoke("Summarizing…");
@@ -202,6 +215,9 @@ sealed class NotesPipeline : IDisposable
                         (summary, summaryError) = await AiChat.SummarizeAsync(transcript, CancellationToken.None, endedLocal);
                         if (summary is not null)
                         {
+                            string? coachLine;
+                            (summary, coachLine) = Coaching.CoachExtract.Split(summary);
+                            coach = await ReadCoachAsync(coachLine, transcript);
                             (summary, proposal) = CallbackProposals.Extract(summary, endedLocal);
                             if (proposal is not null)
                                 Log.Write($"Notes: callback heard → {proposal.WhenUtc.ToLocalTime():ddd HH:mm}");
@@ -219,6 +235,18 @@ sealed class NotesPipeline : IDisposable
                         number,
                         summary is null ? summaryError : null,
                         proposal);
+                    Coaching.CallMetrics? metrics = null;
+                    try
+                    {
+                        metrics = Coaching.CallMetricsCalc.Compute(micVad, sysVad, transcript, durationSec);
+                        note = note with { Metrics = metrics, Coach = coach };
+                        Coaching.CoachStore.Add(new Coaching.CoachRecord(note.Id, note.StartedUtc, durationSec, number,
+                            metrics, coach, Coaching.CoachReports.Phrases(transcript), summary));
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Write($"Coaching metrics failed: {ex.Message}"); // never costs the note
+                    }
                     NotesStore.Add(note);
                     NoteReady?.Invoke(note);
                 }
@@ -244,6 +272,30 @@ sealed class NotesPipeline : IDisposable
         finally
         {
             _processQueue.Release();
+        }
+    }
+
+    /// <summary>The COACH trailer → verified coaching data. Invalid JSON gets
+    /// exactly one repair request; after that coaching is skipped (the note
+    /// is unaffected). A missing line just means no coaching.</summary>
+    static async Task<Coaching.CoachData?> ReadCoachAsync(string? line, string transcript)
+    {
+        if (line is null) return null;
+        try
+        {
+            var (data, error) = Coaching.CoachExtract.Parse(line, transcript);
+            if (data is not null || error is null) return data;
+            Log.Write($"Coaching: COACH line invalid ({error}) — one retry");
+            var repaired = await AiChat.CoachRepairAsync(transcript, line, error, CancellationToken.None);
+            if (repaired is null) return null;
+            (data, error) = Coaching.CoachExtract.Parse(repaired, transcript);
+            if (error is not null) Log.Write($"Coaching: retry still invalid ({error}) — skipped");
+            return data;
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Coaching parse failed: {ex.Message}");
+            return null;
         }
     }
 

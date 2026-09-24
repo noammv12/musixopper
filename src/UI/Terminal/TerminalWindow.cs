@@ -150,6 +150,7 @@ sealed class TerminalWindow : Window
         _screens[TerminalPage.Month] = new MonthScreen(this);
         _screens[TerminalPage.Clients] = new ClientsScreen(this);
         _screens[TerminalPage.Templates] = new TemplatesScreen(this);
+        _screens[TerminalPage.Coaching] = new CoachingScreen(this);
 
         _clock = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
         _clock.Tick += (_, _) => UpdateClock();
@@ -455,6 +456,7 @@ sealed class TerminalWindow : Window
         Add(TerminalPage.Month, "החודש", Icons.Month);
         Add(TerminalPage.Clients, "לקוחות", Icons.Clients);
         Add(TerminalPage.Templates, "תבניות", Icons.Templates);
+        Add(TerminalPage.Coaching, "אימון", Icons.Coach);
 
         row.Children.Add(new Border { Width = 1, Height = 40, Margin = new Thickness(14, 0, 4, 14), Background = Tone.B("#24FFFFFF"), VerticalAlignment = VerticalAlignment.Bottom });
 
