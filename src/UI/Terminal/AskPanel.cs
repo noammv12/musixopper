@@ -467,6 +467,9 @@ sealed class AskPanel : Border
     // ---- screen reading ------------------------------------------------------------
 
     /// <summary>The Ask buttons: capture (region, or a clicked window) → gate → read.</summary>
+    /// <summary>Starts a screen read from outside the panel (the Now shelf's "receipt → deal").</summary>
+    public void StartReadScreen(bool receipt) => ReadScreen(receipt);
+
     async void ReadScreen(bool receipt)
     {
         var typed = _input.Text.Trim();
