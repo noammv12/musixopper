@@ -223,6 +223,6 @@ public class DockTextTests
     public void One_line_strips_bullets_and_explains_a_missing_summary()
     {
         Assert.Equal("פתח חשבון פרו אתמול", DockText.OneLine(SampleNote()));
-        Assert.StartsWith("אין סיכום", DockText.OneLine(SampleNote(null)));
+        Assert.StartsWith("לא נוצר סיכום", DockText.OneLine(SampleNote(null)));
     }
 }

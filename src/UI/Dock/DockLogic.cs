@@ -212,7 +212,9 @@ static class DockText
     public static string OneLine(CallNote note)
     {
         if (note.Summary is not { Length: > 0 } summary)
-            return note.SummaryError is { } reason ? $"אין סיכום ({reason}) — התמליל שמור בהערות" : "אין סיכום — התמליל שמור בהערות";
+            return note.SummaryError is { Length: > 0 } reason
+                ? $"לא נוצר סיכום: {reason} — התמליל שמור בהערות"
+                : "לא נוצר סיכום — התמליל שמור בהערות";
         foreach (var raw in summary.Split('\n'))
         {
             var line = raw.Trim().TrimStart('•', '-', '*', ' ').Trim();
