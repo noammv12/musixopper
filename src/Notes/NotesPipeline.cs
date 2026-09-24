@@ -220,18 +220,58 @@ sealed class NotesPipeline : IDisposable
                         idMap = factIds;
                         (summary, summaryError) = await AiChat.SummarizeAsync(transcript, CancellationToken.None, endedLocal,
                             withFacts: memoryOn, knownFacts: knownFacts);
-                        if (summary is not null)
+                        if (summary is null)
+                        {
+                            Log.Write($"Notes: no summary — {summaryError ?? "unknown AI failure"}");
+                            summaryError = AiChat.DescribeFailureHe(summaryError);
+                        }
+                        else
                         {
                             // Trailers are line-based and order-independent; each parser
                             // strips only its own line, so one failing never loses the others.
-                            (summary, facts) = Memory.FactBook.Extract(summary);
+                            try
+                            {
+                                (summary, facts) = Memory.FactBook.Extract(summary);
+                            }
+                            catch (Exception ex)
+                            {
+                                Log.Write($"Notes: FACTS trailer parse failed ({ex.Message}) — note kept");
+                            }
                             string? coachLine;
-                            (summary, coachLine) = Coaching.CoachExtract.Split(summary);
+                            try
+                            {
+                                (summary, coachLine) = Coaching.CoachExtract.Split(summary);
+                            }
+                            catch (Exception ex)
+                            {
+                                coachLine = null;
+                                Log.Write($"Notes: COACH trailer parse failed ({ex.Message}) — note kept");
+                            }
                             coach = await ReadCoachAsync(coachLine, transcript);
-                            (summary, proposal) = CallbackProposals.Extract(summary, endedLocal);
+                            try
+                            {
+                                (summary, proposal) = CallbackProposals.Extract(summary, endedLocal);
+                            }
+                            catch (Exception ex)
+                            {
+                                Log.Write($"Notes: CALLBACK trailer parse failed ({ex.Message}) — note kept");
+                            }
                             if (proposal is not null)
                                 Log.Write($"Notes: callback heard → {proposal.WhenUtc.ToLocalTime():ddd HH:mm}");
+                            // A reply that was only trailers (CALLBACK/FACTS/COACH)
+                            // must not be stored as an empty "ok" summary.
+                            if (string.IsNullOrWhiteSpace(summary))
+                            {
+                                Log.Write("Notes: summary empty after trailer parsing — keeping transcript only");
+                                summary = null;
+                                summaryError = "תשובת ה-AI הכילה רק נתונים נלווים, בלי סיכום";
+                            }
                         }
+                    }
+                    else
+                    {
+                        summaryError = "אין מפתח AI מוגדר";
+                        Log.Write("Notes: no summary — no AI key configured");
                     }
 
                     var durationSec = (int)Math.Max(session.Duration.TotalSeconds, audioLength.TotalSeconds);

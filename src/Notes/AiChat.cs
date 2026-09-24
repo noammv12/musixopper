@@ -268,7 +268,7 @@ static class AiChat
 
     // ---- provider chain ---------------------------------------------------
 
-    sealed record Provider(string Name, string Url, string Model, string Key, bool IsGemini);
+    internal sealed record Provider(string Name, string Url, string Model, string Key, bool IsGemini);
 
     const string GeminiUrl = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
     const string DeepSeekUrl = "https://api.deepseek.com/chat/completions";
@@ -288,10 +288,32 @@ static class AiChat
         var p = MakeProvider(model, key.Trim());
         var messages = new object[] { new { role = "user", content = "ping. answer: ok" } };
         var started = Environment.TickCount64;
-        var (turn, error) = await RequestChatAsync(p, BuildBody(p, messages, 0, 8, tools: null), rejectTruncated: false, ct,
-            retryDelayMs: 300, requestTimeoutMs: InteractiveTimeoutMs);
+        // 64, not 8: even with thinking off, a tiny cap can end at
+        // finish=length before any visible text. The Test only proves the key
+        // and model work, so any HTTP 200 with a choice counts (acceptEmpty).
+        var (turn, error) = await RequestChatAsync(p, BuildBody(p, messages, 0, KeyTestMaxTokens, tools: null), rejectTruncated: false, ct,
+            retryDelayMs: 300, requestTimeoutMs: InteractiveTimeoutMs, acceptEmpty: true);
         var ms = Environment.TickCount64 - started;
         return turn is not null ? (true, ms, null) : (false, ms, error.Length > 0 ? error : "no reply");
+    }
+
+    internal const int KeyTestMaxTokens = 64;
+
+    /// <summary>A Hebrew reason for the dock card from the chain's English
+    /// error ("DeepSeek: empty reply (…) → Gemini: HTTP 400").</summary>
+    public static string DescribeFailureHe(string? error)
+    {
+        if (string.IsNullOrWhiteSpace(error)) return "שגיאת AI לא ידועה";
+        string why =
+            error.Contains("no AI key") ? "אין מפתח AI מוגדר"
+            : error.Contains("401") ? "המפתח נדחה"
+            : error.Contains("402") ? "אין יתרה בחשבון"
+            : error.Contains("429") ? "חריגה ממגבלת בקשות"
+            : error.Contains("timed out") ? "תם הזמן לתשובה"
+            : error.Contains("empty reply") || error.Contains("token cap") ? "המודל החזיר תשובה ריקה"
+            : error.Contains("HTTP") ? "שגיאת שרת"
+            : "שגיאת רשת";
+        return $"{why} ({error})";
     }
 
     static IEnumerable<Provider> Providers()
@@ -512,7 +534,17 @@ static class AiChat
         })
         .ToList();
 
-    static Dictionary<string, object> BuildBody(
+    /// <summary>
+    /// The request body. Every Palon call wants the answer, not deliberation,
+    /// so thinking is turned off or down per provider:
+    /// DeepSeek V4/V4.1 (deepseek-flash, deepseek-v4-pro) think by default and
+    /// the reasoning tokens count against max_tokens → "thinking":{"type":"disabled"}
+    /// (the top-level field the OpenAI SDK sends via extra_body).
+    /// Gemini 3.x can't fully disable thinking and its OpenAI layer rejects
+    /// "minimal" → reasoning_effort "low" plus a generous cap. Never both
+    /// reasoning_effort and google.thinking_config (Gemini rejects the pair).
+    /// </summary>
+    internal static Dictionary<string, object> BuildBody(
         Provider provider, object messages, double temperature, int maxTokens, object[]? tools)
     {
         var body = new Dictionary<string, object>
@@ -531,6 +563,7 @@ static class AiChat
             ["max_tokens"] = provider.IsGemini ? Math.Max(maxTokens * 4, 4096) : maxTokens,
         };
         if (provider.IsGemini) body["reasoning_effort"] = "low";
+        else if (SupportsThinkingToggle(provider.Model)) body["thinking"] = new Dictionary<string, object> { ["type"] = "disabled" };
         if (tools is { Length: > 0 })
         {
             body["tools"] = tools;
@@ -539,10 +572,61 @@ static class AiChat
         return body;
     }
 
+    /// <summary>deepseek-reasoner is always-thinking and predates the toggle; every
+    /// other DeepSeek id (deepseek-chat, V4/V4.1) accepts "thinking".</summary>
+    internal static bool SupportsThinkingToggle(string model) =>
+        !model.Contains("reasoner", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The one retry after an empty finish=length reply: a larger cap
+    /// and thinking pinned to its minimum. Null when the body was already boosted.</summary>
+    internal static Dictionary<string, object>? BoostForEmptyLength(Provider provider, Dictionary<string, object> body)
+    {
+        if (body.ContainsKey(BoostedMarker)) return null;
+        var boosted = new Dictionary<string, object>(body);
+        var cap = body.TryGetValue("max_tokens", out var m) && m is int i ? i : 1024;
+        boosted["max_tokens"] = Math.Max(cap * 4, 1024);
+        if (provider.IsGemini) boosted["reasoning_effort"] = "low";
+        else if (SupportsThinkingToggle(provider.Model)) boosted["thinking"] = new Dictionary<string, object> { ["type"] = "disabled" };
+        boosted[BoostedMarker] = true;
+        return boosted;
+    }
+
+    internal const string BoostedMarker = "__palon_boosted";
+
+    /// <summary>The wire JSON: the body minus Palon's internal markers.</summary>
+    internal static string Serialize(Dictionary<string, object> body) =>
+        JsonSerializer.Serialize(body.Where(kv => kv.Key != BoostedMarker).ToDictionary(kv => kv.Key, kv => kv.Value));
+
+    /// <summary>What an HTTP-200 reply holds, independent of transport.</summary>
+    internal readonly record struct ReplyShape(string? Content, string? FinishReason, string CompletionTokens, int ReasoningChars)
+    {
+        public bool EmptyAtLength => string.IsNullOrWhiteSpace(Content) && FinishReason == "length";
+    }
+
+    internal static ReplyShape ReadShape(JsonElement root)
+    {
+        var choice = root.GetProperty("choices")[0];
+        var message = choice.TryGetProperty("message", out var msg) ? msg : default;
+        string? content = null;
+        var reasoningChars = 0;
+        if (message.ValueKind == JsonValueKind.Object)
+        {
+            if (message.TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.String) content = c.GetString();
+            // reasoning_content is the model's deliberation — never the answer.
+            if (message.TryGetProperty("reasoning_content", out var r) && r.ValueKind == JsonValueKind.String)
+                reasoningChars = r.GetString()?.Length ?? 0;
+        }
+        var finish = choice.TryGetProperty("finish_reason", out var f) && f.ValueKind == JsonValueKind.String ? f.GetString() : null;
+        var spent = root.TryGetProperty("usage", out var usage) && usage.TryGetProperty("completion_tokens", out var s)
+            ? s.GetRawText() : "?";
+        return new ReplyShape(content, finish, spent, reasoningChars);
+    }
+
     static async Task<(ChatTurn? Turn, string Error)> RequestChatAsync(
         Provider provider, Dictionary<string, object> body, bool rejectTruncated, CancellationToken ct,
-        int retryDelayMs = 2000, int requestTimeoutMs = ForegroundTimeoutMs)
+        int retryDelayMs = 2000, int requestTimeoutMs = ForegroundTimeoutMs, bool acceptEmpty = false)
     {
+        var lengthRetried = false;
         for (var attempt = 0; attempt < 2; attempt++)
         {
             // Per-request budget under the HttpClient's 60 s: sized to who is
@@ -554,7 +638,7 @@ static class AiChat
             {
                 using var request = new HttpRequestMessage(HttpMethod.Post, provider.Url);
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", provider.Key);
-                request.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+                request.Content = new StringContent(Serialize(body), Encoding.UTF8, "application/json");
 
                 using var response = await Http.SendAsync(request, budget.Token);
                 var status = (int)response.StatusCode;
@@ -570,6 +654,25 @@ static class AiChat
 
                 using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(budget.Token));
                 var choice = doc.RootElement.GetProperty("choices")[0];
+                var shape = ReadShape(doc.RootElement);
+                if (shape.ReasoningChars > 0)
+                    Log.Write($"AI: {provider.Name} {provider.Model} reasoning_content {shape.ReasoningChars} chars (ignored), finish={shape.FinishReason ?? "?"}");
+                if (acceptEmpty)
+                {
+                    ClearCooling(provider);
+                    return (new ChatTurn(shape.Content, new List<ToolCallRequest>()), "");
+                }
+                var hasToolCalls = choice.TryGetProperty("message", out var m0)
+                    && m0.TryGetProperty("tool_calls", out var tc0) && tc0.ValueKind == JsonValueKind.Array && tc0.GetArrayLength() > 0;
+                if (shape.EmptyAtLength && !hasToolCalls && !lengthRetried
+                    && BoostForEmptyLength(provider, body) is { } boosted)
+                {
+                    Log.Write($"AI: {provider.Name} {provider.Model} empty reply at the token cap (completion_tokens={shape.CompletionTokens}) — retrying once with max_tokens={boosted["max_tokens"]}, minimal thinking");
+                    body = boosted;
+                    lengthRetried = true;
+                    attempt--; // the length retry doesn't spend a network retry
+                    continue;
+                }
                 if (rejectTruncated
                     && choice.TryGetProperty("finish_reason", out var finish)
                     && finish.GetString() == "length")
