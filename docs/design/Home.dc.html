@@ -1,0 +1,1301 @@
+<!doctype html>
+<html lang="he">
+<head>
+<meta charset="utf-8">
+<title>Palon Now</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@200;300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#000;font-family:'Heebo',system-ui,sans-serif;color:#F5F5F7;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;border:0;background:none;padding:0;margin:0;cursor:pointer}
+input{font:inherit;color:#F5F5F7;background:none;border:0;outline:none;padding:0;margin:0}
+input::placeholder{color:#6E6E73}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.ic{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+button:focus-visible{outline:2px solid rgba(220,230,255,.6);outline-offset:3px}
+.press{transition:transform .45s cubic-bezier(.34,1.56,.64,1),background-color .25s,color .25s,box-shadow .35s,border-color .3s,opacity .3s}
+.press:active{transform:scale(.94);transition-duration:.12s}
+.lift{transition:transform .5s cubic-bezier(.34,1.56,.64,1),background-color .3s,border-color .3s,box-shadow .4s}
+.lift:hover{transform:translateY(-2px)}
+.lift:active{transform:translateY(0) scale(.97);transition-duration:.12s}
+.glass{position:relative;background:linear-gradient(180deg,rgba(255,255,255,.075) 0%,rgba(255,255,255,.022) 100%);backdrop-filter:blur(34px) saturate(160%);-webkit-backdrop-filter:blur(34px) saturate(160%);border:1px solid rgba(255,255,255,.08);box-shadow:inset 0 1px 0 rgba(255,255,255,.13),0 30px 70px rgba(0,0,0,.55)}
+.glass2{background:linear-gradient(180deg,rgba(40,41,46,.82),rgba(18,18,21,.86));backdrop-filter:blur(40px) saturate(170%);-webkit-backdrop-filter:blur(40px) saturate(170%);border:1px solid rgba(255,255,255,.09);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 40px 90px rgba(0,0,0,.7)}
+.silver{background:linear-gradient(180deg,#FFFFFF 0%,#D9DCE2 55%,#A9AEB8 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.btnP{background:linear-gradient(180deg,#FAFAFB 0%,#D6D8DD 100%);color:#0A0A0C;box-shadow:inset 0 1px 0 #fff,0 10px 30px rgba(210,220,240,.16),0 0 0 1px rgba(255,255,255,.5)}
+.btnP:hover{box-shadow:inset 0 1px 0 #fff,0 14px 40px rgba(210,220,240,.28),0 0 0 5px rgba(255,255,255,.07)}
+.btnS{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);color:#E5E5EA}
+.btnS:hover{background:rgba(255,255,255,.11)}
+.rail{color:#8E8E93}
+.rail:hover{color:#F5F5F7;background:rgba(255,255,255,.07)}
+.rail .tip{position:absolute;left:58px;top:50%;transform:translate(-6px,-50%);opacity:0;pointer-events:none;white-space:nowrap;transition:opacity .25s,transform .35s cubic-bezier(.34,1.56,.64,1)}
+.rail:hover .tip{opacity:1;transform:translate(0,-50%)}
+.rail.on{color:#0A0A0C;background:#E9EAEE}
+.row{transition:background-color .25s,transform .45s cubic-bezier(.34,1.56,.64,1)}
+.row:hover{background:rgba(255,255,255,.05)}
+.chip{animation:chipIn .45s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes chipIn{from{opacity:0;transform:translateY(6px) scale(.85)}to{opacity:1;transform:none}}
+.card{transform-origin:50% 100%}
+.card.enter{animation:enter .75s cubic-bezier(.34,1.35,.64,1) both}
+.card.enter2{animation:enter2 .75s cubic-bezier(.34,1.35,.64,1) both}
+@keyframes enter{from{opacity:0;transform:translateY(34px) scale(.93)}to{opacity:1;transform:none}}
+@keyframes enter2{from{opacity:0;transform:translateY(34px) scale(.93)}to{opacity:1;transform:none}}
+.card.fling{animation:fling .55s cubic-bezier(.55,0,.8,.3) both}
+@keyframes fling{0%{transform:none}18%{transform:translate(18px,-8px) rotate(2deg) scale(1.02)}100%{opacity:0;transform:translate(-760px,-120px) rotate(-18deg) scale(.9)}}
+.card.snooze{animation:snooze .5s cubic-bezier(.55,0,.8,.3) both}
+@keyframes snooze{0%{transform:none}100%{opacity:0;transform:translateY(120px) scale(.86)}}
+.breathe{animation:breathe 6s ease-in-out 1s infinite}
+@keyframes breathe{50%{transform:translateY(-2px);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 40px 90px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.03)}}
+.sheet{transition:transform .6s cubic-bezier(.22,1,.36,1),opacity .4s}
+.scrim{transition:opacity .45s}
+.overlay{transition:opacity .7s cubic-bezier(.22,1,.36,1),transform .8s cubic-bezier(.22,1,.36,1)}
+.stage{transition:transform .9s cubic-bezier(.22,1,.36,1),opacity .7s,filter .8s}
+.toast{animation:toastIn .6s cubic-bezier(.34,1.45,.64,1) both}
+@keyframes toastIn{from{opacity:0;transform:translateX(-26px) scale(.92)}to{opacity:1;transform:none}}
+.fadeUp{animation:fadeUp .6s cubic-bezier(.22,1,.36,1) both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.fu1{animation-delay:.12s}.fu2{animation-delay:.24s}.fu3{animation-delay:.36s}.fu4{animation-delay:.5s}.fu5{animation-delay:.7s}
+.caret{display:inline-block;width:2px;height:1em;background:#D9DCE2;vertical-align:-3px;margin-right:2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.dots i{display:inline-block;width:5px;height:5px;border-radius:3px;background:#C7C7CC;margin:0 2px;animation:dot 1s ease-in-out infinite}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes dot{50%{transform:translateY(-4px);opacity:.4}}
+.pulse{animation:pulse .9s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pulse{30%{transform:scale(1.06)}}
+.demo{color:#8E8E93}.demo:hover{color:#F5F5F7;background:rgba(255,255,255,.08)}
+.scroll{overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.15) transparent}
+.qchip{height:34px;padding:0 10px 0 9px;border-radius:17px;display:inline-flex;align-items:center;gap:6px;font-size:13.5px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);color:#E5E5EA;white-space:nowrap}
+.qchip:hover{background:rgba(255,255,255,.1);transform:translateY(-1px)}
+.qchip.done{background:#ECEDF1;color:#0A0A0C;border-color:#fff;animation:copyPop .6s cubic-bezier(.34,1.8,.64,1)}
+@keyframes copyPop{0%{transform:scale(.88)}45%{transform:scale(1.09)}100%{transform:none}}
+.kbd{font-family:'JetBrains Mono',monospace;font-size:10px;min-width:17px;height:17px;padding:0 3px;border-radius:5px;border:1px solid rgba(255,255,255,.16);border-bottom-width:2px;color:#8E8E93;display:inline-flex;align-items:center;justify-content:center}
+.fillName{padding:0 5px;border-radius:6px;background:linear-gradient(90deg,rgba(255,206,110,0),rgba(255,206,110,.75),rgba(255,206,110,0));background-size:220% 100%;animation:sweep 1.1s ease both}
+@keyframes sweep{from{background-position:120% 0}to{background-position:-120% 0}}
+.qwrap{position:relative}
+.pop{background:linear-gradient(180deg,rgba(38,39,44,.98),rgba(20,20,23,.98));position:absolute;bottom:calc(100% + 10px);right:0;width:340px;padding:14px 16px;border-radius:20px;opacity:0;transform:translateY(8px) scale(.97);transform-origin:85% 100%;pointer-events:none;transition:opacity .22s,transform .45s cubic-bezier(.34,1.56,.64,1);z-index:30;text-align:right}
+.qwrap:hover .pop,.qwrap:focus-within .pop{opacity:1;transform:none;pointer-events:auto;transition-delay:.35s}
+.qa{position:relative;width:38px;height:38px;border-radius:19px;display:flex;align-items:center;justify-content:center;color:#C7C7CC;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}
+.qa:hover{color:#fff;background:rgba(255,255,255,.1)}
+.qa .tip{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translate(-50%,4px);opacity:0;pointer-events:none;white-space:nowrap;transition:opacity .2s,transform .35s cubic-bezier(.34,1.56,.64,1);padding:4px 10px;border-radius:10px;font-size:12px;color:#F5F5F7}
+.qa:hover .tip{opacity:1;transform:translate(-50%,0)}
+.av{width:34px;height:34px;border-radius:17px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#0A0A0C;background:linear-gradient(180deg,#F4F5F7,#AEB3BC);box-shadow:0 0 0 2px #151518}
+.av:hover{transform:translateY(-2px) scale(1.06)}
+.tilt{transition:transform .7s cubic-bezier(.22,1,.36,1)}
+.tilt:hover{transform:perspective(1300px) rotateX(1.8deg) translateY(-3px)}
+.mag{display:inline-block;transition:transform .35s cubic-bezier(.34,1.56,.64,1)}
+.roll{display:inline-block;height:1em;overflow:hidden;vertical-align:top}
+.rollc{display:block;transition:transform 1.2s cubic-bezier(.22,1,.36,1)}
+.rollc span{display:block;height:1em}
+.prow{transition:background-color .2s}
+.prow.sel{background:rgba(255,255,255,.08)}
+.hl{color:#F5D08A}
+@media (prefers-reduced-motion: reduce){.card.enter,.card.enter2,.card.fling,.card.snooze,.breathe,.toast,.fadeUp,.chip,.qchip.done,.fillName{animation:none}.rollc,.tilt,.mag,.pop,.sheet,.stage,.overlay{transition:none}.tilt:hover{transform:none}}
+</style>
+</helmet>
+<div dir="rtl" style="width: 1440px; height: 900px; position: fixed; top: 0; left: 0; overflow: hidden; background: #000000; color: #F5F5F7; font-family: 'Heebo', system-ui, sans-serif;">
+<div aria-hidden="true" style="position: absolute; inset: 0; background: radial-gradient(900px 620px at 84% 14%, #1D1E23 0%, rgba(20,20,24,0) 70%), radial-gradient(1100px 700px at 30% 110%, #121317 0%, rgba(0,0,0,0) 65%), linear-gradient(180deg, #0A0A0C 0%, #000 100%);"></div>
+
+<div class="stage" style="position: absolute; inset: 0; transform: {{stage.tf}}; opacity: {{stage.op}}; filter: {{stage.filter}};">
+
+<div style="position: absolute; top: 0; left: 0; right: 0; height: 38px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; border-bottom: 1px solid rgba(255,255,255,.05); font-size: 13px; color: #8E8E93;">
+<div style="display: flex; align-items: center; gap: 10px;">
+<span style="width: 7px; height: 7px; border-radius: 4px; background: #7EE0A6; box-shadow: 0 0 10px rgba(126,224,166,.7);"></span>
+<span style="color: #F5F5F7; font-weight: 600; letter-spacing: .01em;">Palon</span>
+<span>מקשיב לשיחות · מחובר ל-Salesforce</span>
+</div>
+<div style="display: flex; align-items: center; gap: 14px;">
+<span style="display: inline-flex; align-items: center; gap: 6px; color: #BFA675;"><span style="width: 6px; height: 6px; border-radius: 3px; background: #E3B458; box-shadow: 0 0 8px rgba(227,180,88,.7);"></span>שנה טובה</span>
+<span>יום חמישי, 24 בספטמבר</span>
+<span class="mono" dir="ltr" style="color: #E5E5EA;">15:58</span>
+</div>
+</div>
+
+<nav class="glass" aria-label="גיליונות" style="position: absolute; left: 22px; top: 250px; width: 56px; padding: 8px; border-radius: 28px; display: flex; flex-direction: column; gap: 6px;">
+<sc-for list="{{rail}}" as="r" hint-placeholder-count="5">
+<button type="button" class="{{r.cls}}" onClick="{{r.go}}" aria-label="{{r.label}}" style="position: relative; width: 40px; height: 40px; border-radius: 20px; display: flex; align-items: center; justify-content: center;">
+<svg class="ic" width="19" height="19" viewBox="0 0 24 24" aria-hidden="true"><path d="{{r.d}}"></path></svg>
+<span class="tip glass2" style="padding: 5px 12px; border-radius: 12px; font-size: 13px; color: #F5F5F7;">{{r.label}}</span>
+</button>
+</sc-for>
+</nav>
+
+<div style="position: absolute; left: 104px; top: 70px; width: 340px; display: flex; flex-direction: column; gap: 16px;">
+<button type="button" class="glass lift" onClick="{{pay.open}}" style="display: block; width: 100%; text-align: right; padding: 22px 24px 20px; border-radius: 28px; overflow: hidden;">
+<sc-if value="{{honey.on}}" hint-placeholder-val="{{false}}">
+<svg aria-hidden="true" width="340" height="120" viewBox="0 0 340 120" style="position: absolute; top: 0; left: 0; opacity: {{honey.o}}; pointer-events: none;"><defs><linearGradient id="hny" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F6CD74"></stop><stop offset="1" stop-color="#C98A22"></stop></linearGradient></defs><rect x="0" y="0" width="340" height="4" fill="url(#hny)"></rect><path d="{{honey.d}}" fill="none" stroke="url(#hny)" stroke-linecap="round" stroke-width="4.5"></path><path d="{{honey.drops}}" fill="#E9B04E"></path></svg>
+</sc-if>
+<div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #8E8E93;">
+<span>השכר שלך החודש</span>
+<span class="{{pay.streakCls}}" style="display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 10px; border-radius: 12px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.07); color: #C7C7CC; font-size: 12px;"><svg class="ic" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true" style="color: #E8D6B0;"><path d="M12 3c1 4 4 5 4 9a4 4 0 0 1-8 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 0-8z"></path></svg>5 ימים ברצף בקצב</span>
+</div>
+<div class="{{pay.numCls}}" style="margin-top: 8px; display: flex; align-items: baseline; gap: 4px; transform-origin: 100% 60%;">
+<span dir="ltr" aria-label="{{pay.num}}" style="font-size: 62px; font-weight: 200; letter-spacing: -.02em; line-height: 1; height: 62px; color: #EEF0F3; text-shadow: 0 0 24px rgba(255,255,255,.12); display: inline-flex;"><sc-for list="{{pay.digits}}" as="g" hint-placeholder-count="6"><sc-if value="{{g.isD}}" hint-placeholder-val="{{true}}"><span class="roll"><span class="rollc" style="transform: translateY({{g.y}}em);"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span></span></span></sc-if><sc-if value="{{g.isC}}" hint-placeholder-val="{{false}}"><span>{{g.ch}}</span></sc-if></sc-for></span>
+<span style="font-size: 30px; font-weight: 200; color: #A9AEB8;">₪</span>
+</div>
+<div style="margin-top: 6px; font-size: 13px; color: #6E6E73;">בסיס 10,000 + FTD <span class="mono">{{pay.ftd}}</span></div>
+<div style="margin-top: 18px; position: relative; height: 6px; border-radius: 3px; background: rgba(255,255,255,.07); overflow: hidden;">
+<div style="position: absolute; top: 0; bottom: 0; right: 0; width: {{pay.pct}}%; border-radius: 3px; background: linear-gradient(270deg, #FFFFFF, #9AA0AA); transition: width 1s cubic-bezier(.22,1,.36,1); box-shadow: 0 0 12px rgba(255,255,255,.35);"></div>
+</div>
+<div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: baseline; font-size: 14px;">
+<span><span style="font-size: 20px; font-weight: 500;">{{pay.deals}}</span><span style="color: #6E6E73;"> / 55 עסקאות</span></span>
+<span style="color: #C7C7CC;">חסרים {{pay.left}} · {{pay.perDay}} ביום</span>
+</div>
+</button>
+
+<div class="glass" onMouseEnter="{{look.rings}}" onMouseLeave="{{look.off}}" style="padding: 20px 20px 16px; border-radius: 28px;">
+<div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #8E8E93; padding: 0 4px;">
+<span>היעדים של היום</span>
+<span>{{ringsHead}}</span>
+</div>
+<div style="display: flex; align-items: center; gap: 14px; margin-top: 12px;">
+<svg width="150" height="150" viewBox="0 0 200 200" aria-hidden="true" style="flex-shrink: 0; overflow: visible;">
+<defs>
+<linearGradient id="rgA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFFFFF"></stop><stop offset="1" stop-color="#8FA9CE"></stop></linearGradient>
+<linearGradient id="rgB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFFFFF"></stop><stop offset="1" stop-color="#D2B98F"></stop></linearGradient>
+<linearGradient id="rgC" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFFFFF"></stop><stop offset="1" stop-color="#95CDB2"></stop></linearGradient>
+</defs>
+<circle cx="100" cy="100" r="{{rg.a.r}}" style="fill: none; stroke: {{rg.a.track}}; stroke-width: 17;"></circle>
+<circle cx="100" cy="100" r="{{rg.a.r}}" transform="rotate(-90 100 100)" style="fill: none; stroke: {{rg.a.grad}}; stroke-width: 17; stroke-linecap: round; stroke-dasharray: {{rg.a.dash}}; filter: {{rg.a.glow}};"></circle>
+<circle cx="100" cy="100" r="{{rg.b.r}}" style="fill: none; stroke: {{rg.b.track}}; stroke-width: 17;"></circle>
+<circle cx="100" cy="100" r="{{rg.b.r}}" transform="rotate(-90 100 100)" style="fill: none; stroke: {{rg.b.grad}}; stroke-width: 17; stroke-linecap: round; stroke-dasharray: {{rg.b.dash}}; filter: {{rg.b.glow}};"></circle>
+<circle cx="100" cy="100" r="{{rg.c.r}}" style="fill: none; stroke: {{rg.c.track}}; stroke-width: 17;"></circle>
+<circle cx="100" cy="100" r="{{rg.c.r}}" transform="rotate(-90 100 100)" style="fill: none; stroke: {{rg.c.grad}}; stroke-width: 17; stroke-linecap: round; stroke-dasharray: {{rg.c.dash}}; filter: {{rg.c.glow}};"></circle>
+
+</svg>
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px;">
+<sc-for list="{{rings}}" as="g" hint-placeholder-count="3">
+<button type="button" class="row" onClick="{{g.act}}" style="text-align: right; padding: 7px 10px; border-radius: 14px; display: block; width: 100%;">
+<div style="display: flex; align-items: center; gap: 7px; font-size: 13px; color: #8E8E93;"><span style="width: 7px; height: 7px; border-radius: 4px; background: {{g.dot}};"></span>{{g.name}}</div>
+<div style="font-size: 21px; font-weight: 300; line-height: 1.25;">{{g.val}}<span style="font-size: 14px; color: #6E6E73;"> / {{g.goal}}</span></div>
+<div style="font-size: 12px; color: {{g.hintColor}};">{{g.hint}}</div>
+</button>
+</sc-for>
+</div>
+</div>
+</div>
+</div>
+
+<div style="position: absolute; left: 488px; top: 76px; width: 504px;">
+<div style="display: flex; justify-content: space-between; align-items: baseline; padding: 0 6px 14px;">
+<span style="font-size: 13px; color: #8E8E93; letter-spacing: .02em;">הבא בתור</span>
+<span style="font-size: 13px; color: #6E6E73;">{{stack.more}}</span>
+</div>
+<div style="position: relative; height: 382px;">
+<sc-if value="{{stack.peek2}}" hint-placeholder-val="{{true}}">
+<div class="glass" style="position: absolute; left: 36px; right: 36px; top: 0; height: 330px; border-radius: 30px; transform: translateY(30px); opacity: .35;"></div>
+</sc-if>
+<sc-if value="{{stack.peek1}}" hint-placeholder-val="{{true}}">
+<div class="glass" style="position: absolute; left: 18px; right: 18px; top: 0; height: 336px; border-radius: 30px; transform: translateY(15px); opacity: .6;"></div>
+</sc-if>
+<sc-if value="{{stack.has}}" hint-placeholder-val="{{true}}">
+<div class="{{card.cls}}" onMouseEnter="{{look.card}}" onMouseLeave="{{look.off}}" style="position: absolute; left: 0; right: 0; top: 0;">
+<div class="tilt">
+<div class="glass2 breathe" style="border-radius: 30px; padding: 24px 28px 22px; min-height: 340px; display: flex; flex-direction: column;">
+<div style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: {{card.kColor}};">
+<span style="width: 30px; height: 30px; border-radius: 15px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); display: flex; align-items: center; justify-content: center;"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="{{card.icon}}"></path></svg></span>
+<span style="font-weight: 500;">{{card.kicker}}</span>
+</div>
+<div style="margin-top: 14px; font-size: 34px; font-weight: 500; letter-spacing: -.01em; line-height: 1.15;">{{card.who}}</div>
+<div style="margin-top: 4px; font-size: 14px; color: #8E8E93;">{{card.sub}}</div>
+<div style="margin-top: 16px; display: flex; flex-direction: column; gap: 6px;">
+<sc-for list="{{card.lines}}" as="l" hint-placeholder-count="2">
+<div style="display: flex; gap: 10px; font-size: 16px; color: #D1D1D6; line-height: 1.5;"><span style="margin-top: 10px; width: 4px; height: 4px; border-radius: 2px; background: #6E6E73; flex-shrink: 0;"></span><span>{{l}}</span></div>
+</sc-for>
+</div>
+<sc-if value="{{card.hasQuote}}" hint-placeholder-val="{{false}}">
+<div style="margin-top: 16px; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 18px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06);">
+<span style="width: 40px; height: 44px; flex-shrink: 0;"><svg viewBox="-125 -150 250 275" width="100%" height="100%" aria-hidden="true" style="overflow: visible; display: block;"><defs><radialGradient id="plCsh" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#a2a2a3"></stop><stop offset="0.32" stop-color="#3b3b3d"></stop><stop offset="0.72" stop-color="#0a0a0c"></stop><stop offset="1" stop-color="#0a0a0c"></stop></radialGradient><linearGradient id="plCey" gradientUnits="userSpaceOnUse" x1="0" y1="-45" x2="0" y2="55"><stop offset="0" stop-color="#A9D8FF"></stop><stop offset="1" stop-color="#3C86FF"></stop></linearGradient><linearGradient id="plChr" gradientUnits="userSpaceOnUse" x1="0" y1="-60" x2="0" y2="-150"><stop offset="0" stop-color="#E0AE4C"></stop><stop offset="1" stop-color="#FFE9A8"></stop></linearGradient><radialGradient id="plCgd" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#FFF4CF"></stop><stop offset="0.3" stop-color="#D9A444"></stop><stop offset="0.7" stop-color="#5E3F0E"></stop><stop offset="1" stop-color="#3A2606"></stop></radialGradient><radialGradient id="plCpl" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#FFFFFF"></stop><stop offset="0.35" stop-color="#E4DDEB"></stop><stop offset="0.75" stop-color="#9C93AC"></stop><stop offset="1" stop-color="#6E6780"></stop></radialGradient><linearGradient id="plCbr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F3CF83"></stop><stop offset="1" stop-color="#A8731F"></stop></linearGradient><linearGradient id="plCcp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4A5378"></stop><stop offset="1" stop-color="#1D2238"></stop></linearGradient><mask id="plCmk" maskUnits="userSpaceOnUse" x="-125" y="-150" width="250" height="275"><path d="{{pl.card.body}}" fill="#fff"></path><path d="{{pl.card.eyeL}}" fill="#000"></path><path d="{{pl.card.eyeR}}" fill="#000"></path></mask></defs><path d="{{pl.card.hair}}" transform="{{pl.card.hairTf}}" opacity="{{pl.card.hairOp}}" fill="url(#plChr)"></path><path d="{{pl.card.curl}}" fill="none" stroke="url(#plChr)" stroke-width="11" stroke-linecap="round"></path><path d="{{pl.card.eyeL}}" fill="url(#plCey)"></path><path d="{{pl.card.eyeR}}" fill="url(#plCey)"></path><rect x="-125" y="-150" width="250" height="275" fill="{{pl.card.shadeFill}}" mask="url(#plCmk)"></rect><path d="{{pl.card.bow}}" fill="url(#plCbr)"></path><path d="{{pl.card.cap}}" fill="url(#plCcp)"></path><path d="{{pl.card.pom}}" fill="#EDEDF2"></path></svg></span>
+<div><div style="font-size: 18px; color: #F5F5F7;">{{card.quote}}</div><div style="font-size: 12.5px; color: #8E8E93;">{{card.quoteSub}}</div></div>
+</div>
+</sc-if>
+<sc-if value="{{card.hasDeal}}" hint-placeholder-val="{{false}}">
+<div style="margin-top: 16px; display: flex; gap: 10px;">
+<sc-for list="{{card.deal}}" as="d" hint-placeholder-count="3">
+<div style="flex: 1; padding: 11px 14px; border-radius: 16px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06);"><div style="font-size: 12px; color: #8E8E93;">{{d.k}}</div><div style="font-size: 19px; font-weight: 500; color: {{d.c}};">{{d.v}}</div></div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{card.hasTpl}}" hint-placeholder-val="{{false}}">
+<div style="margin-top: 16px; padding: 12px 16px; border-radius: 18px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); font-size: 13.5px; color: #AEAEB2; line-height: 1.55; white-space: pre-line;">{{card.tpl}}</div>
+</sc-if>
+<div style="flex-grow: 1; min-height: 14px;"></div>
+<sc-if value="{{card.mt.has}}" hint-placeholder-val="{{true}}">
+<div style="margin-bottom: 14px; display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: #8E8E93;">
+<svg class="ic" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v13H7zM14 3v5h5"></path></svg>
+<span>מתאימה:</span><span style="color: #E5E5EA;">{{card.mt.name}}</span>
+<button type="button" class="{{card.mt.cls}}" onClick="{{card.mt.copy}}" style="height: 28px; padding: 0 12px; border-radius: 14px; font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px;">{{card.mt.label}}<sc-if value="{{card.mt.hasName}}" hint-placeholder-val="{{false}}"><span class="fillName">{{card.mt.nm}}</span></sc-if></button>
+</div>
+</sc-if>
+<sc-if value="{{card.working}}" hint-placeholder-val="{{false}}">
+<div style="height: 54px; display: flex; align-items: center; gap: 12px; color: #C7C7CC; font-size: 15px;"><span class="dots"><i></i><i></i><i></i></span>{{card.workLabel}}</div>
+</sc-if>
+<sc-if value="{{card.ready}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; align-items: center; gap: 10px;">
+<span class="mag" onMouseMove="{{card.onMag}}" onMouseLeave="{{card.offMag}}" style="transform: translate({{card.mx}}px,{{card.my}}px);"><button type="button" class="press btnP" onClick="{{card.primary}}" style="height: 54px; padding: 0 26px; border-radius: 27px; display: inline-flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 600;"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 2.1;"><path d="{{card.pIcon}}"></path></svg>{{card.pLabel}}</button></span>
+<sc-for list="{{card.secs}}" as="s" hint-placeholder-count="2">
+<button type="button" class="press btnS" onClick="{{s.fn}}" style="height: 54px; padding: 0 20px; border-radius: 27px; font-size: 15px;">{{s.label}}</button>
+</sc-for>
+</div>
+</sc-if>
+</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{stack.empty}}" hint-placeholder-val="{{false}}">
+<div class="glass fadeUp" style="position: absolute; left: 0; right: 0; top: 0; height: 340px; border-radius: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center;">
+<svg class="ic" width="38" height="38" viewBox="0 0 24 24" aria-hidden="true" style="color: #D9DCE2; stroke-width: 1.4;"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0zM8 12.5l3 3 5-6"></path></svg>
+<div style="font-size: 26px; font-weight: 300;">הכל נקי</div>
+<div style="font-size: 15px; color: #8E8E93; max-width: 300px;">אין כרגע משהו דחוף. Palon יקפיץ את הדבר הבא ברגע שיגיע.</div>
+<button type="button" class="press btnS" onClick="{{stack.reload}}" style="margin-top: 8px; height: 40px; padding: 0 18px; border-radius: 20px; font-size: 14px;">החזר את התור (דמו)</button>
+</div>
+</sc-if>
+</div>
+<div class="glass" onMouseEnter="{{look.shelf}}" onMouseLeave="{{look.off}}" style="border-radius: 26px; padding: 14px 16px 14px; display: flex; flex-direction: column; gap: 11px;">
+<div style="display: flex; align-items: center; gap: 8px;">
+<span style="width: 42px; font-size: 12px; color: #6E6E73; flex-shrink: 0;">תבניות</span>
+<div style="display: flex; gap: 6px; flex-wrap: nowrap;">
+<sc-for list="{{shelf.tpls}}" as="t" hint-placeholder-count="5">
+<div class="qwrap">
+<button type="button" class="{{t.cls}}" onClick="{{t.copy}}" aria-label="{{t.aria}}">
+<sc-if value="{{t.idle}}" hint-placeholder-val="{{true}}"><span class="kbd">{{t.key}}</span><span>{{t.label}}</span></sc-if>
+<sc-if value="{{t.done}}" hint-placeholder-val="{{false}}"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 2.8;"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg><sc-if value="{{t.hasName}}" hint-placeholder-val="{{false}}"><span class="fillName">{{t.name}}</span></sc-if><sc-if value="{{t.noName}}" hint-placeholder-val="{{false}}"><span>הועתק</span></sc-if></sc-if>
+</button>
+<div class="pop glass2">
+<div style="display: flex; justify-content: space-between; align-items: baseline;"><span style="font-size: 15px; font-weight: 600;">{{t.title}}</span><span style="font-size: 12px; color: #8E8E93;">{{t.fillLine}}</span></div>
+<div class="scroll" style="margin-top: 8px; max-height: 150px; font-size: 13px; line-height: 1.55; color: #AEAEB2; white-space: pre-line;">{{t.preview}}</div>
+<div style="margin-top: 12px; display: flex; gap: 8px;">
+<button type="button" class="press btnP" onClick="{{t.copy}}" style="height: 32px; padding: 0 14px; border-radius: 16px; font-size: 13px; font-weight: 600;">העתק</button>
+<button type="button" class="press btnS" onClick="{{t.edit}}" style="height: 32px; padding: 0 14px; border-radius: 16px; font-size: 13px;">ערוך לפני העתקה</button>
+</div>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+<div style="display: flex; align-items: center; gap: 8px;">
+<span style="width: 42px; font-size: 12px; color: #6E6E73; flex-shrink: 0;">משפטים</span>
+<div style="display: flex; gap: 6px;">
+<sc-for list="{{shelf.snips}}" as="t" hint-placeholder-count="3">
+<div class="qwrap">
+<button type="button" class="{{t.cls}}" onClick="{{t.copy}}" aria-label="{{t.aria}}">
+<sc-if value="{{t.idle}}" hint-placeholder-val="{{true}}"><span style="color: #6E6E73;">“</span><span>{{t.label}}</span></sc-if>
+<sc-if value="{{t.done}}" hint-placeholder-val="{{false}}"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 2.8;"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg><span>הועתק</span></sc-if>
+</button>
+<div class="pop glass2">
+<div style="font-size: 15px; font-weight: 600;">{{t.title}}</div>
+<div style="margin-top: 6px; font-size: 13.5px; line-height: 1.55; color: #C7C7CC;">{{t.preview}}</div>
+<div style="margin-top: 12px; display: flex; gap: 8px;"><button type="button" class="press btnP" onClick="{{t.copy}}" style="height: 32px; padding: 0 14px; border-radius: 16px; font-size: 13px; font-weight: 600;">העתק</button><button type="button" class="press btnS" onClick="{{t.edit}}" style="height: 32px; padding: 0 14px; border-radius: 16px; font-size: 13px;">ערוך לפני העתקה</button></div>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+<div style="height: 1px; background: rgba(255,255,255,.06);"></div>
+<div style="display: flex; align-items: center; gap: 8px; position: relative;">
+<sc-for list="{{shelf.acts}}" as="q" hint-placeholder-count="5">
+<button type="button" class="press qa" onClick="{{q.fn}}" aria-label="{{q.label}}"><svg class="ic" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><path d="{{q.d}}"></path></svg><span class="tip glass2">{{q.label}}</span></button>
+</sc-for>
+<div style="flex-grow: 1;"></div>
+<span style="font-size: 12px; color: #6E6E73;">אחרונים</span>
+<div style="display: flex; gap: 6px;">
+<sc-for list="{{shelf.recent}}" as="r" hint-placeholder-count="3">
+<button type="button" class="press av" onClick="{{r.fn}}" aria-label="{{r.name}}" style="outline: {{r.ring}};">{{r.ini}}</button>
+</sc-for>
+</div>
+<sc-if value="{{peek.on}}" hint-placeholder-val="{{false}}">
+<div class="glass2 fadeUp" style="position: absolute; left: 0; bottom: 48px; width: 360px; border-radius: 22px; padding: 16px 18px; z-index: 30; background: linear-gradient(180deg, rgba(38,39,44,.98), rgba(20,20,23,.98));">
+<div style="display: flex; justify-content: space-between; align-items: flex-start;">
+<div><div style="font-size: 19px; font-weight: 600;">{{peek.name}}</div><div style="font-size: 12.5px; color: #8E8E93;">{{peek.meta}}</div></div>
+<span style="font-size: 12px; padding: 3px 10px; border-radius: 10px; background: rgba(255,255,255,.07); color: {{peek.tone}};">{{peek.status}}</span>
+</div>
+<div style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+<sc-for list="{{peek.tl}}" as="x" hint-placeholder-count="2">
+<div style="font-size: 13px; line-height: 1.5;"><span class="mono" style="color: #6E6E73; font-size: 11px;">{{x.w}}</span><div style="color: #D1D1D6;">{{x.t}}</div></div>
+</sc-for>
+</div>
+<div style="margin-top: 10px; font-size: 13px; color: #C7C7CC;">הבא: {{peek.next}}</div>
+<div style="margin-top: 12px; display: flex; gap: 8px;">
+<button type="button" class="press btnP" onClick="{{peek.call}}" style="height: 34px; padding: 0 14px; border-radius: 17px; font-size: 13px; font-weight: 600;">התקשר</button>
+<button type="button" class="press btnS" onClick="{{peek.tpl}}" style="height: 34px; padding: 0 14px; border-radius: 17px; font-size: 13px;">{{peek.tplLabel}}</button>
+<button type="button" class="press btnS" onClick="{{peek.close}}" style="height: 34px; padding: 0 12px; border-radius: 17px; font-size: 13px;">סגור</button>
+</div>
+</div>
+</sc-if>
+</div>
+</div>
+</div>
+
+<div style="position: absolute; left: 1040px; top: 54px; width: 360px; display: flex; flex-direction: column; align-items: center;">
+<div aria-hidden="true" style="position: absolute; top: -10px; width: 340px; height: 300px; background: radial-gradient(closest-side, rgba(200,210,230,.10), rgba(0,0,0,0)); pointer-events: none;"></div>
+<div style="width: 180px; height: 198px; position: relative; transform: {{hero.tf}}; transition: transform .8s cubic-bezier(.34,1.56,.64,1);"><svg viewBox="-125 -150 250 275" width="100%" height="100%" aria-hidden="true" style="overflow: visible; display: block;"><defs><radialGradient id="plHsh" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#a2a2a3"></stop><stop offset="0.32" stop-color="#3b3b3d"></stop><stop offset="0.72" stop-color="#0a0a0c"></stop><stop offset="1" stop-color="#0a0a0c"></stop></radialGradient><linearGradient id="plHey" gradientUnits="userSpaceOnUse" x1="0" y1="-45" x2="0" y2="55"><stop offset="0" stop-color="#A9D8FF"></stop><stop offset="1" stop-color="#3C86FF"></stop></linearGradient><linearGradient id="plHhr" gradientUnits="userSpaceOnUse" x1="0" y1="-60" x2="0" y2="-150"><stop offset="0" stop-color="#E0AE4C"></stop><stop offset="1" stop-color="#FFE9A8"></stop></linearGradient><radialGradient id="plHgd" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#FFF4CF"></stop><stop offset="0.3" stop-color="#D9A444"></stop><stop offset="0.7" stop-color="#5E3F0E"></stop><stop offset="1" stop-color="#3A2606"></stop></radialGradient><radialGradient id="plHpl" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#FFFFFF"></stop><stop offset="0.35" stop-color="#E4DDEB"></stop><stop offset="0.75" stop-color="#9C93AC"></stop><stop offset="1" stop-color="#6E6780"></stop></radialGradient><linearGradient id="plHbr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F3CF83"></stop><stop offset="1" stop-color="#A8731F"></stop></linearGradient><linearGradient id="plHcp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4A5378"></stop><stop offset="1" stop-color="#1D2238"></stop></linearGradient><mask id="plHmk" maskUnits="userSpaceOnUse" x="-125" y="-150" width="250" height="275"><path d="{{pl.hero.body}}" fill="#fff"></path><path d="{{pl.hero.eyeL}}" fill="#000"></path><path d="{{pl.hero.eyeR}}" fill="#000"></path></mask></defs><path d="{{pl.hero.hair}}" transform="{{pl.hero.hairTf}}" opacity="{{pl.hero.hairOp}}" fill="url(#plHhr)"></path><path d="{{pl.hero.curl}}" fill="none" stroke="url(#plHhr)" stroke-width="11" stroke-linecap="round"></path><path d="{{pl.hero.eyeL}}" fill="url(#plHey)"></path><path d="{{pl.hero.eyeR}}" fill="url(#plHey)"></path><rect x="-125" y="-150" width="250" height="275" fill="{{pl.hero.shadeFill}}" mask="url(#plHmk)"></rect><path d="{{pl.hero.bow}}" fill="url(#plHbr)"></path><path d="{{pl.hero.cap}}" fill="url(#plHcp)"></path><path d="{{pl.hero.pom}}" fill="#EDEDF2"></path></svg></div>
+<div style="margin-top: 8px; min-height: 84px; width: 340px; text-align: center; font-size: 20px; font-weight: 300; line-height: 1.45; color: #F5F5F7;">{{speech.shown}}<sc-if value="{{speech.typing}}" hint-placeholder-val="{{false}}"><span class="caret"></span></sc-if></div>
+<div style="margin-top: 22px; width: 350px; display: flex; flex-direction: column; gap: 10px;">
+<sc-if value="{{wb.on}}" hint-placeholder-val="{{false}}">
+<div class="glass toast" style="border-radius: 22px; padding: 16px 18px;">
+<div style="font-size: 11.5px; color: #8E8E93;"><span style="color: #D9DCE2; font-weight: 600;">Palon</span> · בזמן שלא היית (22 דק׳)</div>
+<div style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+<sc-for list="{{wb.items}}" as="w" hint-placeholder-count="3">
+<div class="{{w.cls}}" style="display: flex; gap: 10px; font-size: 14px; line-height: 1.45; color: #E5E5EA;"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" style="flex-shrink: 0; margin-top: 3px; stroke-width: 2.6; color: #A6D6BE;"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg><span>{{w.t}}</span></div>
+</sc-for>
+</div>
+<button type="button" class="press btnS" onClick="{{wb.close}}" style="margin-top: 12px; height: 34px; padding: 0 14px; border-radius: 17px; font-size: 13.5px;">תודה, Palon</button>
+</div>
+</sc-if>
+<sc-for list="{{nudges}}" as="n" hint-placeholder-count="2">
+<div class="glass toast" style="border-radius: 22px; padding: 14px 16px 14px 14px;">
+<div style="display: flex; align-items: flex-start; gap: 10px;">
+<div style="flex-grow: 1;">
+<div style="font-size: 11.5px; color: #8E8E93; display: flex; gap: 8px;"><span style="color: #D9DCE2; font-weight: 600;">Palon</span><span class="mono" dir="ltr">{{n.time}}</span></div>
+<div style="margin-top: 3px; font-size: 15px; line-height: 1.45; color: #F5F5F7;">{{n.text}}</div>
+</div>
+<button type="button" class="press" onClick="{{n.close}}" aria-label="סגור" style="width: 26px; height: 26px; border-radius: 13px; color: #6E6E73; display: flex; align-items: center; justify-content: center;"><svg class="ic" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+</div>
+<button type="button" class="press btnS" onClick="{{n.act}}" style="margin-top: 10px; height: 34px; padding: 0 14px; border-radius: 17px; font-size: 13.5px;">{{n.actLabel}}</button>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="position: absolute; left: 380px; width: 680px; bottom: 30px;">
+<sc-if value="{{cmd.showPanel}}" hint-placeholder-val="{{false}}">
+<div class="glass2 fadeUp" style="margin-bottom: 12px; border-radius: 24px; padding: 16px 18px; background: linear-gradient(180deg, rgba(36,37,42,.97), rgba(18,18,21,.98));">
+<sc-if value="{{cmd.working}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; align-items: center; gap: 12px; color: #C7C7CC; font-size: 15px;"><span style="width: 34px; height: 37px;"><svg viewBox="-125 -150 250 275" width="100%" height="100%" aria-hidden="true" style="overflow: visible; display: block;"><defs><radialGradient id="plBsh" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#a2a2a3"></stop><stop offset="0.32" stop-color="#3b3b3d"></stop><stop offset="0.72" stop-color="#0a0a0c"></stop><stop offset="1" stop-color="#0a0a0c"></stop></radialGradient><linearGradient id="plBey" gradientUnits="userSpaceOnUse" x1="0" y1="-45" x2="0" y2="55"><stop offset="0" stop-color="#A9D8FF"></stop><stop offset="1" stop-color="#3C86FF"></stop></linearGradient><linearGradient id="plBhr" gradientUnits="userSpaceOnUse" x1="0" y1="-60" x2="0" y2="-150"><stop offset="0" stop-color="#E0AE4C"></stop><stop offset="1" stop-color="#FFE9A8"></stop></linearGradient><radialGradient id="plBgd" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#FFF4CF"></stop><stop offset="0.3" stop-color="#D9A444"></stop><stop offset="0.7" stop-color="#5E3F0E"></stop><stop offset="1" stop-color="#3A2606"></stop></radialGradient><radialGradient id="plBpl" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#FFFFFF"></stop><stop offset="0.35" stop-color="#E4DDEB"></stop><stop offset="0.75" stop-color="#9C93AC"></stop><stop offset="1" stop-color="#6E6780"></stop></radialGradient><linearGradient id="plBbr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F3CF83"></stop><stop offset="1" stop-color="#A8731F"></stop></linearGradient><linearGradient id="plBcp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4A5378"></stop><stop offset="1" stop-color="#1D2238"></stop></linearGradient><mask id="plBmk" maskUnits="userSpaceOnUse" x="-125" y="-150" width="250" height="275"><path d="{{pl.bar.body}}" fill="#fff"></path><path d="{{pl.bar.eyeL}}" fill="#000"></path><path d="{{pl.bar.eyeR}}" fill="#000"></path></mask></defs><path d="{{pl.bar.hair}}" transform="{{pl.bar.hairTf}}" opacity="{{pl.bar.hairOp}}" fill="url(#plBhr)"></path><path d="{{pl.bar.curl}}" fill="none" stroke="url(#plBhr)" stroke-width="11" stroke-linecap="round"></path><path d="{{pl.bar.eyeL}}" fill="url(#plBey)"></path><path d="{{pl.bar.eyeR}}" fill="url(#plBey)"></path><rect x="-125" y="-150" width="250" height="275" fill="{{pl.bar.shadeFill}}" mask="url(#plBmk)"></rect><path d="{{pl.bar.bow}}" fill="url(#plBbr)"></path><path d="{{pl.bar.cap}}" fill="url(#plBcp)"></path><path d="{{pl.bar.pom}}" fill="#EDEDF2"></path></svg></span><span class="dots"><i></i><i></i><i></i></span>מבין מה ביקשת…</div>
+</sc-if>
+<sc-if value="{{cmd.isAns}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; align-items: flex-start; gap: 12px;"><span style="width: 34px; height: 37px; flex-shrink: 0;"><svg viewBox="-125 -150 250 275" width="100%" height="100%" aria-hidden="true" style="overflow: visible; display: block;"><defs><radialGradient id="plB2sh" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#a2a2a3"></stop><stop offset="0.32" stop-color="#3b3b3d"></stop><stop offset="0.72" stop-color="#0a0a0c"></stop><stop offset="1" stop-color="#0a0a0c"></stop></radialGradient><linearGradient id="plB2ey" gradientUnits="userSpaceOnUse" x1="0" y1="-45" x2="0" y2="55"><stop offset="0" stop-color="#A9D8FF"></stop><stop offset="1" stop-color="#3C86FF"></stop></linearGradient><linearGradient id="plB2hr" gradientUnits="userSpaceOnUse" x1="0" y1="-60" x2="0" y2="-150"><stop offset="0" stop-color="#E0AE4C"></stop><stop offset="1" stop-color="#FFE9A8"></stop></linearGradient><radialGradient id="plB2gd" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#FFF4CF"></stop><stop offset="0.3" stop-color="#D9A444"></stop><stop offset="0.7" stop-color="#5E3F0E"></stop><stop offset="1" stop-color="#3A2606"></stop></radialGradient><radialGradient id="plB2pl" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#FFFFFF"></stop><stop offset="0.35" stop-color="#E4DDEB"></stop><stop offset="0.75" stop-color="#9C93AC"></stop><stop offset="1" stop-color="#6E6780"></stop></radialGradient><linearGradient id="plB2br" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F3CF83"></stop><stop offset="1" stop-color="#A8731F"></stop></linearGradient><linearGradient id="plB2cp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4A5378"></stop><stop offset="1" stop-color="#1D2238"></stop></linearGradient><mask id="plB2mk" maskUnits="userSpaceOnUse" x="-125" y="-150" width="250" height="275"><path d="{{pl.bar.body}}" fill="#fff"></path><path d="{{pl.bar.eyeL}}" fill="#000"></path><path d="{{pl.bar.eyeR}}" fill="#000"></path></mask></defs><path d="{{pl.bar.hair}}" transform="{{pl.bar.hairTf}}" opacity="{{pl.bar.hairOp}}" fill="url(#plB2hr)"></path><path d="{{pl.bar.curl}}" fill="none" stroke="url(#plB2hr)" stroke-width="11" stroke-linecap="round"></path><path d="{{pl.bar.eyeL}}" fill="url(#plB2ey)"></path><path d="{{pl.bar.eyeR}}" fill="url(#plB2ey)"></path><rect x="-125" y="-150" width="250" height="275" fill="{{pl.bar.shadeFill}}" mask="url(#plB2mk)"></rect><path d="{{pl.bar.bow}}" fill="url(#plB2br)"></path><path d="{{pl.bar.cap}}" fill="url(#plB2cp)"></path><path d="{{pl.bar.pom}}" fill="#EDEDF2"></path></svg></span><div style="font-size: 17px; font-weight: 300; line-height: 1.55; padding-top: 4px;">{{cmd.ans}}<sc-if value="{{cmd.ansTyping}}" hint-placeholder-val="{{false}}"><span class="caret"></span></sc-if></div></div>
+</sc-if>
+<sc-if value="{{cmd.isPal}}" hint-placeholder-val="{{false}}">
+<div style="font-size: 12px; color: #8E8E93; margin-bottom: 8px; display: flex; justify-content: space-between;"><span>תבניות ומשפטים · ימולא: {{cmd.palName}}</span><span><span class="kbd">↑</span> <span class="kbd">↓</span> לבחירה · <span class="kbd">Enter</span> מעתיק</span></div>
+<div style="display: flex; flex-direction: column; gap: 2px;">
+<sc-for list="{{cmd.pal}}" as="o" hint-placeholder-count="4">
+<button type="button" class="{{o.cls}}" onClick="{{o.fn}}" style="display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 14px; text-align: right; width: 100%;"><span class="kbd">{{o.key}}</span><span style="font-size: 15px; color: #F5F5F7;">{{o.title}}</span><span style="font-size: 12.5px; color: #6E6E73; flex-grow: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">{{o.sub}}</span><span style="font-size: 12px; color: #8E8E93;">{{o.hint}}</span></button>
+</sc-for>
+<sc-if value="{{cmd.palEmpty}}" hint-placeholder-val="{{false}}"><div style="padding: 10px 12px; font-size: 14px; color: #8E8E93;">אין תבנית כזו. נסה “הפקדה” או “שאלון”.</div></sc-if>
+</div>
+</sc-if>
+<sc-if value="{{cmd.isPrev}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; align-items: center; gap: 14px;">
+<span style="width: 42px; height: 42px; border-radius: 21px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="{{cmd.pIcon}}"></path></svg></span>
+<div style="flex-grow: 1;">
+<div style="font-size: 12px; color: #8E8E93;">{{cmd.pKicker}}</div>
+<div style="font-size: 19px; font-weight: 500;">{{cmd.pTitle}}</div>
+<div style="font-size: 13.5px; color: #AEAEB2;">{{cmd.pSub}}</div>
+</div>
+<sc-for list="{{cmd.pStats}}" as="d" hint-placeholder-count="2">
+<div style="text-align: center; padding: 6px 12px; border-radius: 14px; background: rgba(255,255,255,.04);"><div style="font-size: 11px; color: #8E8E93;">{{d.k}}</div><div style="font-size: 16px; font-weight: 500; color: {{d.c}};">{{d.v}}</div></div>
+</sc-for>
+<button type="button" class="press btnP" onClick="{{cmd.pGo}}" style="height: 42px; padding: 0 20px; border-radius: 21px; font-size: 15px; font-weight: 600;">{{cmd.pGoLabel}}</button>
+</div>
+</sc-if>
+</div>
+</sc-if>
+<div class="glass2" style="border-radius: 30px; padding: 8px 8px 8px 12px; display: flex; align-items: center; gap: 12px; box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 30px 80px rgba(0,0,0,.75), 0 0 0 1px {{cmd.ring}};">
+<span style="width: 40px; height: 40px; border-radius: 20px; display: flex; align-items: center; justify-content: center; color: #D9DCE2; margin-right: 6px;"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"></path></svg></span>
+<input id="cmd" type="text" value="{{cmd.text}}" onChange="{{cmd.onText}}" onKeyDown="{{cmd.onKey}}" placeholder="תגיד ל-Palon מה לעשות… או הקלד תב לתבניות" aria-label="פקודה ל-Palon" style="flex-grow: 1; font-size: 17px; height: 40px;">
+<div style="display: flex; gap: 6px; align-items: center;">
+<sc-for list="{{cmd.chips}}" as="c" hint-placeholder-count="2">
+<span class="chip" style="height: 28px; padding: 0 11px; border-radius: 14px; display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; background: {{c.bg}}; color: {{c.fg}}; white-space: nowrap;"><span style="color: #8E8E93;">{{c.k}}</span>{{c.v}}</span>
+</sc-for>
+</div>
+<button type="button" class="press btnP" onClick="{{cmd.run}}" aria-label="בצע" style="width: 40px; height: 40px; border-radius: 20px; display: flex; align-items: center; justify-content: center; opacity: {{cmd.goOp}};"><svg class="ic" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 2.2;"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+</div>
+<sc-if value="{{cmd.showSugg}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px;">
+<span style="font-size: 12px; color: #6E6E73; display: inline-flex; align-items: center; gap: 5px; margin-left: 8px;"><span class="kbd">1</span>–<span class="kbd">5</span> מעתיק תבנית</span>
+<sc-for list="{{cmd.sugg}}" as="s" hint-placeholder-count="3">
+<button type="button" class="press demo" onClick="{{s.fn}}" style="height: 28px; padding: 0 12px; border-radius: 14px; font-size: 12.5px; border: 1px solid rgba(255,255,255,.06);">{{s.label}}</button>
+</sc-for>
+</div>
+</sc-if>
+</div>
+
+<sc-if value="{{gong.on}}" hint-placeholder-val="{{false}}">
+<span aria-hidden="true" style="position: absolute; left: {{gong.x}}px; top: {{gong.y}}px; width: {{gong.s}}px; height: {{gong.s}}px; border-radius: 50%; background: radial-gradient(closest-side, rgba(236,190,105,.42), rgba(205,150,60,.14) 55%, rgba(0,0,0,0)); opacity: {{gong.o}}; pointer-events: none; mix-blend-mode: screen;"></span>
+<span aria-hidden="true" style="position: absolute; left: {{gong.rx}}px; top: {{gong.ry}}px; width: {{gong.rs}}px; height: {{gong.rs}}px; border-radius: 50%; border: 2px solid rgba(232,190,110,.8); opacity: {{gong.ro}}; pointer-events: none;"></span>
+</sc-if>
+<sc-for list="{{burst}}" as="p" hint-placeholder-count="0">
+<span aria-hidden="true" style="position: absolute; left: {{p.x}}px; top: {{p.y}}px; width: {{p.s}}px; height: {{p.s}}px; border-radius: 50%; background: {{p.bg}}; opacity: {{p.o}}; box-shadow: 0 0 {{p.g}}px rgba(230,236,255,.9); pointer-events: none;"></span>
+</sc-for>
+<sc-if value="{{shock.on}}" hint-placeholder-val="{{false}}">
+<span aria-hidden="true" style="position: absolute; left: {{shock.x}}px; top: {{shock.y}}px; width: {{shock.s}}px; height: {{shock.s}}px; border-radius: 50%; border: 1.5px solid rgba(235,240,255,.8); opacity: {{shock.o}}; pointer-events: none;"></span>
+</sc-if>
+<sc-if value="{{fly.on}}" hint-placeholder-val="{{false}}">
+<span class="silver" aria-hidden="true" style="position: absolute; left: {{fly.x}}px; top: {{fly.y}}px; font-size: 34px; font-weight: 500; transform: translate(-50%,-50%) scale({{fly.s}}); opacity: {{fly.o}}; pointer-events: none; filter: drop-shadow(0 0 14px rgba(255,255,255,.5)); white-space: nowrap;">{{fly.text}}</span>
+</sc-if>
+</div>
+
+<div class="scrim" onClick="{{sheet.close}}" style="position: absolute; inset: 0; background: rgba(0,0,0,.55); opacity: {{sheet.scrimOp}}; pointer-events: {{sheet.pe}};"></div>
+<aside class="sheet glass2" aria-label="{{sheet.title}}" style="position: absolute; left: 14px; top: 14px; bottom: 14px; width: 540px; border-radius: 32px; transform: translateX({{sheet.tx}}px); opacity: {{sheet.op}}; display: flex; flex-direction: column; overflow: hidden;">
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 26px 28px 8px;">
+<div><div style="font-size: 12.5px; color: #8E8E93;">{{sheet.kicker}}</div><div style="font-size: 28px; font-weight: 500;">{{sheet.title}}</div></div>
+<button type="button" class="press btnS" onClick="{{sheet.close}}" aria-label="סגור" style="width: 38px; height: 38px; border-radius: 19px; display: flex; align-items: center; justify-content: center;"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+</div>
+<sc-if value="{{sheet.isMonth}}" hint-placeholder-val="{{false}}">
+<div class="scroll" style="flex-grow: 1; padding: 10px 28px 28px;">
+<div style="display: flex; align-items: baseline; gap: 10px;"><span class="silver" style="font-size: 64px; font-weight: 200; line-height: 1;">{{month.deals}}</span><span style="font-size: 20px; color: #6E6E73; font-weight: 300;">/ 55 עסקאות</span></div>
+<div style="font-size: 14px; color: #C7C7CC; margin-top: 6px;">{{month.line}}</div>
+<div style="margin-top: 22px; height: 150px; display: flex; align-items: flex-end; gap: 6px;">
+<sc-for list="{{month.bars}}" as="b" hint-placeholder-count="20">
+<div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;">
+<div style="width: 100%; height: {{b.h}}px; border-radius: 6px; background: {{b.bg}}; border: {{b.bd}}; transition: height .8s cubic-bezier(.22,1,.36,1);"></div>
+<span class="mono" style="font-size: 9.5px; color: #6E6E73;">{{b.d}}</span>
+</div>
+</sc-for>
+</div>
+<div style="margin-top: 26px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+<sc-for list="{{month.tiles}}" as="t" hint-placeholder-count="4">
+<div style="padding: 14px 16px; border-radius: 18px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06);"><div style="font-size: 12.5px; color: #8E8E93;">{{t.k}}</div><div style="font-size: 24px; font-weight: 300;">{{t.v}}</div><div style="font-size: 12px; color: #6E6E73;">{{t.s}}</div></div>
+</sc-for>
+</div>
+<div style="margin-top: 22px; font-size: 13px; color: #8E8E93;">דרגות</div>
+<div style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+<sc-for list="{{month.tiers}}" as="t" hint-placeholder-count="4">
+<div style="display: flex; align-items: center; gap: 12px; font-size: 14px;"><span style="width: 64px; color: #C7C7CC;">{{t.name}}</span><div style="flex-grow: 1; height: 6px; border-radius: 3px; background: rgba(255,255,255,.06); overflow: hidden;"><div style="height: 100%; width: {{t.w}}%; background: linear-gradient(270deg,#FFFFFF,#8E939C); border-radius: 3px;"></div></div><span class="mono" style="width: 22px; text-align: left; color: #AEAEB2;">{{t.n}}</span></div>
+</sc-for>
+</div>
+<button type="button" class="press btnP" onClick="{{month.ask}}" style="margin-top: 26px; height: 46px; padding: 0 22px; border-radius: 23px; font-size: 15px; font-weight: 600;">{{month.cta}}</button>
+</div>
+</sc-if>
+<sc-if value="{{sheet.isTpl}}" hint-placeholder-val="{{false}}">
+<div class="scroll" style="flex-grow: 1; padding: 10px 20px 24px; display: flex; flex-direction: column; gap: 8px;">
+<sc-for list="{{tpls}}" as="t" hint-placeholder-count="5">
+<div class="row" style="border-radius: 20px; padding: 14px 16px; background: {{t.bg}}; border: 1px solid rgba(255,255,255,.06);">
+<div style="display: flex; align-items: center; gap: 12px;">
+<button type="button" onClick="{{t.pick}}" style="flex-grow: 1; text-align: right;"><div style="font-size: 16.5px; font-weight: 500;">{{t.title}}</div><div style="font-size: 12.5px; color: #8E8E93;">{{t.tag}} · {{t.region}}</div></button>
+<button type="button" class="{{t.copyCls}}" onClick="{{t.copy}}" style="height: 36px; padding: 0 14px; border-radius: 18px; display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px;"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="{{t.copyIcon}}"></path></svg>{{t.copyLabel}}</button>
+</div>
+<sc-if value="{{t.open}}" hint-placeholder-val="{{false}}">
+<textarea class="scroll" value="{{t.edit}}" onChange="{{t.onEdit}}" aria-label="עריכת תבנית" style="margin-top: 12px; width: 100%; height: 220px; resize: none; font: inherit; font-size: 13.5px; color: #E5E5EA; line-height: 1.6; background: rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 10px 12px; outline: none;">{{t.edit}}</textarea>
+</sc-if>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{sheet.isStub}}" hint-placeholder-val="{{false}}">
+<div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 60px 60px;">
+<div style="width: 120px; height: 132px;"><svg viewBox="-125 -150 250 275" width="100%" height="100%" aria-hidden="true" style="overflow: visible; display: block;"><defs><radialGradient id="plSsh" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#a2a2a3"></stop><stop offset="0.32" stop-color="#3b3b3d"></stop><stop offset="0.72" stop-color="#0a0a0c"></stop><stop offset="1" stop-color="#0a0a0c"></stop></radialGradient><linearGradient id="plSey" gradientUnits="userSpaceOnUse" x1="0" y1="-45" x2="0" y2="55"><stop offset="0" stop-color="#A9D8FF"></stop><stop offset="1" stop-color="#3C86FF"></stop></linearGradient><linearGradient id="plShr" gradientUnits="userSpaceOnUse" x1="0" y1="-60" x2="0" y2="-150"><stop offset="0" stop-color="#E0AE4C"></stop><stop offset="1" stop-color="#FFE9A8"></stop></linearGradient><radialGradient id="plSgd" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#FFF4CF"></stop><stop offset="0.3" stop-color="#D9A444"></stop><stop offset="0.7" stop-color="#5E3F0E"></stop><stop offset="1" stop-color="#3A2606"></stop></radialGradient><radialGradient id="plSpl" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#FFFFFF"></stop><stop offset="0.35" stop-color="#E4DDEB"></stop><stop offset="0.75" stop-color="#9C93AC"></stop><stop offset="1" stop-color="#6E6780"></stop></radialGradient><linearGradient id="plSbr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F3CF83"></stop><stop offset="1" stop-color="#A8731F"></stop></linearGradient><linearGradient id="plScp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4A5378"></stop><stop offset="1" stop-color="#1D2238"></stop></linearGradient><mask id="plSmk" maskUnits="userSpaceOnUse" x="-125" y="-150" width="250" height="275"><path d="{{pl.sheet.body}}" fill="#fff"></path><path d="{{pl.sheet.eyeL}}" fill="#000"></path><path d="{{pl.sheet.eyeR}}" fill="#000"></path></mask></defs><path d="{{pl.sheet.hair}}" transform="{{pl.sheet.hairTf}}" opacity="{{pl.sheet.hairOp}}" fill="url(#plShr)"></path><path d="{{pl.sheet.curl}}" fill="none" stroke="url(#plShr)" stroke-width="11" stroke-linecap="round"></path><path d="{{pl.sheet.eyeL}}" fill="url(#plSey)"></path><path d="{{pl.sheet.eyeR}}" fill="url(#plSey)"></path><rect x="-125" y="-150" width="250" height="275" fill="{{pl.sheet.shadeFill}}" mask="url(#plSmk)"></rect><path d="{{pl.sheet.bow}}" fill="url(#plSbr)"></path><path d="{{pl.sheet.cap}}" fill="url(#plScp)"></path><path d="{{pl.sheet.pom}}" fill="#EDEDF2"></path></svg></div>
+<div style="margin-top: 18px; font-size: 22px; font-weight: 400;">{{sheet.stubTitle}}</div>
+<div style="margin-top: 8px; font-size: 15px; color: #8E8E93; line-height: 1.6;">{{sheet.stubText}}</div>
+</div>
+</sc-if>
+</aside>
+
+<div class="overlay" style="position: absolute; inset: 0; background: radial-gradient(900px 600px at 50% 30%, #1A1B1F 0%, #050506 70%); opacity: {{morn.op}}; transform: scale({{morn.sc}}); pointer-events: {{morn.pe}}; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+<sc-if value="{{morn.live}}" hint-placeholder-val="{{false}}">
+<div style="width: 250px; height: 275px;"><svg viewBox="-125 -150 250 275" width="100%" height="100%" aria-hidden="true" style="overflow: visible; display: block;"><defs><radialGradient id="plMsh" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#a2a2a3"></stop><stop offset="0.32" stop-color="#3b3b3d"></stop><stop offset="0.72" stop-color="#0a0a0c"></stop><stop offset="1" stop-color="#0a0a0c"></stop></radialGradient><linearGradient id="plMey" gradientUnits="userSpaceOnUse" x1="0" y1="-45" x2="0" y2="55"><stop offset="0" stop-color="#A9D8FF"></stop><stop offset="1" stop-color="#3C86FF"></stop></linearGradient><linearGradient id="plMhr" gradientUnits="userSpaceOnUse" x1="0" y1="-60" x2="0" y2="-150"><stop offset="0" stop-color="#E0AE4C"></stop><stop offset="1" stop-color="#FFE9A8"></stop></linearGradient><radialGradient id="plMgd" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#FFF4CF"></stop><stop offset="0.3" stop-color="#D9A444"></stop><stop offset="0.7" stop-color="#5E3F0E"></stop><stop offset="1" stop-color="#3A2606"></stop></radialGradient><radialGradient id="plMpl" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#FFFFFF"></stop><stop offset="0.35" stop-color="#E4DDEB"></stop><stop offset="0.75" stop-color="#9C93AC"></stop><stop offset="1" stop-color="#6E6780"></stop></radialGradient><linearGradient id="plMbr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F3CF83"></stop><stop offset="1" stop-color="#A8731F"></stop></linearGradient><linearGradient id="plMcp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4A5378"></stop><stop offset="1" stop-color="#1D2238"></stop></linearGradient><mask id="plMmk" maskUnits="userSpaceOnUse" x="-125" y="-150" width="250" height="275"><path d="{{pl.morn.body}}" fill="#fff"></path><path d="{{pl.morn.eyeL}}" fill="#000"></path><path d="{{pl.morn.eyeR}}" fill="#000"></path></mask></defs><path d="{{pl.morn.hair}}" transform="{{pl.morn.hairTf}}" opacity="{{pl.morn.hairOp}}" fill="url(#plMhr)"></path><path d="{{pl.morn.curl}}" fill="none" stroke="url(#plMhr)" stroke-width="11" stroke-linecap="round"></path><path d="{{pl.morn.eyeL}}" fill="url(#plMey)"></path><path d="{{pl.morn.eyeR}}" fill="url(#plMey)"></path><rect x="-125" y="-150" width="250" height="275" fill="{{pl.morn.shadeFill}}" mask="url(#plMmk)"></rect><path d="{{pl.morn.bow}}" fill="url(#plMbr)"></path><path d="{{pl.morn.cap}}" fill="url(#plMcp)"></path><path d="{{pl.morn.pom}}" fill="#EDEDF2"></path></svg></div>
+<div class="fadeUp" style="margin-top: 12px; font-size: 13px; color: #8E8E93; letter-spacing: .08em;">יום חמישי · 24 בספטמבר · 08:52</div>
+<div class="silver" style="margin-top: 6px; font-size: 64px; font-weight: 200; letter-spacing: -.01em; min-height: 80px;">{{morn.hello}}</div>
+<div style="margin-top: 22px; display: flex; flex-direction: column; gap: 12px; width: 560px;">
+<sc-for list="{{morn.items}}" as="m" hint-placeholder-count="3">
+<div class="{{m.cls}}" style="display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-radius: 20px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06);"><span class="mono" style="font-size: 13px; color: #6E6E73;">{{m.n}}</span><span style="font-size: 18px; font-weight: 300;">{{m.t}}</span></div>
+</sc-for>
+</div>
+<button type="button" class="press btnP fadeUp fu5" onClick="{{morn.go}}" style="margin-top: 34px; height: 58px; padding: 0 56px; border-radius: 29px; font-size: 20px; font-weight: 600;">יאללה</button>
+</sc-if>
+</div>
+
+<div class="overlay" style="position: absolute; inset: 0; background: {{eod.bg}}; opacity: {{eod.op}}; transform: scale({{eod.sc}}); pointer-events: {{eod.pe}}; display: flex; align-items: center; justify-content: center; transition: opacity .7s, transform .8s, background 1.4s;">
+<sc-if value="{{eod.night}}" hint-placeholder-val="{{false}}">
+<div class="fadeUp" style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+<div style="position: relative; width: 150px; height: 165px;"><div aria-hidden="true" style="position: absolute; left: -110px; top: -90px; width: 370px; height: 340px; background: radial-gradient(closest-side, rgba(150,170,220,.16), rgba(0,0,0,0));"></div><div style="position: relative; width: 150px; height: 165px;"><svg viewBox="-125 -150 250 275" width="100%" height="100%" aria-hidden="true" style="overflow: visible; display: block;"><defs><radialGradient id="plE2sh" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#a2a2a3"></stop><stop offset="0.32" stop-color="#3b3b3d"></stop><stop offset="0.72" stop-color="#0a0a0c"></stop><stop offset="1" stop-color="#0a0a0c"></stop></radialGradient><linearGradient id="plE2ey" gradientUnits="userSpaceOnUse" x1="0" y1="-45" x2="0" y2="55"><stop offset="0" stop-color="#A9D8FF"></stop><stop offset="1" stop-color="#3C86FF"></stop></linearGradient><linearGradient id="plE2hr" gradientUnits="userSpaceOnUse" x1="0" y1="-60" x2="0" y2="-150"><stop offset="0" stop-color="#E0AE4C"></stop><stop offset="1" stop-color="#FFE9A8"></stop></linearGradient><radialGradient id="plE2gd" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#FFF4CF"></stop><stop offset="0.3" stop-color="#D9A444"></stop><stop offset="0.7" stop-color="#5E3F0E"></stop><stop offset="1" stop-color="#3A2606"></stop></radialGradient><radialGradient id="plE2pl" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#FFFFFF"></stop><stop offset="0.35" stop-color="#E4DDEB"></stop><stop offset="0.75" stop-color="#9C93AC"></stop><stop offset="1" stop-color="#6E6780"></stop></radialGradient><linearGradient id="plE2br" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F3CF83"></stop><stop offset="1" stop-color="#A8731F"></stop></linearGradient><linearGradient id="plE2cp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4A5378"></stop><stop offset="1" stop-color="#1D2238"></stop></linearGradient><mask id="plE2mk" maskUnits="userSpaceOnUse" x="-125" y="-150" width="250" height="275"><path d="{{pl.eod.body}}" fill="#fff"></path><path d="{{pl.eod.eyeL}}" fill="#000"></path><path d="{{pl.eod.eyeR}}" fill="#000"></path></mask></defs><path d="{{pl.eod.hair}}" transform="{{pl.eod.hairTf}}" opacity="{{pl.eod.hairOp}}" fill="url(#plE2hr)"></path><path d="{{pl.eod.curl}}" fill="none" stroke="url(#plE2hr)" stroke-width="11" stroke-linecap="round"></path><path d="{{pl.eod.eyeL}}" fill="url(#plE2ey)"></path><path d="{{pl.eod.eyeR}}" fill="url(#plE2ey)"></path><rect x="-125" y="-150" width="250" height="275" fill="{{pl.eod.shadeFill}}" mask="url(#plE2mk)"></rect><path d="{{pl.eod.bow}}" fill="url(#plE2br)"></path><path d="{{pl.eod.cap}}" fill="url(#plE2cp)"></path><path d="{{pl.eod.pom}}" fill="#EDEDF2"></path></svg></div></div>
+<div style="margin-top: 22px; font-size: 40px; font-weight: 200; color: #D9DCE2;">לילה טוב, נועם</div>
+<div class="fadeUp fu3" style="margin-top: 8px; font-size: 16px; color: #6E6E73;">מחר נמשיך מ-{{eod.deals}}. שמרתי לך את Tomer ל-10:00.</div>
+</div>
+</sc-if>
+<sc-if value="{{eod.live}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; align-items: center; gap: 80px;">
+<div style="display: flex; flex-direction: column; align-items: center;">
+<div style="width: 170px; height: 187px;"><svg viewBox="-125 -150 250 275" width="100%" height="100%" aria-hidden="true" style="overflow: visible; display: block;"><defs><radialGradient id="plEsh" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#a2a2a3"></stop><stop offset="0.32" stop-color="#3b3b3d"></stop><stop offset="0.72" stop-color="#0a0a0c"></stop><stop offset="1" stop-color="#0a0a0c"></stop></radialGradient><linearGradient id="plEey" gradientUnits="userSpaceOnUse" x1="0" y1="-45" x2="0" y2="55"><stop offset="0" stop-color="#A9D8FF"></stop><stop offset="1" stop-color="#3C86FF"></stop></linearGradient><linearGradient id="plEhr" gradientUnits="userSpaceOnUse" x1="0" y1="-60" x2="0" y2="-150"><stop offset="0" stop-color="#E0AE4C"></stop><stop offset="1" stop-color="#FFE9A8"></stop></linearGradient><radialGradient id="plEgd" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#FFF4CF"></stop><stop offset="0.3" stop-color="#D9A444"></stop><stop offset="0.7" stop-color="#5E3F0E"></stop><stop offset="1" stop-color="#3A2606"></stop></radialGradient><radialGradient id="plEpl" gradientUnits="userSpaceOnUse" cx="-50.56" cy="-63.2" r="244.9"><stop offset="0" stop-color="#FFFFFF"></stop><stop offset="0.35" stop-color="#E4DDEB"></stop><stop offset="0.75" stop-color="#9C93AC"></stop><stop offset="1" stop-color="#6E6780"></stop></radialGradient><linearGradient id="plEbr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F3CF83"></stop><stop offset="1" stop-color="#A8731F"></stop></linearGradient><linearGradient id="plEcp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4A5378"></stop><stop offset="1" stop-color="#1D2238"></stop></linearGradient><mask id="plEmk" maskUnits="userSpaceOnUse" x="-125" y="-150" width="250" height="275"><path d="{{pl.eod.body}}" fill="#fff"></path><path d="{{pl.eod.eyeL}}" fill="#000"></path><path d="{{pl.eod.eyeR}}" fill="#000"></path></mask></defs><path d="{{pl.eod.hair}}" transform="{{pl.eod.hairTf}}" opacity="{{pl.eod.hairOp}}" fill="url(#plEhr)"></path><path d="{{pl.eod.curl}}" fill="none" stroke="url(#plEhr)" stroke-width="11" stroke-linecap="round"></path><path d="{{pl.eod.eyeL}}" fill="url(#plEey)"></path><path d="{{pl.eod.eyeR}}" fill="url(#plEey)"></path><rect x="-125" y="-150" width="250" height="275" fill="{{pl.eod.shadeFill}}" mask="url(#plEmk)"></rect><path d="{{pl.eod.bow}}" fill="url(#plEbr)"></path><path d="{{pl.eod.cap}}" fill="url(#plEcp)"></path><path d="{{pl.eod.pom}}" fill="#EDEDF2"></path></svg></div>
+<div class="fadeUp" style="margin-top: 10px; font-size: 13px; color: #8E8E93; letter-spacing: .08em;">סיכום היום</div>
+<div class="silver" style="font-size: 120px; font-weight: 200; line-height: 1;">{{eod.score}}</div>
+<div style="font-size: 15px; color: #C7C7CC;">ציון היום · הכי גבוה השבוע</div>
+</div>
+<div style="width: 520px; display: flex; flex-direction: column; gap: 12px;">
+<sc-for list="{{eod.rows}}" as="r" hint-placeholder-count="3">
+<div class="{{r.cls}}" style="display: flex; align-items: center; justify-content: space-between; padding: 16px 22px; border-radius: 20px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06);"><span style="display: flex; align-items: center; gap: 10px; font-size: 16px; color: #C7C7CC;"><svg width="30" height="30" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="14" style="fill: none; stroke: rgba(255,255,255,.08); stroke-width: 5;"></circle><circle cx="18" cy="18" r="14" transform="rotate(-90 18 18)" style="fill: none; stroke: {{r.dot}}; stroke-width: 5; stroke-linecap: round; stroke-dasharray: {{r.dash}};"></circle></svg>{{r.k}}</span><span style="font-size: 24px; font-weight: 300;">{{r.v}}</span></div>
+</sc-for>
+<div class="fadeUp fu4" style="margin-top: 6px; padding: 18px 22px; border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03)); border: 1px solid rgba(255,255,255,.1);">
+<div style="font-size: 12.5px; color: #8E8E93;">טיפ אחד למחר</div>
+<div style="margin-top: 4px; font-size: 17px; line-height: 1.55; font-weight: 300;">החזרות שלך אחרי 16:00 נסגרות פי 2. שמור את Tomer ו-Maya לחלון הזה.</div>
+</div>
+<button type="button" class="press btnP fadeUp fu5" onClick="{{eod.go}}" style="margin-top: 12px; align-self: flex-start; height: 54px; padding: 0 38px; border-radius: 27px; font-size: 18px; font-weight: 600;">סיימנו להיום</button>
+</div>
+</div>
+</sc-if>
+</div>
+
+<sc-if value="{{toast.on}}" hint-placeholder-val="{{false}}">
+<div class="glass2 fadeUp" role="status" style="position: absolute; top: 52px; left: 50%; transform: translateX(-50%); padding: 9px 18px; border-radius: 20px; font-size: 14px; display: flex; align-items: center; gap: 8px;"><svg class="ic" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 2.4;"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>{{toast.text}}</div>
+</sc-if>
+
+<div style="position: absolute; right: 20px; bottom: 20px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; z-index: 40;">
+<sc-if value="{{demoOpen}}" hint-placeholder-val="{{false}}">
+<div class="glass fadeUp" style="border-radius: 18px; padding: 6px; display: flex; flex-direction: column; gap: 2px; width: 180px;">
+<sc-for list="{{demo}}" as="d" hint-placeholder-count="9">
+<button type="button" class="press demo" onClick="{{d.fn}}" style="height: 30px; padding: 0 12px; border-radius: 12px; font-size: 13px; text-align: right;">{{d.label}}</button>
+</sc-for>
+</div>
+</sc-if>
+<button type="button" class="press glass demo" onClick="{{demoToggle}}" style="height: 30px; padding: 0 14px; border-radius: 15px; font-size: 11px; letter-spacing: .14em;"><span class="mono" dir="ltr">DEMO</span></button>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+// Palon Now. Palon motion engine adapted from bloub by jeremy-prt (MIT) https://github.com/jeremy-prt/bloub
+class Component extends DCLogic {
+  state = {
+    now: 0, morning: true, mornAt: 0, mornOut: -1, eod: false, eodAt: -1,
+    queue: [0, 1, 2, 3, 4, 5], anim: 'enter', working: -1,
+    rings: { calls: { v: 64, a: 0, t0: 0.2 }, cbs: { v: 4, a: 0, t0: 0.35 }, deps: { v: 1, a: 0, t0: 0.5 } },
+    closed: {}, trail: [['Itay Shani', 'הפקדה · ₪400'], ['שירן כהן', 'שאלון'], ['Liad Perry', 'חזרה']], deals: 40, ftd: 8200, payA: 8200, payT0: -9, payPulse: 0,
+    speech: null, happyUntil: -1, thinkUntil: -1,
+    burst: null, fly: null, nudges: [], nudgeNext: 0,
+    cmdText: '', cmdRes: null, sheet: '', demoOpen: false, look: '', lookK: '', lookUntil: -1, mag: { x: 0, y: 0 }, cp: { i: -1, t0: -9, name: '' }, peek: -1, palSel: 0, editIdx: -1, editText: '', tuft: { k: '', until: -1 }, acc: false, shiny: '', rosh: true, honeyDone: false, honeyT0: -99, gongT0: -99, wb: -1, night: -1, lastSheet: 'month', tpl: -1, copied: -1, toast: '', toastAt: -9, heardSet: false
+  };
+
+  engine() {
+    if (!this._E) this._E = (function () {
+  // Palon engine. Motion approach adapted from bloub (MIT, (c) jeremy-prt, github.com/jeremy-prt/bloub):
+  // pure sample(t), radial-profile body, eyes on a sphere, easeOutQuint morphs, loopNoise gaze drift, blink schedule.
+  var TAU = Math.PI * 2, N = 64;
+  var clamp = function (v, a, b) { a = a == null ? 0 : a; b = b == null ? 1 : b; return v < a ? a : v > b ? b : v; };
+  var lerp = function (a, b, t) { return a + (b - a) * t; };
+  var ease = function (t) { return 1 - Math.pow(1 - t, 5); };
+  var r2 = function (v) { return Math.round(v * 100) / 100; };
+  var noise = function (t, p, s) { var a = t / p * TAU; return 0.55 * Math.sin(a + s) + 0.3 * Math.sin(2 * a + s * 1.7 + 1.1) + 0.15 * Math.sin(3 * a + s * 2.3 + 2.4); };
+  var COS = [], SIN = [];
+  for (var i = 0; i < N; i++) { COS.push(Math.cos(i / N * TAU)); SIN.push(Math.sin(i / N * TAU)); }
+  // blink schedule, deterministic (mulberry32)
+  var BL = (function () { var a = 0x5eed, rnd = function () { a = (a + 0x6d2b79f5) >>> 0; var t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    var o = [], t = 1.2; while (t < 4000) { o.push(t); t += 2.2 + rnd() * 2.8; if (rnd() < 0.18) { o.push(t); t += 0.26; } } return o; })();
+  function blinkLid(t) {
+    var p = ((t % 4000) + 4000) % 4000, lo = 0, hi = BL.length - 1;
+    while (lo < hi) { var m = (lo + hi + 1) >> 1; if (BL[m] <= p) lo = m; else hi = m - 1; }
+    var k = (p - BL[lo]) / 0.19; if (k < 0 || k > 1) return 1;
+    return k < 0.42 ? 1 - k / 0.42 : ease((k - 0.42) / 0.58);
+  }
+  var eye = function (w, h, o) { o = o || {}; return { w: w, h: h, open: o.open == null ? 1 : o.open, tilt: o.tilt || 0, bend: o.bend || 0 }; };
+  // each mood: head orientation (degrees), eye split on sphere, two eyes, body squash and live motion
+  var MOODS = {
+    idle:   { gaze: [-1, -5.5, -13], split: 15.5, eyes: [eye(.186, .412), eye(.186, .412)], wander: 1 },
+    listen: { gaze: [1, -1, -6], split: 16, eyes: [eye(.215, .46), eye(.215, .46)], wander: .45, sy: 1.012 },
+    think:  { gaze: [-21, 12, -5], split: 15, eyes: [eye(.19, .25, { tilt: -6 }), eye(.19, .31, { tilt: 3 })], wander: .5 },
+    talk:   { gaze: [0, -4, -11], split: 15.5, eyes: [eye(.19, .4), eye(.19, .4)], wander: .6 },
+    happy:  { gaze: [0, -3, -9], split: 17, eyes: [eye(.26, .1, { bend: .06 }), eye(.26, .1, { bend: .06 })], wander: .35 }
+  };
+  var MORPH = 0.5;
+  function mood(id, t) {
+    var m = MOODS[id], g = m.gaze;
+    var p = { yaw: g[0], pitch: g[1], roll: g[2], split: m.split, eyes: m.eyes.map(function (e) { return { w: e.w, h: e.h, open: e.open, tilt: e.tilt, bend: e.bend }; }),
+      sx: 1, sy: m.sy || 1, offY: 0, wander: m.wander, hair: 0 };
+    if (id === 'talk') {
+      // syllable rhythm: layered sines, never repeats visibly
+      var s = 0.5 + 0.5 * Math.sin(t * 11.3) * (0.6 + 0.4 * Math.sin(t * 2.7));
+      var s2 = Math.max(0, Math.sin(t * 5.9 + 1));
+      p.eyes.forEach(function (e) { e.h *= 1 + 0.07 * s; e.w *= 1 - 0.025 * s; });
+      p.sy *= 1 + 0.016 * s2; p.sx *= 1 - 0.008 * s2; p.offY = -0.014 * s2; p.pitch += 2.5 * s2; p.hair = 3 * s2;
+    }
+    if (id === 'happy') {
+      var c = (t % 0.95) / 0.95, hop = Math.sin(Math.PI * c); hop = hop * hop;
+      p.offY = -0.07 * hop; p.sy *= 1 + 0.025 * hop - 0.03 * Math.pow(1 - hop, 6); p.sx *= 1 - 0.015 * hop + 0.025 * Math.pow(1 - hop, 6);
+      p.hair = 10 * Math.cos(TAU * c) * -1; p.roll += 4 * Math.sin(t * 2.1);
+    }
+    if (id === 'think') { p.yaw += 5 * Math.sin(t * 0.9); p.pitch += 3 * Math.sin(t * 0.6 + 1); }
+    if (id === 'listen') { p.roll += 2 * Math.sin(t * 1.1); var nod = Math.max(0, Math.sin(t * 2.2)); p.pitch -= 3 * nod * nod; }
+    return p;
+  }
+  function blendPose(a, b, k) {
+    var o = {}; ['yaw', 'pitch', 'roll', 'split', 'sx', 'sy', 'offY', 'wander', 'hair'].forEach(function (f) { o[f] = lerp(a[f], b[f], k); });
+    o.eyes = a.eyes.map(function (e, i) { var f = b.eyes[i]; return { w: lerp(e.w, f.w, k), h: lerp(e.h, f.h, k), open: lerp(e.open, f.open, k), tilt: lerp(e.tilt, f.tilt, k), bend: lerp(e.bend, f.bend, k) }; });
+    return o;
+  }
+  function create(id, now) { return { cur: id, prev: null, tCur: now || 0, tPrev: 0, frozen: null, blinkAt: -10, seed: 0 }; }
+  function composed(s, now) {
+    var p = mood(s.cur, now - s.tCur), since = now - s.tCur;
+    if (since >= MORPH || (!s.prev && !s.frozen)) return p;
+    var from = s.frozen || mood(s.prev, now - s.tPrev);
+    return blendPose(from, p, ease(clamp(since / MORPH)));
+  }
+  function setMood(s, id, now) {
+    if (id === s.cur || !MOODS[id]) return;
+    s.frozen = (s.prev && now - s.tCur < MORPH) ? composed(s, now) : null;
+    s.prev = s.cur; s.tPrev = s.tCur; s.cur = id; s.tCur = now; s.blinkAt = now;
+  }
+  // tangent frames of two eyes on a unit sphere (bloub face.ts eyePoses)
+  function spin(u, v, a) { var c = Math.cos(a), s = Math.sin(a); return [[u[0] * c + v[0] * s, u[1] * c + v[1] * s, u[2] * c + v[2] * s], [v[0] * c - u[0] * s, v[1] * c - u[1] * s, v[2] * c - u[2] * s]]; }
+  function eyePoses(yaw, pitch, roll, split) {
+    var d = Math.PI / 180, f = [0, 0, 1], r = [1, 0, 0], dn = [0, 1, 0], q;
+    q = spin(f, r, yaw * d); f = q[0]; r = q[1];
+    q = spin(dn, f, pitch * d); dn = q[0]; f = q[1];
+    q = spin(r, dn, roll * d); r = q[0]; dn = q[1];
+    return [-1, 1].map(function (side) { var e = spin(f, r, split * side * d); return { x: e[0][0], y: e[0][1], a: e[1][0], b: e[1][1], c: dn[0], d: dn[1], z: e[0][2] }; });
+  }
+  function catmull(P) {
+    var n = P.length, d = 'M' + r2(P[0][0]) + ' ' + r2(P[0][1]);
+    for (var i = 0; i < n; i++) {
+      var p0 = P[(i - 1 + n) % n], p1 = P[i], p2 = P[(i + 1) % n], p3 = P[(i + 2) % n];
+      d += 'C' + r2(p1[0] + (p2[0] - p0[0]) / 6) + ' ' + r2(p1[1] + (p2[1] - p0[1]) / 6) + ' ' + r2(p2[0] - (p3[0] - p1[0]) / 6) + ' ' + r2(p2[1] - (p3[1] - p1[1]) / 6) + ' ' + r2(p2[0]) + ' ' + r2(p2[1]);
+    }
+    return d + 'Z';
+  }
+  // eye outline: capsule sampled at EP points evenly by arc length, starting at top centre, so any two
+  // eye shapes have matching points and morph by plain interpolation (same idea as bloub's radial profiles)
+  var EP = 44;
+  function eyeOutline(w, h, bend) {
+    var hw = Math.max(w, .01) / 2, hh = Math.max(h, .01) / 2, r = Math.min(hw, hh), ex = hw - r, ey = hh - r;
+    var segs = [[0, ex], [1, Math.PI / 2 * r], [0, 2 * ey], [1, Math.PI / 2 * r], [0, 2 * ex], [1, Math.PI / 2 * r], [0, 2 * ey], [1, Math.PI / 2 * r], [0, ex]];
+    var total = 0; segs.forEach(function (s) { total += s[1]; });
+    var out = [];
+    for (var i = 0; i < EP; i++) {
+      var d = i / EP * total, k = 0;
+      while (k < segs.length - 1 && d > segs[k][1]) { d -= segs[k][1]; k++; }
+      var f = segs[k][1] > 0 ? d / segs[k][1] : 0, x, y, a;
+      // walk clockwise: top edge -> TR corner -> right edge -> BR -> bottom -> BL -> left -> TL -> top
+      switch (k) {
+        case 0: x = f * ex; y = -hh; break;
+        case 1: a = -Math.PI / 2 + f * Math.PI / 2; x = ex + r * Math.cos(a); y = -ey + r * Math.sin(a); break;
+        case 2: x = hw; y = -ey + f * 2 * ey; break;
+        case 3: a = f * Math.PI / 2; x = ex + r * Math.cos(a); y = ey + r * Math.sin(a); break;
+        case 4: x = ex - f * 2 * ex; y = hh; break;
+        case 5: a = Math.PI / 2 + f * Math.PI / 2; x = -ex + r * Math.cos(a); y = ey + r * Math.sin(a); break;
+        case 6: x = -hw; y = ey - f * 2 * ey; break;
+        case 7: a = Math.PI + f * Math.PI / 2; x = -ex + r * Math.cos(a); y = -ey + r * Math.sin(a); break;
+        default: x = -ex + f * ex; y = -hh;
+      }
+      var u = x / hw; y -= bend * (1 - u * u) * 1.7; out.push([x, y]);
+    }
+    return out;
+  }
+  function sample(s, now, R) {
+    R = R || 100;
+    var p = composed(s, now), w = p.wander;
+    var lid = blinkLid(now + s.seed);
+    var fk = clamp((now - s.blinkAt) / 0.22); if (fk < 1) lid = Math.min(lid, Math.abs(fk * 2 - 1));
+    var yaw = p.yaw + (noise(now, 11.3, .4) * 5.5 + noise(now, 3.7, 2.1) * 1.6) * w;
+    var pitch = p.pitch + (noise(now, 9.1, 1.3) * 4 + noise(now, 4.3, .7) * 1.2) * w;
+    var roll = p.roll + noise(now, 13.7, 3.2) * 2.2 * w;
+    var breath = 1 + Math.sin(now / 3.6 * TAU) * 0.006;
+    var ox = noise(now, 7.9, 1.9) * 0.006, oy = p.offY + noise(now, 5.3, .3) * 0.007;
+    var sx = p.sx, sy = p.sy * breath;
+    // body: radial profile, a circle whose squash is anchored at the bottom (feels grounded)
+    var B = [];
+    for (var i = 0; i < N; i++) { var x = COS[i] * sx, y = SIN[i] * sy + (1 - sy); B.push([(x + ox) * R, (y + oy) * R]); }
+    // eyes
+    var E = eyePoses(yaw, pitch, roll, p.split), eyes = [];
+    for (var k = 0; k < 2; k++) {
+      var e = E[k], cfg = p.eyes[k], ph = cfg.tilt * Math.PI / 180, cp = Math.cos(ph), sp = Math.sin(ph);
+      var ax = e.a * cp + e.c * sp, ay = e.b * cp + e.d * sp, bx = -e.a * sp + e.c * cp, by = -e.b * sp + e.d * cp;
+      var sq = 0.06 + 0.94 * clamp(Math.min(lid, cfg.open)) ;
+      if (cfg.bend > 0.02) sq = 1 - (1 - sq) * 0.35; // happy arcs barely blink
+      var cx = (e.x * sx + ox) * R, cy = (e.y * sy + (1 - sy) + oy) * R;
+      var pts = eyeOutline(cfg.w * R, cfg.h * R, cfg.bend * R).map(function (q) { return [cx + q[0] * ax + q[1] * bx, cy + (q[0] * ay + q[1] * by) * sq]; });
+      eyes.push(catmull(pts));
+    }
+    // hair tuft: three tapered strands rooted just inside the top of the body, lagging sway
+    var sway = (noise(now, 4.7, .9) * 6 + noise(now, 2.3, 2.2) * 2) + p.hair - roll * 0.6 + yaw * 0.12;
+    var tx = (ox + 0.04 + Math.sin(yaw * Math.PI / 180) * 0.12) * R, ty = (-sy + (1 - sy) + oy + 0.16) * R;
+    var H = [[-16, .28, .17, 1], [6, .41, .19, 1], [28, .26, .15, 1]].map(function (st, j) {
+      var ang = (st[0] + sway * (0.8 + j * 0.25)) * Math.PI / 180, L = st[1] * R, wd = st[2] * R, cv = st[3];
+      var dx = Math.sin(ang), dy = -Math.cos(ang), nx = -dy, ny = dx, bx0 = tx + (j - 1) * 0.045 * R;
+      var tipx = bx0 + dx * L + nx * cv * 0.42 * L, tipy = ty + dy * L + ny * cv * 0.42 * L;
+      var l1x = bx0 - nx * wd / 2, l1y = ty - ny * wd / 2, r1x = bx0 + nx * wd / 2, r1y = ty + ny * wd / 2;
+      var mx = bx0 + dx * L * 0.55 + nx * cv * 0.2 * L, my = ty + dy * L * 0.55 + ny * cv * 0.2 * L;
+      return 'M' + r2(l1x) + ' ' + r2(l1y) + 'Q' + r2(mx - nx * wd * .45) + ' ' + r2(my - ny * wd * .45) + ' ' + r2(tipx) + ' ' + r2(tipy) +
+        'Q' + r2(mx + nx * wd * .55) + ' ' + r2(my + ny * wd * .55) + ' ' + r2(r1x) + ' ' + r2(r1y) + 'Z';
+    }).join('');
+    return { body: catmull(B), eyeL: eyes[0], eyeR: eyes[1], hair: H };
+  }
+  return { create: create, setMood: setMood, sample: sample, moods: Object.keys(MOODS), MORPH: MORPH };
+})();
+    return this._E;
+  }
+
+  componentDidMount() {
+    this._t0 = performance.now();
+    this.ensure();
+    const tick = (ms) => { this.setState({ now: (ms - this._t0) / 1000 }); this._raf = requestAnimationFrame(tick); };
+    this._raf = requestAnimationFrame(tick);
+  }
+  componentWillUnmount() { cancelAnimationFrame(this._raf); (this._to || []).forEach(clearTimeout); }
+  later(fn, ms) { this._to = this._to || []; this._to.push(setTimeout(fn, ms)); }
+  t() { return this.state.now || 0; }
+
+  ensure() {
+    if (this._P) return;
+    const E = this.engine();
+    this._P = {};
+    ['hero', 'card', 'bar', 'sheet', 'morn', 'eod'].forEach((k, i) => { this._P[k] = E.create(k === 'morn' ? 'talk' : 'idle', 0); this._P[k].seed = 1.3 + i * 2.7; });
+    this._blank = { body: '', eyeL: '', eyeR: '', hair: '' };
+  }
+
+  fmt(n) { return Math.round(n).toLocaleString('en-US'); }
+  ease(k) { k = Math.max(0, Math.min(1, k)); return 1 - Math.pow(1 - k, 4); }
+  spring(k) { k = Math.max(0, Math.min(1, k)); return 1 - Math.exp(-6 * k) * Math.cos(9 * k) * (1 - k) - 0 * k; }
+  tierOf(a) { return a < 3000 ? 'Margin' : a < 10000 ? 'Bronze' : a < 25000 ? 'Silver' : a < 100000 ? 'Gold' : 'VIP'; }
+  ftdOf(region, source, a) {
+    const paid = source === 'PPC' || source === 'חבר מביא חבר';
+    if (region === 'il') return paid ? 600 : 200;
+    if (a < 3000) return 0;
+    if (a < 10000) return paid ? 600 : 200;
+    return paid ? 800 : 400;
+  }
+
+  data() {
+    if (this._data) return this._data;
+    const D = [
+      ['Yoav Peretz', 1, 'pro', 'Affiliate', 1000, 'OMRI INVEST'], ['Lior Ashkenazi', 1, 'pro', 'Affiliate', 3000, ''],
+      ['Nir Bar-On', 2, 'pro', 'Affiliate', 1000, 'אינסיידרס'], ['רונית אלמוג', 2, 'il', 'Organic', 12000, '', 'Bronze'],
+      ['Guy Shemesh', 3, 'pro', 'PPC', 3000, ''], ['Omer Katz', 6, 'pro', 'Affiliate', 1000, ''],
+      ['שלמה ביטון', 6, 'il', 'PPC', 300, '', 'Margin'], ['Tal Rosen', 6, 'pro', 'Affiliate', 1000, 'אינסיידרס'],
+      ['Eyal Brenner', 6, 'pro', 'Affiliate', 25000, 'SOLO INVESTING'], ['Roni Segal', 7, 'pro', 'Affiliate', 3000, 'DVIR SHALOM'],
+      ['משה אזולאי', 7, 'il', 'Affiliate', 700, 'רז גמליאל', 'Margin'], ['Dana Friedman', 7, 'pro', 'PPC', 1000, ''],
+      ['חיים עמר', 8, 'il', 'PPC', 300, '', 'Margin'], ['Itai Navon', 8, 'pro', 'Affiliate', 1000, 'אינסיידרס'],
+      ['Keren Sasson', 8, 'pro', 'Affiliate', 1000, 'אינסיידרס'], ['Ofir Dagan', 8, 'pro', 'Affiliate', 1000, 'אינסיידרס'],
+      ['Shai Harel', 9, 'pro', 'PPC', 1000, ''], ['אלי פרץ', 9, 'il', 'Affiliate', 300, 'סייקלס', 'Margin'],
+      ['Gil Ohana', 10, 'pro', 'Affiliate', 49000, ''], ['Asaf Tzur', 14, 'pro', 'PPC', 3000, ''],
+      ['Elad Mizrahi', 14, 'pro', 'Affiliate', 1000, 'Katalan Investment'], ['Boaz Kfir', 14, 'pro', 'Affiliate', 16000, 'OMRI INVEST'],
+      ['Nadav Yaron', 14, 'pro', 'Affiliate', 6000, 'OMRI INVEST'], ['יעקב חדד', 14, 'il', 'PPC', 1600, '', 'Bronze'],
+      ['Ran Golan', 14, 'pro', 'Affiliate', 3000, 'DANIEL DAMARI'], ['Adi Levin', 15, 'pro', 'Affiliate', 2000, 'MICHA'],
+      ['Noa Shalev', 15, 'pro', 'Affiliate', 3000, 'SKILLS'], ['Tomer Weiss', 16, 'pro', 'Affiliate', 10000, 'DAVID ARIEL'],
+      ['Yarden Oz', 17, 'pro', 'Affiliate', 3000, 'OMRI INVEST'], ['Hila Barak', 17, 'pro', 'Organic', 1000, ''],
+      ['Or Malka', 17, 'pro', 'Affiliate', 3000, 'DAVID ARIEL'], ['Ido Ben-Ari', 17, 'pro', 'Affiliate', 1000, 'DAVID ARIEL'],
+      ['Amir Stern', 17, 'pro', 'Affiliate', 10000, 'DAVID ARIEL'], ['Rotem Hazan', 22, 'pro', 'Affiliate', 10000, 'DAVID ARIEL'],
+      ['Sagi Levy', 23, 'pro', 'Affiliate', 2000, 'DAVID ARIEL'], ['Chen Avraham', 23, 'pro', 'Affiliate', 3000, 'אינסיידרס'],
+      ['אורית גבאי', 23, 'il', 'Organic', 1500, '', 'Margin'], ['Idan Rahav', 23, 'pro', 'Affiliate', 1000, 'DAVID ARIEL'],
+      ['Liad Perry', 23, 'pro', 'Affiliate', 2000, 'MICHA'], ['Itay Shani', 24, 'pro', 'Affiliate', 10000, 'DVIR SHALOM']
+    ];
+    const TPL = [
+      { label: 'ברוך הבא', head: 'ברוך הבא', title: 'ברוך הבא', tag: 'אחרי שהלקוח הפקיד', region: 'פרו', text: 'ברוך הבא!\nלנוחיותך מצרף לך את מספרי הטלפון הבאים שיוכלו לשמש אותך מכאן והלאה (בנוסף לנציג האישי שיוצמד אליך)\nדילינג פרו - 0732580001\nשירות לקוחות צ׳אט - ווטסאפ פרו\nhttps://api.whatsapp.com/send/?phone=972538281878\n\nמייל לשירות הלקוחות - support@colmexpro.com\n\nסרטוני הסבר על התוכנה:\nhttps://www.youtube.com/watch?v=DzoUh-rfPYE&list=PLZyt2aPobnAxdb2JRQtLjf0ST6X_ZB0IT\nסרטוני הסבר על האפליקציה:\nhttps://www.youtube.com/playlist?list=PLZyt2aPobnAzQKtJ9uSOqP3BwD3XjhOqp' },
+      { label: 'פרו', title: 'פתיחה · קולמקס פרו', tag: 'אחרי שיחה על פרו', region: 'פרו', text: 'שמחתי לשוחח איתך, נועם מקולמקס פרו\nתעדכן אותי אם יש לך שאלות על הפלטפורמה או דברים לא ברורים, אני כאן\n\nקולמקס פרו - חשבון מסחר – מדוע אצלנו?\n• נציג אישי צמוד אליך - שיעשה איתך הדרכה על המערכת וזמין עבורך לכל שאלה\n• חשבון דמו ללא הגבלה\n• גישה לשורטים במערכת.\n• כולל פני סטוקס ו- OTC.\n• בקולמקס פרו אין מגבלה בפעולות.\n• חדר שירות ותמיכה טכנית כל יום עד 23:00.\n• אפשרות לביצוע פעולות ישירות מתוך טריידינג ויו!\n\nהנציג/ה שלך בקולמקס פרו: נועם\nלאתר שלנו: https://www.colmexpro.com/' },
+      { label: 'ישראל', head: 'היי', title: 'פתיחה · קולמקס ישראל', tag: 'אחרי שיחה על ישראל', region: 'ישראל', text: 'היי!\nשמחתי לשוחח איתך, נועם מקולמקס ישראל\n\nקולמקס ישראל - חשבון מסחר – מדוע אצלנו?\n1. פיקוח הרשות לניירות ערך בישראל.\n2. חדר עסקאות ותמיכה 24 שעות ביממה, בכל ימי המסחר.\n3. נציג קשרי לקוחות אישי להדרכות מערכת.\n4. מגוון אפיקי השקעה במערכת מסחר אחת.\n5. אפליקציית מסחר חדשה ומתקדמת- colmex plus.\n6. משיכת כספים עד יום עסקים אחד.\n\n(הסכום הנדרש לצורך פתיחת החשבון: 300 דולר)\nהנציג/ה שלך בקולמקס : נועם' },
+      { label: 'שאלון', title: 'מענה על שאלון', tag: 'כשמדברים על השאלון', region: 'פרו', text: 'מענה על שאלון - https://my.colmexpro.com/signup?lang=he' },
+      { label: 'הפקדה', title: 'הפקדת כספים · פרו', tag: 'כשמדברים על הפקדה', region: 'פרו', text: 'הפקדת כספים-קולמקס פרו:\n\nלפקודת קולמקס פרו,\nבנק לאומי, סניף 855\nמספר חשבון: 64570006\n\nנא לשלוח צילום מסך של ההפקדה אליי לווטסאפ.' }
+    ];
+    const SNIP = [
+      { label: 'חוזר תוך שעה', title: 'חוזר תוך שעה', tag: 'משפט קצר', region: 'כללי', snip: true, text: 'אני על זה, חוזר אליך תוך שעה עם תשובה מסודרת.' },
+      { label: 'צילום העברה', title: 'צילום העברה', tag: 'משפט קצר', region: 'כללי', snip: true, text: 'אפשר לשלוח לי צילום מסך של ההעברה? ככה אעקוב שהכל נקלט.' },
+      { label: 'זמן נוח', title: 'זמן נוח', tag: 'משפט קצר', region: 'כללי', snip: true, text: 'מתי נוח לך שנדבר? אני זמין היום עד 20:00.' }
+    ];
+    const I = {
+      eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+      plus: 'M12 5v14M5 12h14',
+      phone: 'M5 4h3l2 5-2.5 1.5a11 11 0 0 0 6 6L15 14l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2',
+      clock: 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0',
+      send: 'M4 12l16-8-6 16-3-7-7-1z',
+      copy: 'M9 9h10v10H9zM5 15V5h10',
+      check: 'M5 12.5l4.5 4.5L19 7.5',
+      wave: 'M3 12h2M7 8v8M11 5v14M15 8v8M19 11v2',
+      receipt: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6',
+      cloud: 'M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6 9.5 4.25 4.25 0 0 0 7 18z',
+      chart: 'M5 20V11M12 20V5M19 20v-6',
+      users: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21a7 7 0 0 1 14 0M16 3.5a4 4 0 0 1 0 7.5M22 21a7 7 0 0 0-4-6.3',
+      doc: 'M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6',
+      compass: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0zM15.5 8.5l-2 5-5 2 2-5z',
+      memory: 'M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6',
+      cal: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4'
+    };
+    const CARDS = [
+      { id: 'dani', kind: 'call', kicker: 'חזרה באיחור · 11:30', kColor: '#F2C48D', icon: I.phone, who: 'דני לוי', first: 'דני', tplIdx: 4, sub: 'פרו · Affiliate · DAVID ARIEL · 050-555-0186',
+        lines: ['שאל על 10K · פתח חשבון פרו אתמול', 'רצה לשמוע על שורטים ו-OTC לפני שמעביר'],
+        pLabel: 'התקשר עכשיו', pIcon: I.phone, secs: ['עוד שעה', 'שלח תבנית'], fx: { calls: 1, cbs: 1 },
+        say: '3 חזרות באיחור. נתחיל עם דני — הוא שאל על 10K.', doneSay: 'יפה. דני בדרך ל-10K. הבא: Maya.' },
+      { id: 'maya', kind: 'tpl', kicker: 'המשך עם תבנית', kColor: '#C7C7CC', icon: I.send, who: 'Maya Goldberg', first: 'Maya', tplIdx: 4, sub: 'פרו · Affiliate · אינסיידרס',
+        lines: ['אמרה שתעביר 3K הבוקר ותשלח צילום', 'עוד לא הגיע כלום'], tpl: 'הפקדת כספים-קולמקס פרו:\nבנק לאומי, סניף 855 · חשבון 64570006\nנא לשלוח צילום מסך של ההפקדה…',
+        pLabel: 'שלח בווטסאפ', pIcon: I.send, secs: ['העתק', 'עוד שעה'], fx: {},
+        say: 'Maya אמרה 3K הבוקר ועוד לא העבירה. נשלח לה שוב את פרטי ההפקדה?', doneSay: 'נשלח. אזכיר לך אם לא תענה עד 17:00.' },
+      { id: 'heard', kind: 'heard', kicker: 'Palon שמע בשיחה', kColor: '#B9CCEA', icon: I.wave, who: 'אליאור דהן', first: 'אליאור', tplIdx: 2, sub: 'ליד חדש · רוצה לשמוע על קולמקס ישראל',
+        lines: [], quote: '״תחזור אליי מחר ב-11״', quoteSub: 'מהשיחה של 14:52 · הצעה: מחר, 11:00',
+        pLabel: 'קבע למחר 11:00', pIcon: I.cal, secs: ['זמן אחר'], fx: {},
+        say: 'שמעתי את אליאור: “מחר ב-11”. לקבוע לך?', doneSay: 'קבעתי. מחר ב-10:55 אזכיר לך.' },
+      { id: 'receipt', kind: 'deposit', kicker: 'קבלה בווטסאפ · לפני 4 דק׳', kColor: '#A8DCC2', icon: I.receipt, who: 'Ella Mor', first: 'Ella', tplIdx: 0, sub: 'פרו · Affiliate · DVIR SHALOM',
+        lines: ['שלחה צילום העברה מבנק הפועלים'], deal: [{ k: 'סכום', v: '$10,000', c: '#F5F5F7' }, { k: 'דרגה', v: 'Silver', c: '#E4E7EC' }, { k: 'בונוס', v: '+₪400', c: '#A8DCC2' }],
+        pLabel: 'רשום הפקדה', pIcon: I.check, secs: ['לא עכשיו'], fx: { deps: 1 }, deposit: 400,
+        say: 'Ella שלחה צילום העברה. $10,000 — זה Silver ו-₪400 בשבילך.', doneSay: '₪400 נכנסו. 41 מתוך 55.' },
+      { id: 'sf', kind: 'sf', kicker: 'סיכום שיחה · Salesforce', kColor: '#B9CCEA', icon: I.cloud, who: 'Sarit Klein', first: 'שרית', tplIdx: 2, sub: 'שיחה של 13:48 · 2:05',
+        lines: ['מתלבטת בין קולמקס ישראל לפרו', 'חשוב לה פיקוח ישראלי ומשיכה מהירה', 'הצעד הבא: לשלוח את היתרונות של ישראל'],
+        pLabel: 'רשום ב-Salesforce', pIcon: I.cloud, secs: ['ערוך'], fx: { calls: 1 }, work: 'רושם ב-Salesforce…',
+        say: 'סיכמתי את השיחה עם שרית. לרשום ב-Salesforce?', doneSay: 'רשום. גם שלחתי לה את תבנית ישראל לטיוטה.' },
+      { id: 'ron', kind: 'call', kicker: 'חזרה באיחור · 13:00', kColor: '#F2C48D', icon: I.phone, who: 'רון אברהם', first: 'רון', tplIdx: 3, sub: 'פרו · PPC · 052-555-0131',
+        lines: ['ביקש לדבר אחרי שיחה עם רואה החשבון', 'רואה החשבון אישר אתמול לפי מה שאמר'],
+        pLabel: 'התקשר עכשיו', pIcon: I.phone, secs: ['עוד שעה'], fx: { calls: 1, cbs: 1 },
+        say: 'רון חיכה לרואה החשבון — ועכשיו יש לו אישור. זה הזמן.', doneSay: 'שש מתוך שש חזרות. ניקית את היום.' }
+    ];
+    const NUDGES = [
+      { time: '16:00', text: 'חסרות לך 2 הפקדות לקצב היום. Tomer ו-Maya הכי קרובים.', act: 'מי הכי קרוב?', go: 'close' },
+      { time: '16:02', text: 'לא דיברת עם Maya 3 ימים — לשלוח לה תבנית הפקדה?', act: 'שלח תבנית', go: 'send' },
+      { time: '16:05', text: 'שמתי לב: PPC מביא לך ₪429 בונוס ממוצע לעסקה — כמעט כפול מ-Affiliate.', act: 'הראה בחודש', go: 'month' }
+    ];
+    const RECENT = [
+      { ini: 'ד', name: 'דני לוי', meta: 'פרו · Affiliate · DAVID ARIEL', status: 'בתהליך', tone: '#B9CCEA', next: 'ראשון 12:00 · פרטי הפקדה', tpl: 4, tl: [{ w: 'היום 14:12', t: 'שאל על שורטים ו-OTC. מתכנן 10K עד סוף השבוע.' }, { w: 'אתמול 17:48', t: 'נשלחה: פתיחה · קולמקס פרו' }] },
+      { ini: 'M', name: 'Maya Goldberg', meta: 'פרו · Affiliate · אינסיידרס', status: 'באיחור', tone: '#F2C48D', next: 'היום 13:00 · לבדוק העברה', tpl: 4, tl: [{ w: 'אתמול 15:55', t: 'החליטה להתחיל עם 3K. תעביר בבוקר ותשלח צילום.' }, { w: 'אתמול 16:02', t: 'נשלחה: הפקדת כספים · פרו' }] },
+      { ini: 'S', name: 'Sarit Klein', meta: 'מתלבטת בין ישראל לפרו', status: 'בתהליך', tone: '#B9CCEA', next: 'לשלוח יתרונות ישראל', tpl: 2, tl: [{ w: 'היום 13:48', t: 'חשוב לה פיקוח ישראלי ומשיכה מהירה.' }] }
+    ];
+    this._data = { SNIP: SNIP, ALL: TPL.concat(SNIP), RECENT: RECENT, D: D, TPL: TPL, I: I, CARDS: CARDS, NUDGES: NUDGES, WD: [1, 2, 3, 6, 7, 8, 9, 10, 14, 15, 16, 17, 20, 22, 23, 24, 27, 28, 29, 30] };
+    return this._data;
+  }
+
+  first() { const q = this.state.queue, c = q.length ? this.data().CARDS[q[0]] : null; return c ? c.first : ''; }
+  fillText(i, name) {
+    const it = this.data().ALL[i];
+    if (!it) return '';
+    if (!name || it.snip) return it.text;
+    if (it.head && it.text.indexOf(it.head) === 0) return it.head + ' ' + name + it.text.slice(it.head.length);
+    return 'היי ' + name + '!\n' + it.text;
+  }
+  copyItem(i, via) {
+    const it = this.data().ALL[i]; if (!it) return;
+    const name = it.snip ? '' : this.first();
+    const text = this.state.editIdx === i && this.state.editText ? this.state.editText : this.fillText(i, name);
+    try { navigator.clipboard.writeText(text).catch(function () {}); } catch (e) {}
+    this.setState({ cp: { i: i, t0: this.t(), name: name }, lookK: 'shelf', lookUntil: this.t() + 1.3 });
+    if (via) this.flash('הועתק · ' + it.title + (name ? ' · ' + name : ''));
+  }
+  editItem(i) { this.setState({ sheet: 'tpl', lastSheet: 'tpl', tpl: i, editIdx: i, editText: this.fillText(i, this.data().ALL[i].snip ? '' : this.first()) }); }
+  readScreen() {
+    this.setState({ thinkUntil: this.t() + 1.3 });
+    this.say('קורא את המסך…');
+    this.later(() => { this.say('ב-WhatsApp: Maya שלחה צילום העברה של $3,000. הכנתי לך עסקה.'); this.runCmd('Maya הפקידה 3000'); }, 1300);
+  }
+  logSF() { this.setState({ thinkUntil: this.t() + 1 }); this.later(() => { this.flash('השיחה עם Sarit נרשמה ב-Salesforce'); this.cheer(0.8); }, 1000); }
+  copySummary() { try { navigator.clipboard.writeText('Sarit Klein · 13:48 · מתלבטת בין ישראל לפרו. חשוב לה פיקוח ישראלי ומשיכה מהירה. הבא: לשלוח יתרונות ישראל.').catch(function () {}); } catch (e) {} this.flash('הסיכום של Sarit הועתק'); this.setState({ lookK: 'shelf', lookUntil: this.t() + 1.2 }); }
+  gong() {
+    const x = { gongT0: this.t(), acc: true, tuft: { k: 'up', until: this.t() + 9 } };
+    if (this.state.rosh && !this.state.honeyDone) { x.honeyDone = true; x.honeyT0 = this.t() + 0.6; this.later(() => this.say('שנה מתוקה ועסקאות עסיסיות. ההפקדה הראשונה של השנה.'), 1500); }
+    this.setState(x);
+  }
+  say(text, extra) { this.setState(Object.assign({ speech: { text: text, t0: this.t() } }, extra || {})); }
+  cheer(sec) { this.setState({ happyUntil: this.t() + (sec || 1.8) }); }
+  flash(text) { this.setState({ toast: text, toastAt: this.t() }); }
+  ringVal(k) { const r = this.state.rings[k], k2 = this.ease((this.t() - r.t0) / 1.3); return r.a + (r.v - r.a) * k2; }
+  bumpRings(fx) {
+    const G = { calls: 100, cbs: 6, deps: 3.8 };
+    const rings = Object.assign({}, this.state.rings), closed = Object.assign({}, this.state.closed);
+    let justClosed = null;
+    Object.keys(fx || {}).forEach((k) => {
+      const cur = this.ringVal(k), v = rings[k].v + fx[k];
+      if (rings[k].v < G[k] && v >= G[k]) { closed[k] = this.t() + 1.0; justClosed = k; }
+      rings[k] = { v: v, a: cur, t0: this.t() };
+    });
+    this.setState({ rings: rings, closed: closed });
+    return justClosed;
+  }
+  burstAt(x, y) { this.setState({ burst: { t0: this.t(), x: x, y: y } }); }
+
+  complete(snooze) {
+    const q = this.state.queue;
+    if (!q.length || this.state.anim === 'fling' || this.state.anim === 'snooze') return;
+    const c = this.data().CARDS[q[0]];
+    if (snooze) {
+      this.setState({ anim: 'snooze' });
+      this.say('דחיתי את ' + c.who + ' בשעה. ממשיכים.');
+      this.later(() => this.advance(true), 480);
+      return;
+    }
+    const doIt = () => {
+      const W = { call: 'חזרה', tpl: 'תבנית', heard: 'נקבע', deposit: 'הפקדה · ₪' + (c.deposit || 0), sf: 'Salesforce' };
+      this.setState({ working: -1, anim: 'fling', trail: [[c.who, W[c.kind]]].concat(this.state.trail).slice(0, 6) });
+      this.burstAt(740, 300);
+      const jc = this.bumpRings(c.fx);
+      this.cheer(1.9);
+      const names = { calls: 'השיחות', cbs: 'החזרות', deps: 'ההפקדות' };
+      this.say(jc ? 'סגרת את טבעת ' + names[jc] + '. ' + c.doneSay : c.doneSay);
+      if (jc) this.later(() => this.cheer(2.2), 1000);
+      if (c.deposit) this.deposit(c.deposit, 740, 300);
+      this.later(() => this.advance(false), 520);
+    };
+    if (c.work) { this.setState({ working: q[0], thinkUntil: this.t() + 1.0 }); this.later(doIt, 1000); }
+    else doIt();
+  }
+  advance(snooze) {
+    const q = this.state.queue.slice(), h = q.shift();
+    if (snooze) q.push(h);
+    this.setState({ queue: q, anim: this.state.anim2 === 'enter' ? 'enter2' : 'enter', anim2: this.state.anim2 === 'enter' ? 'enter2' : 'enter' });
+    if (q.length) this.later(() => { if (this.state.speech && this.t() - this.state.speech.t0 > 1.8) this.say(this.data().CARDS[q[0]].say); else this.later(() => this.say(this.data().CARDS[this.state.queue[0]] ? this.data().CARDS[this.state.queue[0]].say : 'הכל נקי. אני על זה.'), 1400); }, 900);
+    else this.later(() => this.say('הכל נקי. אני שומר עין על Tomer — הבנק שלו אמור לאשר היום.'), 1400);
+  }
+  deposit(amount, x, y) {
+    this.later(() => this.gong(), 900);
+    this.setState({ fly: { t0: this.t(), x0: x, y0: y, text: '+₪' + amount } });
+    this.later(() => {
+      this.setState({ payA: this.payNow(), ftd: this.state.ftd + amount, payT0: this.t(), deals: this.state.deals + 1, payPulse: this.t() });
+    }, 900);
+  }
+  payNow() { const k = this.ease((this.t() - this.state.payT0) / 1.1); return this.state.payA + (this.state.ftd - this.state.payA) * k; }
+
+  closeAll() {
+    const rings = Object.assign({}, this.state.rings), closed = {}, G = { calls: 100, cbs: 6, deps: 4 };
+    ['calls', 'cbs', 'deps'].forEach((k, i) => { rings[k] = { v: Math.max(rings[k].v, G[k]), a: this.ringVal(k), t0: this.t() + i * 0.25 }; closed[k] = this.t() + 1.2 + i * 0.25; });
+    this.setState({ rings: rings, closed: closed });
+    this.later(() => { this.cheer(2.8); this.burstAt(215, 480); this.say('שלוש טבעות סגורות. יום של אלופים.'); }, 1500);
+  }
+  nudge() {
+    const N = this.data().NUDGES, i = this.state.nudgeNext % N.length;
+    const list = this.state.nudges.filter((n) => n.i !== i).concat([{ i: i, t0: this.t() }]).slice(-2);
+    this.setState({ nudges: list, nudgeNext: i + 1, happyUntil: this.t() + 0.8 });
+  }
+  dropNudge(i) { this.setState({ nudges: this.state.nudges.filter((n) => n.i !== i) }); }
+  nudgeAct(i) {
+    const g = this.data().NUDGES[i].go;
+    this.dropNudge(i);
+    if (g === 'month') this.openSheet('month');
+    else if (g === 'send') { this.flash('תבנית הפקדה נשלחה ל-Maya'); this.cheer(1.4); this.say('שלחתי ל-Maya. אעדכן כשתענה.'); }
+    else this.say('Tomer מחכה לאישור בנק על 25K, ו-Maya אמרה 3K. שניהם עד 17:00.');
+  }
+  openSheet(k) { this.setState({ sheet: k, lastSheet: k }); }
+  goMorning() { this.setState({ morning: true, mornAt: this.t(), mornOut: -1 }); this._P.morn.tCur = this.t(); }
+  dismissMorning() {
+    const t = this.t();
+    const rings = {}; Object.keys(this.state.rings).forEach((k, i) => { rings[k] = { v: this.state.rings[k].v, a: 0, t0: t + 0.35 + i * 0.12 }; });
+    this.setState({ mornOut: t, rings: rings, payA: this.state.ftd - 2400, payT0: t + 0.3 });
+    this.later(() => this.setState({ morning: false }), 900);
+    this.later(() => this.say(this.data().CARDS[this.state.queue[0]] ? this.data().CARDS[this.state.queue[0]].say : 'הכל נקי.'), 700);
+    if (!this._nudged) { this._nudged = true; this.later(() => this.nudge(), 5200); }
+  }
+
+  parse(text) {
+    const s = (text || '').trim();
+    if (!s) return { kind: '' };
+    const dep = s.match(/^(\S+)\s+(?:הפקיד|הפקידה|העביר|העבירה)\s+\$?([\d,\.]+)\s*(k|K|אלף)?/);
+    if (dep) { let a = parseFloat(dep[2].replace(/,/g, '')); if (dep[3]) a *= 1000; return { kind: 'dep', name: dep[1], amount: a }; }
+    const tm = s.match(/ב-?\s?(\d{1,2})(?::(\d\d))?/), day = s.match(/מחר|היום|ראשון|שני|שלישי|רביעי|חמישי/);
+    if (!/^מה|^איך|^כמה|\?$/.test(s) && (tm || day)) {
+      const name = s.split(/\s+/)[0];
+      return { kind: 'cb', name: name, day: day ? day[0] : 'היום', time: tm ? (tm[1].padStart(2, '0') + ':' + (tm[2] || '00')) : '' };
+    }
+    return { kind: 'q', q: s };
+  }
+  fullName(n) { const M = { 'דני': 'דני לוי', 'מתן': 'מתן כהן', 'רון': 'רון אברהם', 'Maya': 'Maya Goldberg', 'מאיה': 'Maya Goldberg', 'תומר': 'Tomer Levi' }; return M[n] || n; }
+  answerFor(q) {
+    if (/שכר|כסף|בונוס|משכורת|אקבל/.test(q)) return 'כרגע ₪' + this.fmt(10000 + this.state.ftd) + ': בסיס 10,000 ועוד FTD ' + this.fmt(this.state.ftd) + '. כל עסקת Silver מוסיפה ₪400 — Tomer לבד שווה ₪800.';
+    const left = 55 - this.state.deals;
+    return 'יש לך ' + this.state.deals + ' עסקאות מתוך 55. נשארו 4 ימי עבודה, אז ' + left + ' עסקאות — ' + (left / 4).toFixed(1) + ' ביום. היום סגרת ' + Math.round(this.state.rings.deps.v) + '; Tomer ו-Maya הכי קרובים.';
+  }
+  runCmd(text) {
+    const p = this.parse(text == null ? this.state.cmdText : text);
+    if (!p.kind) return;
+    if (text != null) this.setState({ cmdText: text });
+    this.setState({ cmdRes: { p: p, t0: this.t(), done: false }, thinkUntil: this.t() + 0.8 });
+    if (p.kind === 'q') { this._ans = this.answerFor(p.q); }
+  }
+  applyCmd() {
+    const r = this.state.cmdRes; if (!r) return;
+    if (r.p.kind === 'dep') {
+      const a = r.p.amount, b = this.ftdOf('pro', 'Affiliate', a);
+      this.bumpRings({ deps: 1 }); this.cheer(2);
+      this.burstAt(900, 790);
+      this.deposit(b, 900, 790);
+      this.say(this.fullName(r.p.name) + ' נרשם. ' + this.tierOf(a) + (b ? ' ועוד ₪' + b + '.' : '.'));
+    } else {
+      this.cheer(1.4); this.flash('נקבעה חזרה · ' + this.fullName(r.p.name) + ' · ' + r.p.day + ' ' + (r.p.time || '12:00'));
+      this.say('קבעתי. אזכיר לך 5 דקות לפני.');
+    }
+    this.setState({ cmdRes: null, cmdText: '' });
+  }
+
+  sample(k, mood, visible, R) {
+    if (!visible) return this.dress(this._blank, 'x');
+    const E = this.engine(), now = this.t();
+    E.setMood(this._P[k], mood, now);
+    return E.sample(this._P[k], now, R || 100);
+  }
+  dress(f, p, x) {
+    x = x || {};
+    const T = { up: 'translate(4 -84) scale(1.12 1.5) translate(-4 84)', droop: 'translate(4 -84) rotate(64) scale(.92 .8) translate(-4 84)' };
+    return { body: f.body, eyeL: f.eyeL, eyeR: f.eyeR, hair: f.hair,
+      hairTf: T[x.tuft] || 'translate(0 0)', hairOp: x.tuft === 'curl' || x.cap ? '0' : '1',
+      curl: x.tuft === 'curl' && f.body ? 'M6 -86 C8 -100 34 -104 34 -124 C34 -146 2 -152 -10 -134' : '',
+      bow: x.bow && f.body ? 'M-24 52 L-3 62 L-24 72 Z M24 52 L3 62 L24 72 Z M-6 56 H6 V68 H-6 Z' : '',
+      cap: x.cap && f.body ? 'M-80 -56 Q-40 -130 30 -130 Q88 -128 120 -64 Q70 -102 28 -98 Q-26 -92 -80 -56 Z' : '',
+      pom: x.cap && f.body ? 'M106 -62 a15 15 0 1 0 30 0 a15 15 0 1 0 -30 0' : '',
+      shadeFill: 'url(#' + p + (x.shiny === 'gold' ? 'gd' : x.shiny === 'pearl' ? 'pl' : 'sh') + ')', eyeFill: 'url(#' + p + 'ey)', hairFill: 'url(#' + p + 'hr)', maskUrl: 'url(#' + p + 'mk)' };
+  }
+
+  renderVals() {
+    this.ensure();
+    const S = this.state, now = this.t(), Dd = this.data(), I = Dd.I;
+    // speech
+    const sp = S.speech;
+    const spText = sp ? sp.text : '';
+    const spChars = sp ? Math.min(spText.length, Math.floor((now - sp.t0) * 42)) : 0;
+    const typing = !!sp && spChars < spText.length;
+    const cr = S.cmdRes, crAge = cr ? now - cr.t0 : 0, crWorking = !!cr && crAge < 0.8;
+    const ansChars = cr && cr.p.kind === 'q' ? Math.min((this._ans || '').length, Math.floor((crAge - 0.8) * 40)) : 0;
+    const ansTyping = !!cr && cr.p.kind === 'q' && !crWorking && ansChars < (this._ans || '').length;
+    const heroMood = now < S.happyUntil ? 'happy' : now < S.thinkUntil ? 'think' : typing ? 'talk' : S.cmdText ? 'listen' : 'idle';
+    const barMood = crWorking ? 'think' : ansTyping ? 'talk' : 'idle';
+
+    // stage / overlays
+    const mOut = S.mornOut >= 0 ? this.ease((now - S.mornOut) / 0.9) : 0;
+    const mornVis = S.morning;
+    const eodK = S.eodAt >= 0 ? this.ease((now - S.eodAt) / 0.8) : 0;
+    const eodOn = S.eod, eodV = eodOn ? eodK : (S.eodAt >= 0 ? 1 - eodK : 0);
+    const stageK = S.morning ? mOut : 1;
+    const stage = {
+      tf: 'scale(' + (0.93 + 0.07 * stageK - (eodOn ? 0.04 * eodK : 0) - (S.sheet ? 0.035 : 0)).toFixed(4) + ')' + (S.sheet ? ' translateX(18px)' : ''),
+      op: (0.2 + 0.8 * stageK) * (eodOn ? 1 - 0.7 * eodK : 1),
+      filter: 'blur(' + ((1 - stageK) * 8 + (eodOn ? eodK * 6 : 0) + (S.sheet ? 1.5 : 0)).toFixed(2) + 'px) brightness(' + (S.sheet ? 0.7 : 1) + ')'
+    };
+    const mornHello = 'בוקר טוב נועם';
+    const mAge = now - S.mornAt;
+    const morn = {
+      live: mornVis, op: mornVis ? 1 - mOut : 0, sc: (1 + mOut * 0.12).toFixed(4), pe: mornVis && S.mornOut < 0 ? 'auto' : 'none',
+      hello: mornHello.slice(0, Math.max(0, Math.floor((mAge - 0.3) * 18))),
+      items: [
+        { n: '01', t: '3 חזרות באיחור — דני ראשון, הוא שאל על 10K' },
+        { n: '02', t: 'חסרות 15 עסקאות לחודש · 3.8 ביום' },
+        { n: '03', t: 'Tomer Levi מחכה לאישור בנק על 25K' }
+      ].map((m, i) => Object.assign(m, { cls: 'fadeUp fu' + (i + 2) })),
+      go: () => this.dismissMorning()
+    };
+    const mornMood = mAge < 1.4 ? 'talk' : (mAge < 3.2 ? 'happy' : 'idle');
+
+    // rail
+    const RAIL = [['month', 'חודש', I.chart], ['clients', 'לקוחות', I.users], ['tpl', 'תבניות', I.doc], ['coach', 'אימון', I.compass], ['memory', 'זיכרון', I.memory]];
+    const rail = RAIL.map((r) => ({ label: r[1], d: r[2], cls: 'press rail' + (S.sheet === r[0] ? ' on' : ''), go: () => this.openSheet(S.sheet === r[0] ? '' : r[0]) }));
+
+    // pay
+    const payV = this.payNow();
+    const pay = {
+      digits: this.fmt(10000 + S.ftd).split('').map((ch) => /\d/.test(ch) ? { isD: true, isC: false, y: -(+ch), ch: ch } : { isD: false, isC: true, y: 0, ch: ch }),
+      num: this.fmt(10000 + S.ftd), ftd: this.fmt(payV), deals: S.deals, pct: (S.deals / 55 * 100).toFixed(1),
+      left: 55 - S.deals, perDay: ((55 - S.deals) / 4).toFixed(1),
+      numCls: now - S.payPulse < 0.9 ? 'pulse' : '', streakCls: '',
+      open: () => this.openSheet('month')
+    };
+
+    // rings
+    const RG = [
+      { k: 'calls', name: 'שיחות', goal: 100, r: 84, grad: 'url(#rgA)', dot: '#B7C8E2', hint: () => S.rings.calls.v < 100 ? 'עוד ' + (100 - Math.round(S.rings.calls.v)) + ' · עד 18:40' : 'נסגרה', act: () => this.say('עוד ' + Math.max(0, 100 - Math.round(S.rings.calls.v)) + ' שיחות ל-100. בקצב שלך, עד 18:40.') },
+      { k: 'cbs', name: 'חזרות', goal: 6, r: 62, grad: 'url(#rgB)', dot: '#DCC7A0', hint: () => S.rings.cbs.v >= 6 ? 'נסגרה' : (6 - S.rings.cbs.v) + ' באיחור · עכשיו', act: () => { const q = S.queue.slice(), j = q.findIndex((x) => Dd.CARDS[x].kind === 'call'); if (j > 0) { q.unshift(q.splice(j, 1)[0]); this.setState({ queue: q, anim: S.anim === 'enter' ? 'enter2' : 'enter' }); } this.say('החזרות קודם. ' + (Dd.CARDS[q[0]] ? Dd.CARDS[q[0]].who + ' בראש התור.' : '')); } },
+      { k: 'deps', name: 'הפקדות', goal: '3.8', r: 40, grad: 'url(#rgC)', dot: '#A6D6BE', hint: () => S.rings.deps.v >= 3.8 ? 'בקצב' : 'חסרות ' + Math.ceil(3.8 - S.rings.deps.v) + ' לקצב', act: () => this.openSheet('month') }
+    ];
+    let anyGlow = false;
+    const rings = RG.map((g) => {
+      const v = this.ringVal(g.k), goal = parseFloat(g.goal), p = Math.min(1, Math.max(0, v / goal)), C = 2 * Math.PI * g.r;
+      const cl = S.closed[g.k], glowK = cl != null && now >= cl ? Math.max(0, 1 - (now - cl) / 1.6) : 0;
+      const isClosed = S.rings[g.k].v >= goal;
+      if (glowK > 0) anyGlow = true;
+      return {
+        r: g.r, grad: g.grad, dot: g.dot, name: g.name, goal: g.goal,
+        track: 'rgba(255,255,255,' + (0.07 + (isClosed ? 0.03 : 0)) + ')',
+        dash: (p * C).toFixed(2) + ' ' + C.toFixed(2),
+        glow: 'drop-shadow(0 0 ' + (4 + glowK * 18).toFixed(1) + 'px rgba(255,255,255,' + (0.18 + glowK * 0.6).toFixed(2) + '))',
+        val: g.k === 'deps' ? String(Math.round(v)) : String(Math.round(v)),
+        hint: g.hint(), hintColor: isClosed ? '#A6D6BE' : '#8E8E93', act: g.act
+      };
+    });
+    const closedN = RG.filter((g) => S.rings[g.k].v >= parseFloat(g.goal)).length;
+    const ringsHead = closedN === 3 ? 'כל הטבעות סגורות' : closedN + ' מתוך 3 נסגרו';
+
+    // card
+    const q = S.queue, cur = q.length ? Dd.CARDS[q[0]] : null;
+    const working = cur && S.working === q[0];
+    const secFn = (label) => () => {
+      if (label === 'עוד שעה' || label === 'לא עכשיו' || label === 'זמן אחר') this.complete(true);
+      else if (label === 'שלח תבנית' || label === 'העתק') { try { navigator.clipboard.writeText(Dd.TPL[4].text).catch(function () {}); } catch (e) {} this.flash('תבנית הפקדה הועתקה'); }
+      else if (label === 'ערוך') this.flash('נפתח לעריכה (דמו)');
+    };
+    const card = cur ? {
+      cls: 'card ' + S.anim, kicker: cur.kicker, kColor: cur.kColor, icon: cur.icon, who: cur.who, sub: cur.sub, lines: cur.lines,
+      hasQuote: !!cur.quote, quote: cur.quote || '', quoteSub: cur.quoteSub || '',
+      hasDeal: !!cur.deal, deal: cur.deal || [], hasTpl: !!cur.tpl, tpl: cur.tpl || '',
+      working: !!working, ready: !working, workLabel: cur.work || '',
+      pLabel: cur.pLabel, pIcon: cur.pIcon, primary: () => this.complete(false),
+      secs: cur.secs.map((l) => ({ label: l, fn: secFn(l) })),
+      mx: S.mag.x.toFixed(1), my: S.mag.y.toFixed(1),
+      onMag: (ev) => { const r = ev.currentTarget.getBoundingClientRect(); const cl = (v) => Math.max(-7, Math.min(7, v)); this.setState({ mag: { x: cl((ev.clientX - r.left - r.width / 2) * 0.16), y: cl((ev.clientY - r.top - r.height / 2) * 0.3) } }); },
+      offMag: () => this.setState({ mag: { x: 0, y: 0 } }),
+      mt: (() => { const i = cur.tplIdx, dn = S.cp.i === i && now - S.cp.t0 < 1.8; return { has: i != null && !cur.tpl, name: Dd.ALL[i].title, copy: () => this.copyItem(i), cls: 'press ' + (dn ? 'qchip done' : 'btnS'), label: dn ? 'הועתק ✓' : 'העתק עם השם', hasName: dn && !!S.cp.name, nm: S.cp.name }; })()
+    } : { cls: 'card', lines: [], deal: [], secs: [], primary: () => {}, mt: { has: false } };
+    const stack = {
+      has: !!cur, empty: !cur, peek1: q.length > 1, peek2: q.length > 2,
+      more: q.length > 1 ? 'עוד ' + (q.length - 1) + ' בתור' : q.length ? 'אחרון בתור' : '',
+      reload: () => { this.setState({ queue: [0, 1, 2, 3, 4, 5], anim: S.anim === 'enter' ? 'enter2' : 'enter' }); this.say(Dd.CARDS[0].say); }
+    };
+
+    // burst particles
+    let burst = [], shock = { on: false, x: 0, y: 0, s: 0, o: 0 };
+    if (S.burst) {
+      const bt = now - S.burst.t0;
+      if (bt < 1.1) {
+        for (let i = 0; i < 26; i++) {
+          const a = i / 26 * Math.PI * 2 + Math.sin(i * 7.3) * 0.3, sp2 = 150 + (Math.sin(i * 3.7) * 0.5 + 0.5) * 230;
+          const d = sp2 * (1 - Math.exp(-3.2 * bt)) / 3.2 * 3.2 * 0.55;
+          const sz = 3 + (i % 4) * 1.3;
+          burst.push({ x: (S.burst.x + Math.cos(a) * d).toFixed(1), y: (S.burst.y + Math.sin(a) * d + 60 * bt * bt).toFixed(1), s: sz, g: sz * 3, o: Math.pow(Math.max(0, 1 - bt / 1.1), 1.2).toFixed(3), bg: i % 3 ? '#E8ECF4' : '#FFFFFF' });
+        }
+        const ss = 20 + this.ease(bt / 0.8) * 240;
+        shock = { on: bt < 0.8, x: (S.burst.x - ss / 2).toFixed(1), y: (S.burst.y - ss / 2).toFixed(1), s: ss.toFixed(1), o: Math.max(0, 0.7 * (1 - bt / 0.8)).toFixed(3) };
+      }
+    }
+    // flying +amount
+    let fly = { on: false, x: 0, y: 0, s: 1, o: 0, text: '' };
+    if (S.fly) {
+      const ft = (now - S.fly.t0) / 0.9;
+      if (ft < 1) {
+        const k = ft < 0 ? 0 : (ft * ft * (3 - 2 * ft)), x1 = 300, y1 = 150;
+        fly = { on: true, text: S.fly.text, x: (S.fly.x0 + (x1 - S.fly.x0) * k).toFixed(1), y: (S.fly.y0 + (y1 - S.fly.y0) * k - Math.sin(Math.PI * k) * 110).toFixed(1), s: (1.25 - 0.55 * k).toFixed(3), o: (ft > 0.85 ? (1 - ft) / 0.15 : Math.min(1, ft * 6 + 0.2)).toFixed(3) };
+      }
+    }
+
+    // nudges
+    const nudges = S.nudges.map((n) => { const N = Dd.NUDGES[n.i]; return { time: N.time, text: N.text, actLabel: N.act, act: () => this.nudgeAct(n.i), close: () => this.dropNudge(n.i) }; });
+
+    // command bar
+    const p = this.parse(S.cmdText);
+    const chip = (k, v, strong) => ({ k: k, v: v, bg: strong ? 'rgba(235,238,245,.92)' : 'rgba(255,255,255,.07)', fg: strong ? '#0A0A0C' : '#E5E5EA' });
+    const isPal = /^(\/|תב|סנ|מש)/.test(S.cmdText.trim());
+    const palQ = S.cmdText.trim().replace(/^(\/|תבניות|תבנית|תב|סניפטים|סנ|משפטים|משפט|מש)\s*/, '');
+    const palItems = isPal ? Dd.ALL.map((x, i) => i).filter((i) => !palQ || (Dd.ALL[i].title + ' ' + Dd.ALL[i].tag).indexOf(palQ) >= 0) : [];
+    const palSel = Math.min(S.palSel, Math.max(0, palItems.length - 1));
+    let chips = [];
+    if (p.kind === 'dep') chips = [chip('', 'הפקדה', true), chip('', this.fullName(p.name)), chip('', '$' + this.fmt(p.amount || 0)), chip('', this.tierOf(p.amount || 0))];
+    else if (p.kind === 'cb') chips = [chip('', 'חזרה', true), chip('', this.fullName(p.name)), chip('', p.day + (p.time ? ' ' + p.time : ''))];
+    else if (p.kind === 'q') chips = [chip('', 'שאלה', true)];
+    if (isPal) chips = [chip('', 'תבניות', true), chip('', palItems.length + ' תוצאות')];
+    let cmd = {
+      text: S.cmdText, chips: chips, goOp: S.cmdText ? 1 : 0.35,
+      ring: S.cmdText ? 'rgba(255,255,255,.14)' : 'rgba(255,255,255,0)',
+      onText: (ev) => this.setState({ palSel: 0, cmdText: ev.target.value, cmdRes: S.cmdRes && S.cmdRes.p.kind === 'q' ? S.cmdRes : null }),
+      onKey: (ev) => {
+        if (!S.cmdText && /^[1-5]$/.test(ev.key)) { ev.preventDefault(); this.copyItem(+ev.key - 1, 'key'); return; }
+        if (isPal && (ev.key === 'ArrowDown' || ev.key === 'ArrowUp')) { ev.preventDefault(); const n = palItems.length || 1; this.setState({ palSel: (palSel + (ev.key === 'ArrowDown' ? 1 : n - 1)) % n }); return; }
+        if (ev.key === 'Enter') { if (isPal) { if (palItems.length) { this.copyItem(palItems[palSel], 'pal'); this.setState({ cmdText: '', palSel: 0 }); } } else this.runCmd(); }
+        if (ev.key === 'Escape') this.setState({ cmdText: '', cmdRes: null, palSel: 0 });
+      },
+      run: () => this.runCmd(),
+      showSugg: !S.cmdText && !cr,
+      sugg: ['דני מחר ב-11', 'מתן הפקיד 3000', 'מה הקצב שלי?'].map((s) => ({ label: s, fn: () => this.runCmd(s) })),
+      isPal: isPal, palEmpty: isPal && !palItems.length, palName: this.first() || '—',
+      pal: palItems.map((i, k) => ({ key: i < 5 ? String(i + 1) : '·', title: Dd.ALL[i].title, sub: this.fillText(i, Dd.ALL[i].snip ? '' : this.first()).split('\n').join(' ').slice(0, 60), hint: k === palSel ? 'Enter' : '', cls: 'prow' + (k === palSel ? ' sel' : ''), fn: () => { this.copyItem(i, 'pal'); this.setState({ cmdText: '', palSel: 0 }); } })),
+      showPanel: !!cr || isPal, working: crWorking, isAns: !!cr && !crWorking && cr.p.kind === 'q', isPrev: !!cr && !crWorking && cr.p.kind !== 'q',
+      ans: (this._ans || '').slice(0, Math.max(0, ansChars)), ansTyping: ansTyping, pStats: [], pIcon: '', pKicker: '', pTitle: '', pSub: '', pGoLabel: '', pGo: () => {}
+    };
+    if (cr && cr.p.kind === 'dep') {
+      const a = cr.p.amount, b = this.ftdOf('pro', 'Affiliate', a);
+      Object.assign(cmd, { pIcon: I.receipt, pKicker: 'עסקה חדשה · תצוגה מקדימה', pTitle: this.fullName(cr.p.name) + ' · $' + this.fmt(a), pSub: 'פרו · Affiliate · נרשם עכשיו', pStats: [{ k: 'דרגה', v: this.tierOf(a), c: '#E4E7EC' }, { k: 'בונוס', v: '+₪' + b, c: '#A8DCC2' }], pGoLabel: 'רשום', pGo: () => this.applyCmd() });
+    } else if (cr && cr.p.kind === 'cb') {
+      const nm = this.fullName(cr.p.name);
+      Object.assign(cmd, { pIcon: I.cal, pKicker: 'חזרה חדשה', pTitle: nm + ' · ' + cr.p.day + ' ' + (cr.p.time || '12:00'), pSub: nm === 'דני לוי' ? 'מהשיחה האחרונה: שאל על 10K ועל OTC' : 'אזכיר לך 5 דקות לפני', pGoLabel: 'קבע', pGo: () => this.applyCmd() });
+    }
+
+    // sheets
+    const SH = { month: ['ספטמבר 2026', 'החודש'], clients: ['אנשים', 'לקוחות'], tpl: ['מוכנות להעתקה', 'תבניות'], coach: ['מה עובד לך', 'אימון'], memory: ['מה Palon זוכר', 'זיכרון'] };
+    const shK = S.sheet || S.lastSheet, shOpen = !!S.sheet;
+    const STUB = { clients: ['כל הלקוחות במקום אחד', 'חיפוש, היסטוריה וציר זמן לכל לקוח. בינתיים — פשוט תכתוב שם בשורת הפקודה.'], coach: ['אימון אישי, בלי הרצאות', 'Palon ילמד מהשיחות שלך ויציע טיפ אחד ביום, בדיוק כשהוא רלוונטי.'], memory: ['עוד אין כאן כלום', 'כל מה ש-Palon שומע ולומד עליך ועל הלקוחות — גלוי ונשלט. תוכל למחוק כל דבר.'], month: ['', ''], tpl: ['', ''] };
+    const sheet = {
+      tx: shOpen ? 0 : -580, op: shOpen ? 1 : 0, scrimOp: shOpen ? 1 : 0, pe: shOpen ? 'auto' : 'none',
+      kicker: SH[shK][0], title: SH[shK][1], isMonth: shK === 'month', isTpl: shK === 'tpl', isStub: !!STUB[shK][0],
+      stubTitle: STUB[shK][0], stubText: STUB[shK][1], close: () => this.setState({ sheet: '' })
+    };
+    const perDay = {}; Dd.D.forEach((d) => { perDay[d[1]] = (perDay[d[1]] || 0) + 1; });
+    if (S.deals > 40) perDay[24] = (perDay[24] || 0) + (S.deals - 40);
+    const tiers = {}; Dd.D.forEach((d) => { const t = d[6] || this.tierOf(d[4]); tiers[t] = (tiers[t] || 0) + 1; });
+    const month = {
+      deals: S.deals, cta: 'איך סוגרים את ה-' + (55 - S.deals) + ' הנותרות?', line: 'חסרים ' + (55 - S.deals) + ' · נשארו 4 ימי עבודה · ' + ((55 - S.deals) / 4).toFixed(1) + ' ביום',
+      bars: Dd.WD.map((d) => { const n = perDay[d] || 0, fut = d > 24; return { d: d, h: fut ? 3.8 * 16 : Math.max(4, n * 16), bg: fut ? 'transparent' : (d === 24 ? 'linear-gradient(180deg,#FFFFFF,#AEB3BC)' : 'linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,.18))'), bd: fut ? '1px dashed rgba(255,255,255,.18)' : '0' }; }),
+      tiles: [
+        { k: 'שכר עד עכשיו', v: '₪' + this.fmt(10000 + S.ftd), s: 'בסיס + FTD' },
+        { k: 'FTD', v: '₪' + this.fmt(S.ftd), s: 'ממוצע ₪' + Math.round(S.ftd / S.deals) + ' לעסקה' },
+        { k: 'יום שיא', v: '8 עסקאות', s: '14.9 · שבע Affiliate' },
+        { k: 'PPC', v: '₪429', s: 'בונוס ממוצע · 7 עסקאות' }
+      ],
+      tiers: ['Margin', 'Bronze', 'Silver', 'Gold'].map((t) => ({ name: t, n: tiers[t] || 0, w: ((tiers[t] || 0) / 30 * 100).toFixed(1) })),
+      ask: () => { this.setState({ sheet: '' }); this.runCmd('מה הקצב שלי?'); }
+    };
+    const tpls = Dd.ALL.map((t, i) => {
+      const dn = S.cp.i === i && now - S.cp.t0 < 1.8, open = S.tpl === i;
+      return {
+        title: t.title, tag: t.tag, region: t.region, open: open, bg: open ? 'rgba(255,255,255,.06)' : 'rgba(255,255,255,.025)',
+        edit: S.editIdx === i ? S.editText : this.fillText(i, t.snip ? '' : this.first()),
+        onEdit: (ev) => this.setState({ editIdx: i, editText: ev.target.value }),
+        copyCls: 'press ' + (dn ? 'btnP' : 'btnS'), copyLabel: dn ? 'הועתק' : 'העתק', copyIcon: dn ? I.check : I.copy,
+        pick: () => this.setState({ tpl: open ? -1 : i, editIdx: -1, editText: '' }),
+        copy: () => this.copyItem(i)
+      };
+    });
+    const shelfItem = (i) => {
+      const it = Dd.ALL[i], dn = S.cp.i === i && now - S.cp.t0 < 1.8, nm = it.snip ? '' : this.first();
+      return { key: String(i + 1), label: it.label, title: it.title, aria: 'העתק ' + it.title, cls: 'press qchip' + (dn ? ' done' : ''), idle: !dn, done: dn, hasName: dn && !!S.cp.name, noName: dn && !S.cp.name, name: S.cp.name,
+        fillLine: nm ? 'ימולא: ' + nm : '', preview: this.fillText(i, nm).slice(0, 420), copy: () => this.copyItem(i), edit: () => this.editItem(i) };
+    };
+    const shelf = {
+      tpls: [0, 1, 2, 3, 4].map(shelfItem), snips: [5, 6, 7].map(shelfItem),
+      acts: [
+        { label: 'חזרה חדשה', d: I.cal, fn: () => this.setState({ cmdText: (this.first() || 'דני') + ' מחר ב-' }) },
+        { label: 'עסקה חדשה', d: I.plus, fn: () => this.setState({ cmdText: 'מתן הפקיד ' }) },
+        { label: 'קרא מסך', d: I.eye, fn: () => this.readScreen() },
+        { label: 'רשום ב-Salesforce', d: I.cloud, fn: () => this.logSF() },
+        { label: 'העתק סיכום אחרון', d: I.copy, fn: () => this.copySummary() }
+      ],
+      recent: Dd.RECENT.map((r, i) => ({ ini: r.ini, name: r.name, ring: S.peek === i ? '2px solid rgba(255,255,255,.7)' : 'none', fn: () => this.setState({ peek: S.peek === i ? -1 : i, lookK: 'shelf', lookUntil: now + 1 }) }))
+    };
+    const pr = Dd.RECENT[S.peek];
+    const peek = pr ? { on: true, name: pr.name, meta: pr.meta, status: pr.status, tone: pr.tone, next: pr.next, tl: pr.tl, tplLabel: 'העתק ' + Dd.ALL[pr.tpl].label,
+      call: () => { this.setState({ peek: -1 }); this.flash('מחייג ל' + pr.name + '…'); }, tpl: () => { try { navigator.clipboard.writeText(this.fillText(pr.tpl, pr.name.split(' ')[0])).catch(function () {}); } catch (e) {} this.setState({ cp: { i: pr.tpl, t0: now, name: pr.name.split(' ')[0] } }); this.flash('הועתק · ' + Dd.ALL[pr.tpl].title + ' · ' + pr.name.split(' ')[0]); },
+      close: () => this.setState({ peek: -1 }) } : { on: false, tl: [], name: '', meta: '', tone: '', status: '', next: '', tplLabel: '', call: () => {}, tpl: () => {}, close: () => {} };
+
+    // end of day
+    const eodRows = [
+      { k: 'הפקדות היום', v: Math.round(S.rings.deps.v) + ' · +₪' + this.fmt(S.ftd - 8200 + 400), dot: '#A6D6BE', p: S.rings.deps.v / 3.8 },
+      { k: 'שיחות', v: String(Math.round(S.rings.calls.v)), dot: '#B7C8E2', p: S.rings.calls.v / 100 },
+      { k: 'חזרות', v: Math.min(6, S.rings.cbs.v) + ' / 6', dot: '#DCC7A0', p: S.rings.cbs.v / 6 }
+    ].map((r, i) => Object.assign(r, { cls: 'fadeUp fu' + (i + 1), dash: (87.96 * Math.min(1, r.p) * this.ease((now - S.eodAt - 0.4 - i * 0.15) / 1.2)).toFixed(2) + ' 87.96' }));
+    const eodAge = S.eodAt >= 0 ? now - S.eodAt : 0;
+    const eod = {
+      live: eodOn || (S.eodAt >= 0 && eodK < 1), op: eodV, sc: (eodOn ? 1.04 - 0.04 * eodK : 1 + 0.06 * eodK).toFixed(4), pe: eodOn ? 'auto' : 'none',
+      score: String(Math.round(86 * this.ease((eodAge - 0.3) / 1.4))), rows: eodRows,
+      go: () => { this.setState({ night: this.t() }); this._P.eod.tCur = this.t(); this.later(() => this.setState({ eod: false, eodAt: this.t(), night: -1 }), 4600); },
+      night: S.night >= 0 && eodOn, deals: S.deals,
+      bg: S.night >= 0 && eodOn ? '#000' : 'radial-gradient(900px 620px at 50% 35%, #1B1C20 0%, #040405 72%)'
+    };
+    if (eod.night) eod.live = false;
+
+    const demo = [
+      { label: 'בוקר', fn: () => { this.setState({ sheet: '', eod: false, eodAt: -1 }); this.goMorning(); } },
+      { label: 'הפקדה', fn: () => { const j = S.queue.indexOf(3); if (j > 0) { const q2 = S.queue.slice(); q2.splice(j, 1); q2.unshift(3); this.setState({ queue: q2, anim: S.anim === 'enter' ? 'enter2' : 'enter' }); this.say(Dd.CARDS[3].say); } else if (j === 0) this.complete(false); else { this.bumpRings({ deps: 1 }); this.cheer(2); this.burstAt(740, 300); this.deposit(400, 740, 300); this.say('עוד הפקדה. ₪400 נכנסו.'); } } },
+      { label: 'טבעות', fn: () => this.closeAll() },
+      { label: 'נאדג׳', fn: () => this.nudge() },
+      { label: 'חזרתי מהפסקה', fn: () => { this.setState({ wb: this.t(), nudges: [] }); this.cheer(1.6); this.say('ברוך שובך. סידרתי לך 3 עפרונות.'); } },
+      { label: 'לא עונים ×3', fn: () => { this.setState({ tuft: { k: 'droop', until: this.t() + 9 } }); this.say('שלושה לא עונים ברצף. קורה. הבא ירים.'); } },
+      { label: 'Palon נוצץ', fn: () => { const nx = S.shiny === '' ? 'gold' : S.shiny === 'gold' ? 'pearl' : ''; this.setState({ shiny: nx }); if (nx) { this.cheer(2.4); this.burstAt(1220, 170); this.say(nx === 'gold' ? 'Palon זהב. פעם באלף ימים — היום שלך.' : 'פנינה. עוד יותר נדיר.'); } } },
+      { label: 'דבש (ראש השנה)', fn: () => { this.setState({ honeyDone: false, rosh: true }); this.bumpRings({ deps: 1 }); this.cheer(2); this.burstAt(740, 300); this.deposit(400, 740, 300); } },
+      { label: 'סוף יום', fn: () => { this.setState({ sheet: '', eod: true, eodAt: this.t(), happyUntil: -1, night: -1 }); this._P.eod.tCur = this.t(); } }
+    ];
+
+    const heroLook = S.look || (now < S.lookUntil ? S.lookK : '');
+    const LT = { card: 'translateX(-6px) rotate(-5deg)', shelf: 'translate(-9px,6px) rotate(-9deg)', rings: 'translateX(-12px) rotate(-11deg)' };
+    const tuftK = now < S.tuft.until ? S.tuft.k : (cur && cur.kind === 'heard' ? 'curl' : /תחזור/.test(S.cmdText) ? 'curl' : '');
+    const hero = { tf: LT[heroLook] || 'none' };
+    const look = { card: () => this.setState({ look: 'card' }), shelf: () => this.setState({ look: 'shelf' }), rings: () => this.setState({ look: 'rings' }), off: () => this.setState({ look: '' }) };
+    const gt = now - S.gongT0;
+    const gong = gt < 1.8 ? (() => { const k = this.ease(gt / 1.6), sz = 80 + k * 520, rs = 60 + this.ease(gt / 1.1) * 300; return { on: true, x: (274 - sz / 2).toFixed(1), y: (165 - sz / 2).toFixed(1), s: sz.toFixed(1), o: (Math.sin(Math.min(1, gt / 1.8) * Math.PI) * 0.9).toFixed(3), rx: (274 - rs / 2).toFixed(1), ry: (165 - rs / 2).toFixed(1), rs: rs.toFixed(1), ro: Math.max(0, 0.8 * (1 - gt / 1.1)).toFixed(3) }; })() : { on: false, x: 0, y: 0, s: 0, o: 0, rx: 0, ry: 0, rs: 0, ro: 0 };
+    const ht = now - S.honeyT0;
+    const honey = ht >= 0 && ht < 7 ? (() => { const L = [[40, 18, 4], [96, 30, 3.5], [310, 14, 3]]; let d = '', dr = ''; L.forEach((l, j) => { const len = 6 + l[1] * this.ease((ht - j * 0.25) / 2.4); d += 'M' + l[0] + ' 3 V' + len.toFixed(1); const cy = len + 5; dr += 'M' + (l[0] - l[2]) + ' ' + cy.toFixed(1) + ' a' + l[2] + ' ' + l[2] + ' 0 1 0 ' + (2 * l[2]) + ' 0 a' + l[2] + ' ' + l[2] + ' 0 1 0 ' + (-2 * l[2]) + ' 0'; }); return { on: true, d: d, drops: dr, o: (ht > 5.5 ? (7 - ht) / 1.5 : Math.min(1, ht * 3)).toFixed(3) }; })() : { on: false, d: '', drops: '', o: 0 };
+    const wbA = now - S.wb;
+    const wb = { on: S.wb >= 0, close: () => this.setState({ wb: -1 }), items: ['הכנתי ל-Maya את תבנית ההפקדה עם השם שלה', 'הזזתי את Tomer ל-17:00 — הבנק מאשר עד 16:30', 'סיכמתי את שרית ורשמתי ב-Salesforce'].map((t, i) => ({ t: t, cls: 'fadeUp fu' + (i + 1) })) };
+    const toast = { on: !!S.toast && now - S.toastAt < 2.2, text: S.toast };
+    const eodMood = eodAge < 2.4 ? 'happy' : 'idle';
+    const pl = {
+      hero: this.dress(this.sample('hero', heroLook && heroMood === 'idle' ? 'listen' : heroMood, !S.morning || S.mornOut >= 0, 100), 'plH', { tuft: tuftK, bow: S.acc, shiny: S.shiny }),
+      card: this.dress(this.sample('card', 'listen', !!(cur && cur.quote), 100), 'plC'),
+      bar: this.dress(this.sample('bar', barMood, !!cr, 100), 'plB'),
+      sheet: this.dress(this.sample('sheet', 'think', shOpen && sheet.isStub, 100), 'plS'),
+      morn: this.dress(this.sample('morn', mornMood, mornVis, 100), 'plM'),
+      eod: this.dress(this.sample('eod', eod.night ? 'happy' : eodMood, eod.live || eod.night, 100), eod.night ? 'plE2' : 'plE', { cap: eod.night, bow: S.acc, shiny: eod.night ? 'pearl' : S.shiny })
+    };
+    return {
+      pl: pl, stage: stage, morn: morn, eod: eod, rail: rail, pay: pay, rg: { a: rings[0], b: rings[1], c: rings[2] }, rings: rings, ringsHead: ringsHead,
+      card: card, stack: stack, burst: burst, shock: shock, fly: fly, nudges: nudges, cmd: cmd, sheet: sheet, month: month, tpls: tpls,
+      hero: hero, look: look, gong: gong, honey: honey, wb: wb, shelf: shelf, peek: peek, demoOpen: S.demoOpen, demoToggle: () => this.setState({ demoOpen: !S.demoOpen }), speech: { shown: spText.slice(0, spChars), typing: typing }, demo: demo, toast: toast, anyGlow: anyGlow
+    };
+  }
+}
+</script>
+</body>
+</html>
