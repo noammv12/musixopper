@@ -212,7 +212,11 @@ static class Settings
     /// <summary>The pinned default Gemini model. Pinned rather than the
     /// "-latest" alias: Google deprecated the alias (it 404s), and a pin
     /// makes latency and quality predictable.</summary>
-    public const string DefaultGeminiModel = "gemini-3.7-flash";
+    public const string DefaultGeminiModel = "gemini-3.8-flash";
+
+    /// <summary>Earlier defaults. A stored one is a leftover pin, not a
+    /// choice, so it is cleared to track the current default.</summary>
+    static readonly string[] RetiredGeminiDefaults = ["gemini-flash-latest", "gemini-3.7-flash"];
 
     /// <summary>Gemini model id; blank falls back to the pinned default.</summary>
     public static string GeminiModel
@@ -225,22 +229,53 @@ static class Settings
         }
     }
 
-    /// <summary>Clears a stored "gemini-flash-latest" — the old default,
-    /// whose alias Google deprecated — so the model re-tracks the current
-    /// default. A genuinely custom model id is left alone.</summary>
+    /// <summary>The pinned default DeepSeek model — V4.1 Flash, fast and
+    /// non-thinking by default.</summary>
+    public const string DefaultDeepSeekModel = "deepseek-flash";
+
+    /// <summary>DeepSeek retired these ids on 2026-07-24; they now fail.</summary>
+    static readonly string[] RetiredDeepSeekModels = ["deepseek-chat", "deepseek-reasoner"];
+
+    /// <summary>DeepSeek model id; blank falls back to the pinned default.</summary>
+    public static string DeepSeekModel
+    {
+        get => Read("DeepSeekModel") is { Length: > 0 } model ? model : DefaultDeepSeekModel;
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value)) DeleteValue("DeepSeekModel");
+            else WriteValue("DeepSeekModel", value.Trim());
+        }
+    }
+
+    /// <summary>True when a stored Gemini id is a retired default. Pure, for tests.</summary>
+    internal static bool IsRetiredGeminiDefault(string? model) =>
+        model is not null && RetiredGeminiDefaults.Contains(model.Trim(), StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>True when a stored DeepSeek id no longer exists. Pure, for tests.</summary>
+    internal static bool IsRetiredDeepSeekModel(string? model) =>
+        model is not null && RetiredDeepSeekModels.Contains(model.Trim(), StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Clears stored model pins that are old defaults or retired
+    /// ids, so the model re-tracks the current default. A genuinely custom
+    /// model id is left alone.</summary>
     public static void UpgradeDeprecatedGeminiModel()
     {
         try
         {
-            if (Read("GeminiModel") == "gemini-flash-latest")
+            if (Read("GeminiModel") is { } gemini && IsRetiredGeminiDefault(gemini))
             {
                 DeleteValue("GeminiModel");
-                Log.Write($"Settings: retired gemini-flash-latest — now tracking {DefaultGeminiModel}");
+                Log.Write($"Settings: retired {gemini} — now tracking {DefaultGeminiModel}");
+            }
+            if (Read("DeepSeekModel") is { } deepSeek && IsRetiredDeepSeekModel(deepSeek))
+            {
+                DeleteValue("DeepSeekModel");
+                Log.Write($"Settings: retired {deepSeek} — now tracking {DefaultDeepSeekModel}");
             }
         }
         catch (Exception ex)
         {
-            Log.Write($"Settings: Gemini model upgrade check failed: {ex.Message}");
+            Log.Write($"Settings: model upgrade check failed: {ex.Message}");
         }
     }
 

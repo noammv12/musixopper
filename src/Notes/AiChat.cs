@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using Palon.Agent;
 
 namespace Palon.Notes;
 
@@ -30,7 +31,7 @@ static class AiChat
     const int MaxTranscriptChars = 100_000;
     const int MaxDictationChars = 8_000;
 
-    const string SummaryPrompt =
+    static readonly string SummaryPrompt = PalonPersona.Ghostwriting(
         "You write the quick note a salesperson jots down for themselves right after a " +
         "sales call, from its transcript. Reply in the language the transcript is mostly " +
         "in (Hebrew transcript → Hebrew note). One short flowing paragraph, 1–3 sentences, " +
@@ -44,7 +45,7 @@ static class AiChat
         "מישהו לקו לראות האם עידף לה על הבנק והבינו ביחד שכן, הוסבר על הפרטים וביקשה לדבר " +
         "בשבוע הבא כי היא בדיוק מסיימת תהליך גירושים מבעלה.... נשלח ווצאפ ואחזור אליה שבוע הבא.\"\n" +
         "\"סחר באינטראקטיב ישראל בעבר - יותר רלוונטי לקולמקס פרו רוצה לפתוח חשבון ב2,000$ " +
-        "הוסבר על הפרטים ואחזור אליו בימיםה קרובים, נשלח ווצאפ\"";
+        "הוסבר על הפרטים ואחזור אליו בימיםה קרובים, נשלח ווצאפ\"");
 
     const string PolishPrompt =
         "You clean up dictated text. Fix punctuation and casing, remove filler words, false " +
@@ -56,19 +57,18 @@ static class AiChat
         " Then lightly smooth the phrasing so it reads as clear, professional business " +
         "writing — still without adding or removing information.";
 
-    const string RecapPrompt =
-        "You write a short spoken end-of-day recap for a salesperson from their raw activity log. " +
-        "Reply in the language most of the log is in (Hebrew → Hebrew, male grammatical forms for " +
-        "yourself). 4 to 6 short lines: calls and talk time, the two or three things that mattered, " +
+    static readonly string RecapPrompt = PalonPersona.Speaking(
+        "You write the user's short spoken end-of-day recap from their raw activity log. " +
+        "Reply in the language most of the log is in (Hebrew → Hebrew). 4 to 6 short lines: calls and talk time, the two or three things that mattered, " +
         "the next steps that were promised, then pending reminders if any. Plain text — no emoji, " +
-        "no headings, no bullets.";
+        "no headings, no bullets.");
 
-    const string FollowUpPrompt =
+    static readonly string FollowUpPrompt = PalonPersona.Ghostwriting(
         "You draft the short follow-up message a salesperson sends right after a call, " +
         "WhatsApp style. Write in the language of the notes (Hebrew notes → Hebrew " +
         "message). Warm and brief — 2 to 4 sentences: reference what was discussed, " +
         "then end with the agreed next step. No subject line, no signature, no " +
-        "placeholders like [name]. Reply with the message text only.";
+        "placeholders like [name]. Reply with the message text only.");
 
     static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(60) };
 
@@ -122,8 +122,8 @@ static class AiChat
     public static async Task<AssistResult?> AssistAsync(
         string question, IReadOnlyList<PalonCommand> commands, CancellationToken ct)
     {
-        var prompt = new StringBuilder(
-            "You are Palon, a decisive personal assistant for a busy salesperson. The input is an " +
+        var prompt = new StringBuilder(PalonPersona.Speaking(
+            "Be decisive. The input is an " +
             "imperfect speech-recognition transcript of a Hebrew (occasionally English) speaker: " +
             "if it reads as any other language, or as nonsense, it is almost certainly Hebrew " +
             "misheard — reinterpret it phonetically as Hebrew before deciding (e.g. 'La Rabia de " +
@@ -145,7 +145,7 @@ static class AiChat
             "help'. If asked to open something you can't resolve to a command or a URL, the answer " +
             "is one short sentence telling the user to add it under Commands. Only if you truly " +
             "cannot recover the meaning, say you didn't catch it. Prefer a saved command over " +
-            "open_url when both fit.");
+            "open_url when both fit."));
         if (commands.Count > 0)
         {
             prompt.Append("\nSaved commands:");
@@ -210,7 +210,7 @@ static class AiChat
                 "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
                 Settings.GeminiModel, gemini, IsGemini: true));
         if (Settings.DeepSeekKey is { } deepSeek)
-            all.Add(new Provider("DeepSeek", "https://api.deepseek.com/chat/completions", "deepseek-chat", deepSeek, IsGemini: false));
+            all.Add(new Provider("DeepSeek", "https://api.deepseek.com/chat/completions", Settings.DeepSeekModel, deepSeek, IsGemini: false));
         // Benched providers go last, not away: they still get a turn when
         // they're all we have, and any success un-benches them. Materialized
         // eagerly — a lazy Concat would re-check cooldowns mid-walk and hand
@@ -330,8 +330,8 @@ static class AiChat
             ["temperature"] = temperature,
             ["stream"] = false,
             // Gemini Flash thinks by default and thinking tokens count
-            // against max_tokens — the caps sized for deepseek-chat would be
-            // eaten by reasoning and return empty replies. The 4096 floor is
+            // against max_tokens — the caps sized for DeepSeek's non-thinking
+            // chat mode would be eaten by reasoning and return empty replies. The 4096 floor is
             // for long inputs (call-summary transcripts): even at low effort
             // the thinking scales with the input, and 2048 was observed fully
             // consumed with nothing left for the answer. A high cap costs
