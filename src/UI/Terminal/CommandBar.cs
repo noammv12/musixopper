@@ -76,11 +76,10 @@ sealed class CommandBar : StackPanel
         row.Children.Add(inputHost);
         Grid.SetColumn(run, 2);
         row.Children.Add(run);
-        _frame = new Border
+        _frame = new ShadowedBorder(new System.Windows.Media.Effects.DropShadowEffect { Color = Colors.Black, BlurRadius = 50, ShadowDepth = 16, Direction = 270, Opacity = 0.6, RenderingBias = System.Windows.Media.Effects.RenderingBias.Performance })
         {
             Height = 60, CornerRadius = new CornerRadius(30), Background = Fx.Vertical("#E62A2B30", "#EB151518"),
             BorderBrush = Tone.GlassDeepRim, BorderThickness = new Thickness(1), Padding = new Thickness(22, 0, 10, 0), Child = row,
-            Effect = new System.Windows.Media.Effects.DropShadowEffect { Color = Colors.Black, BlurRadius = 50, ShadowDepth = 16, Direction = 270, Opacity = 0.6, RenderingBias = System.Windows.Media.Effects.RenderingBias.Performance },
         };
         _frame.MouseLeftButtonDown += (_, _) => _box.Focus();
         _box.GotKeyboardFocus += (_, _) => _frame.BorderBrush = Tone.AccentLine;

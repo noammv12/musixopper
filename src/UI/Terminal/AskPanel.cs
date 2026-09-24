@@ -21,7 +21,7 @@ namespace Palon.UI;
 /// instant and exact; anything else goes through the agent loop, which now
 /// also sees the month's numbers.
 /// </summary>
-sealed class AskPanel : Border
+sealed class AskPanel : ShadowedBorder
 {
     static AssistantSession? _session;
 
@@ -47,6 +47,7 @@ sealed class AskPanel : Border
     int _generation;
 
     public AskPanel(TerminalWindow host)
+        : base(new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 80, ShadowDepth = 24, Direction = 270, Opacity = 0.7, Color = System.Windows.Media.Colors.Black })
     {
         _host = host;
         Width = 740;
@@ -55,7 +56,6 @@ sealed class AskPanel : Border
         BorderBrush = Tone.GlassDeepRim;
         BorderThickness = new Thickness(1);
         Padding = new Thickness(34, 30, 34, 28);
-        Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 80, ShadowDepth = 24, Direction = 270, Opacity = 0.7, Color = System.Windows.Media.Colors.Black };
 
         var root = new StackPanel();
         var close = Kit.IconButton(Icons.Close, 34, () => _host.CloseOverlay());

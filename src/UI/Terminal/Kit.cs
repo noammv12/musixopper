@@ -261,18 +261,18 @@ static class Kit
         return card;
     }
 
-    public static Border DeepGlass(double radius, Thickness padding) => new()
+    public static Border DeepGlass(double radius, Thickness padding) => new ShadowedBorder(
+        new System.Windows.Media.Effects.DropShadowEffect
+        {
+            Color = Colors.Black, BlurRadius = 60, ShadowDepth = 20, Direction = 270, Opacity = 0.6,
+            RenderingBias = System.Windows.Media.Effects.RenderingBias.Performance,
+        })
     {
         CornerRadius = new CornerRadius(radius),
         Background = Tone.GlassDeep,
         BorderBrush = Tone.GlassDeepRim,
         BorderThickness = new Thickness(1),
         Padding = padding,
-        Effect = new System.Windows.Media.Effects.DropShadowEffect
-        {
-            Color = Colors.Black, BlurRadius = 60, ShadowDepth = 20, Direction = 270, Opacity = 0.6,
-            RenderingBias = System.Windows.Media.Effects.RenderingBias.Performance,
-        },
     };
 
     /// <summary>A list row: rounded, transparent, a whisper of fill on hover.</summary>

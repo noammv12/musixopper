@@ -35,14 +35,14 @@ static class Fx
     }
 
     /// <summary>The design's "glass2": deep, more opaque glass with a lit rim.</summary>
-    public static Border Glass2(double radius, Thickness padding) => new()
+    public static Border Glass2(double radius, Thickness padding) => new ShadowedBorder(
+        new DropShadowEffect { Color = Colors.Black, BlurRadius = 44, ShadowDepth = 14, Direction = 270, Opacity = 0.55, RenderingBias = RenderingBias.Performance })
     {
         CornerRadius = new CornerRadius(radius),
         Background = Vertical("#D128292E", "#DB121215"),
         BorderBrush = Tone.GlassDeepRim,
         BorderThickness = new Thickness(1),
         Padding = padding,
-        Effect = new DropShadowEffect { Color = Colors.Black, BlurRadius = 44, ShadowDepth = 14, Direction = 270, Opacity = 0.55, RenderingBias = RenderingBias.Performance },
     };
 
     /// <summary>A small caps-less label in the design's kicker grey.</summary>
@@ -225,4 +225,47 @@ sealed class Odometer : StackPanel
             _columns.Add((move, 0));
         }
     }
+}
+
+/// <summary>
+/// A Border whose drop shadow lives on a separate, childless plate drawn beneath the content.
+/// A DropShadowEffect on a Border re-rasterizes its whole subtree whenever anything inside
+/// changes (a live Palon, a typing caret, a count-up) — in software that is a full blur pass
+/// per frame. Here only the static plate carries the effect, so content changes never touch it.
+/// Looks the same: the plate draws the card's background, rim and shadow; the Border itself draws nothing.
+/// </summary>
+class ShadowedBorder : Border
+{
+    readonly Border _plate = new() { IsHitTestVisible = true };
+
+    public ShadowedBorder(Effect shadow)
+    {
+        _plate.Effect = shadow;
+        Bind(Border.BackgroundProperty);
+        Bind(Border.BorderBrushProperty);
+        Bind(Border.BorderThicknessProperty);
+        Bind(Border.CornerRadiusProperty);
+        AddVisualChild(_plate);
+    }
+
+    void Bind(DependencyProperty dp) =>
+        _plate.SetBinding(dp, new System.Windows.Data.Binding(dp.Name) { Source = this });
+
+    protected override int VisualChildrenCount => base.VisualChildrenCount + 1;
+
+    protected override Visual GetVisualChild(int index) => index == 0 ? _plate : base.GetVisualChild(index - 1);
+
+    protected override Size MeasureOverride(Size constraint)
+    {
+        _plate.Measure(constraint);
+        return base.MeasureOverride(constraint);
+    }
+
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        _plate.Arrange(new Rect(finalSize));
+        return base.ArrangeOverride(finalSize);
+    }
+
+    protected override void OnRender(DrawingContext dc) { } // the plate draws the chrome
 }
