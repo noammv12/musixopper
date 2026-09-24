@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace Palon.UI;
 
@@ -16,8 +17,10 @@ enum PalonMood { Idle, Listen, Think, Talk, Happy }
 /// <remarks>
 /// Frames come from <see cref="PalonEngine"/> (a port of docs/design/engine.js) and are drawn in
 /// engine units (R=100, centred on 0,0) inside a 220x250 box trimmed from the web viewBox, uniformly fitted into the element.
-/// All instances share one CompositionTarget.Rendering hook, active only while at least one
-/// avatar is loaded and visible.
+/// All instances share one DispatcherTimer clock (not CompositionTarget.Rendering, which forces
+/// WPF to compose every window at the monitor rate). Each instance is paced by <see cref="AvatarPacer"/>:
+/// 60 fps only for large ones mid-motion in the active window, 12-30 fps otherwise, none while its
+/// window is minimized. The clock stops when no instance needs frames.
 /// </remarks>
 sealed class PalonAvatar : FrameworkElement
 {
@@ -82,7 +85,10 @@ sealed class PalonAvatar : FrameworkElement
     static readonly Stopwatch Clock = Stopwatch.StartNew();
     static double Now => Clock.Elapsed.TotalSeconds;
     static readonly List<PalonAvatar> Live = new();
-    static TimeSpan _lastRenderingTime = TimeSpan.MinValue;
+    static DispatcherTimer? _clock;
+
+    /// <summary>Diagnostics: live instances and whether the shared clock is running.</summary>
+    public static (int Avatars, bool ClockOn) Probe() => (Live.Count, _clock?.IsEnabled == true);
     static int _instances;
     static bool _reducedMotion = !SystemParameters.ClientAreaAnimation;
 
@@ -94,13 +100,18 @@ sealed class PalonAvatar : FrameworkElement
     double _gYaw, _gPitch;            // eased gaze offsets (degrees)
     bool _pointerNear; double _noticeAt = -10;
     bool _dirty = true;
+    double _lastFrame = -10, _interval;
+    Window? _window;
+    bool _windowActive = true, _windowMinimized;
+    // pointer hit-test cache: screen origin + device px per DIP, refreshed a few times a second
+    Point _scrOrigin; double _scrScale; double _scrAt = -10;
 
     public PalonAvatar()
     {
         _now = _lastTick = Now;
         _state = new PalonState(PalonMood.Idle, _now) { Seed = 1.7 + (_instances++ % 17) * 2.9 }; // desynced blinks
-        Loaded += (_, _) => UpdateHook();
-        Unloaded += (_, _) => UpdateHook();
+        Loaded += (_, _) => { AttachWindow(); UpdateHook(); };
+        Unloaded += (_, _) => { DetachWindow(); UpdateHook(); };
         IsVisibleChanged += (_, _) => UpdateHook();
     }
 
@@ -112,7 +123,7 @@ sealed class PalonAvatar : FrameworkElement
         _cheerUntil = now + (_state.Cur == PalonMood.Happy ? 0.95 : PalonEngine.Morph + 0.95); // one full hop, landing included
         if (_state.Cur == PalonMood.Happy) _state.BlinkAt = now;
         else PalonEngine.SetMood(_state, PalonMood.Happy, now, Motion);
-        _dirty = true; InvalidateVisual();
+        _dirty = true; InvalidateVisual(); Wake();
     }
 
     static double Motion => _reducedMotion ? 0 : 1;
@@ -121,10 +132,72 @@ sealed class PalonAvatar : FrameworkElement
     {
         if (_cheering) return; // the cheer settles into the new Mood when it ends
         PalonEngine.SetMood(_state, Mood, Now, Motion);
-        _dirty = true;
+        _dirty = true; Wake();
     }
 
-    // ---- frame hook: one Rendering subscription shared by every live avatar ----
+    // ---- host window: pause while minimized, slow down while in the background ----
+    void AttachWindow()
+    {
+        var w = Window.GetWindow(this);
+        if (ReferenceEquals(w, _window)) return;
+        DetachWindow();
+        _window = w;
+        if (w is null) { _windowActive = true; _windowMinimized = false; return; }
+        w.StateChanged += OnWindowChanged;
+        w.Activated += OnWindowChanged;
+        w.Deactivated += OnWindowChanged;
+        ReadWindow();
+    }
+
+    void DetachWindow()
+    {
+        if (_window is null) return;
+        _window.StateChanged -= OnWindowChanged;
+        _window.Activated -= OnWindowChanged;
+        _window.Deactivated -= OnWindowChanged;
+        _window = null;
+    }
+
+    void ReadWindow()
+    {
+        if (_window is null) return;
+        _windowMinimized = _window.WindowState == WindowState.Minimized;
+        // Topmost tool windows (the dock) are rarely "active" but always in view.
+        _windowActive = _window.IsActive || _window.Topmost;
+    }
+
+    void OnWindowChanged(object? sender, EventArgs e)
+    {
+        ReadWindow();
+        _scrAt = -10;
+        if (!_windowMinimized) { _lastTick = Now; _dirty = true; InvalidateVisual(); }
+        Wake();
+    }
+
+    /// <summary>Something changed: make sure the clock is running at a rate this instance can use.</summary>
+    void Wake()
+    {
+        if (!IsAnimating) return;
+        _interval = AvatarPacer.FrameInterval(Math.Min(RenderSize.Width, RenderSize.Height), true, _windowActive, _windowMinimized);
+        Reclock();
+    }
+
+    static void Reclock()
+    {
+        double best = 0;
+        foreach (var a in Live) if (a._interval > 0 && (best == 0 || a._interval < best)) best = a._interval;
+        if (best == 0) { _clock?.Stop(); return; }
+        if (_clock is null)
+        {
+            _clock = new DispatcherTimer(DispatcherPriority.Render);
+            _clock.Tick += OnClock;
+        }
+        var iv = TimeSpan.FromSeconds(best);
+        if (_clock.Interval != iv) _clock.Interval = iv;
+        if (!_clock.IsEnabled) _clock.Start();
+    }
+
+    // ---- frame clock: one DispatcherTimer shared by every live avatar ----
     void UpdateHook()
     {
         bool want = IsLoaded && IsVisible;
@@ -133,23 +206,22 @@ sealed class PalonAvatar : FrameworkElement
         if (want)
         {
             _lastTick = Now; // no gaze-easing jump after being hidden
+            _scrAt = -10;
             Live.Add(this);
             if (Live.Count == 1)
             {
                 _reducedMotion = !SystemParameters.ClientAreaAnimation;
-                CompositionTarget.Rendering += OnRendering;
                 SystemParameters.StaticPropertyChanged += OnSystemParameters;
             }
             _dirty = true; InvalidateVisual();
+            Wake();
         }
         else
         {
             Live.Remove(this);
-            if (Live.Count == 0)
-            {
-                CompositionTarget.Rendering -= OnRendering;
-                SystemParameters.StaticPropertyChanged -= OnSystemParameters;
-            }
+            _interval = 0;
+            if (Live.Count == 0) SystemParameters.StaticPropertyChanged -= OnSystemParameters;
+            Reclock();
         }
     }
 
@@ -158,17 +230,18 @@ sealed class PalonAvatar : FrameworkElement
         if (e.PropertyName == nameof(SystemParameters.ClientAreaAnimation)) _reducedMotion = !SystemParameters.ClientAreaAnimation;
     }
 
-    static void OnRendering(object? sender, EventArgs e)
+    static void OnClock(object? sender, EventArgs e)
     {
-        // Rendering can fire more than once per composed frame; only do work once per frame.
-        if (e is RenderingEventArgs re)
-        {
-            if (re.RenderingTime == _lastRenderingTime) return;
-            _lastRenderingTime = re.RenderingTime;
-        }
         double now = Now;
         bool? cursorOk = null; POINT cursor = default;
-        for (int i = Live.Count - 1; i >= 0; i--) Live[i].Tick(now, ref cursorOk, ref cursor);
+        for (int i = Live.Count - 1; i >= 0; i--)
+        {
+            var a = Live[i];
+            if (!AvatarPacer.Due(now, a._lastFrame, a._interval)) continue;
+            a._lastFrame = now;
+            a.Tick(now, ref cursorOk, ref cursor);
+        }
+        Reclock();
     }
 
     void Tick(double now, ref bool? cursorOk, ref POINT cursor)
@@ -189,11 +262,11 @@ sealed class PalonAvatar : FrameworkElement
         else if (FollowPointer && !reduced && RenderSize.Width > 0)
         {
             cursorOk ??= GetCursorPos(out cursor);
-            if (cursorOk == true && PresentationSource.FromVisual(this) != null)
+            if (cursorOk == true && ScreenCache(now))
             {
                 try
                 {
-                    var p = PointFromScreen(new Point(cursor.X, cursor.Y));
+                    var p = new Point((cursor.X - _scrOrigin.X) / _scrScale, (cursor.Y - _scrOrigin.Y) / _scrScale);
                     double r = Math.Min(RenderSize.Width, RenderSize.Height) / 2;
                     double dx = (p.X - RenderSize.Width / 2) / r, dy = (p.Y - RenderSize.Height / 2) / r;
                     double dist = Math.Sqrt(dx * dx + dy * dy), reach = Math.Max(3.2, 260 / Math.Max(r, 1)); // small avatars look farther
@@ -224,9 +297,33 @@ sealed class PalonAvatar : FrameworkElement
         bool active = !reduced || _dirty || gazeMoving || _cheering || now - _noticeAt < 0.7
             || PalonEngine.IsMorphing(_state, now) || PalonEngine.IsBlinking(_state, now);
         if (active || _wasActive) InvalidateVisual(); // reduced motion: draw only while something changes, plus one settle frame
+        bool busy = _dirty || gazeMoving || _cheering || now - _noticeAt < 0.7
+            || PalonEngine.IsMorphing(_state, now) || PalonEngine.IsBlinking(_state, now);
         _wasActive = active; _dirty = false;
+        // Next frame budget. Reduced motion with nothing moving needs no clock at all (Wake restarts it).
+        _interval = reduced && !active && !_wasActive && !(FollowPointer && Gaze is null)
+            ? 0
+            : AvatarPacer.FrameInterval(Math.Min(RenderSize.Width, RenderSize.Height), busy || near, _windowActive, _windowMinimized);
     }
     bool _wasActive;
+
+    /// <summary>Refreshes the element's screen origin/scale (for the pointer test) a few times a second
+    /// instead of a PointFromScreen per frame per instance.</summary>
+    bool ScreenCache(double now)
+    {
+        if (now - _scrAt < 0.25) return _scrScale > 0;
+        _scrAt = now; _scrScale = 0;
+        if (PresentationSource.FromVisual(this) == null) return false;
+        try
+        {
+            var o = PointToScreen(new Point(0, 0));
+            var x = PointToScreen(new Point(100, 0));
+            _scrOrigin = o;
+            _scrScale = Math.Abs(x.X - o.X) / 100;
+        }
+        catch (InvalidOperationException) { }
+        return _scrScale > 0;
+    }
 
     protected override void OnRender(DrawingContext dc)
     {
@@ -248,7 +345,12 @@ sealed class PalonAvatar : FrameworkElement
         PalonEngine.Sample(_state, now, _frame, 100, x);
 
         // Fit the viewBox, centred; draw in viewBox units so the frozen Absolute brushes line up.
-        dc.PushTransform(new MatrixTransform(s, 0, 0, s, (w - VbW * s) / 2 - VbX * s, (h - VbH * s) / 2 - VbY * s));
+        if (_fit is null || w != _fitW || h != _fitH)
+        {
+            _fit = new MatrixTransform(s, 0, 0, s, (w - VbW * s) / 2 - VbX * s, (h - VbH * s) / 2 - VbY * s);
+            _fit.Freeze(); _fitW = w; _fitH = h;
+        }
+        dc.PushTransform(_fit);
 
         var hair = new StreamGeometry();
         using (var c = hair.Open())
@@ -279,6 +381,8 @@ sealed class PalonAvatar : FrameworkElement
         dc.DrawGeometry(ShadeBrush, null, shade);
         dc.Pop();
     }
+
+    MatrixTransform? _fit; double _fitW, _fitH;
 
     /// <summary>Closed Catmull-Rom (tension 1/6) through interleaved points, as engine.js catmull().</summary>
     static void Catmull(StreamGeometryContext c, double[] P)

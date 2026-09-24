@@ -25,6 +25,7 @@ static class Program
 
         Log.Init();
         Log.Write($"Palon {Version} starting");
+        Perf.Start(); // "perf:" line every 5 min (Palon.exe perf shows them)
         Settings.MigrateFromPredecessors(); // must run before Shell reads Settings
         Settings.UpgradeDeprecatedGeminiModel();
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Write($"Unhandled: {e.ExceptionObject}");
@@ -73,6 +74,7 @@ static class Program
         "resume" or "play" => SignalOrRun(verb, TraySignals.CallEndName, MediaController.CliResumeAsync),
         "test" => RunTest(),
         "terminal" => RunTerminal(),
+        "perf" => RunPerf(),
         _ => Usage(verb),
     };
 
@@ -103,6 +105,30 @@ static class Program
         catch (Exception ex)
         {
             Log.Write($"CLI '{verb}' failed: {ex.Message}");
+            return 1;
+        }
+    }
+
+    /// <summary>Diagnostic: prints the running app's recent "perf:" log lines (written every 5 minutes).</summary>
+    static int RunPerf()
+    {
+        try
+        {
+            NativeMethods.AttachConsole(NativeMethods.ATTACH_PARENT_PROCESS);
+            var lines = new List<string>();
+            foreach (var f in new[] { System.IO.Path.Combine(Log.Dir, "log.old.txt"), Log.FilePath })
+                if (System.IO.File.Exists(f))
+                    using (var fs = new System.IO.FileStream(f, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.ReadWrite | System.IO.FileShare.Delete))
+                    using (var r = new System.IO.StreamReader(fs))
+                        while (r.ReadLine() is { } l) lines.Add(l);
+            var perf = Perf.LastLines(lines);
+            TryWriteLine(perf.Count == 0 ? $"No perf lines yet in {Log.FilePath} (the running app writes one every 5 minutes)." : string.Join(Environment.NewLine, perf));
+            TryWriteLine("This process: " + Perf.Snapshot());
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            TryWriteLine(ex.Message);
             return 1;
         }
     }
@@ -180,7 +206,7 @@ static class Program
     {
         Log.Write($"CLI: unknown verb '{verb}'");
         NativeMethods.AttachConsole(NativeMethods.ATTACH_PARENT_PROCESS);
-        TryWriteLine("Usage: Palon.exe [pause [number] | resume | test | terminal]   (no arguments starts the app)");
+        TryWriteLine("Usage: Palon.exe [pause [number] | resume | test | terminal | perf]   (no arguments starts the app)");
         return 2;
     }
 

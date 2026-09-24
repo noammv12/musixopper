@@ -30,7 +30,9 @@ sealed partial class DockWindow
 
     // ---- hover ----
     StackPanel _hoverSeg = null!;
-    StackPanel _moreSeg = null!;
+    StackPanel _moreTray = null!;
+    Border _moreButton = null!;
+    Grid _restLayer = null!;
     Border _quickButton = null!;
     StackPanel _pinsPanel = null!;
     StackPanel _snippetsPanel = null!;
@@ -145,45 +147,74 @@ sealed partial class DockWindow
         _restRow.Children.Add(_flashPanel);
         _restRow.Children.Add(_hoverSeg);
         _restRow.Children.Add(_restAvatar);
+
+        // Row 0: the "…" tray (collapsed unless open); row 1: the pill row, centered in what's left.
+        _restLayer = new Grid();
+        _restLayer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        _restLayer.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        _restLayer.Children.Add(_moreTray);
+        Grid.SetRow(_restRow, 1);
+        _restLayer.Children.Add(_restRow);
     }
 
     void BuildHover()
     {
-        _quickButton = DockKit.Button("+ חזרה", DockKit.Kind.Primary, () => OpenQuick(), height: 34);
+        // Primary row (Dock2): + חזרה · up to 3 pinned templates · "…" — then the Palon avatar.
+        _quickButton = DockKit.Button("+ חזרה", DockKit.Kind.Primary, () => OpenQuick(), height: ChipHeight);
         _pinsPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        var more = DockKit.IconButton(DockKit.IconMore, "עוד: הכתבה, קריאת מסך, קטעים", ToggleMore, 34, DockPalette.Text);
-
-        _dictateButton = DockKit.IconButton(DockKit.IconMic, "הכתבה", () => DictationToggleRequested?.Invoke(), 34, DockPalette.Text);
-        _scanButton = DockKit.IconButton(DockKit.IconScan, "קרא מהמסך", TerminalWindow.ReadScreenFromShortcut, 34, DockPalette.Text);
-        var ask = DockKit.IconButton(DockKit.IconChat, "שאל את Palon", () => AssistantToggleRequested?.Invoke(), 34, DockPalette.Text);
-        var settings = DockKit.IconButton(DockKit.IconGear, "קטעים והגדרות", () => OpenFlyoutRequested?.Invoke(), 34, DockPalette.Text);
-        _snippetsPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        _moreSeg = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
-        _moreSeg.Children.Add(DockKit.Divider());
-        _moreSeg.Children.Add(_dictateButton);
-        _moreSeg.Children.Add(_scanButton);
-        _moreSeg.Children.Add(ask);
-        _moreSeg.Children.Add(_snippetsPanel);
-        _moreSeg.Children.Add(settings);
+        _moreButton = DockKit.IconButton(DockKit.IconMore, "עוד: הכתבה, קריאת מסך, שאל, קטעים", ToggleMore, ChipHeight, DockPalette.Text);
 
         _hoverSeg = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
         _hoverSeg.Children.Add(DockKit.Divider());
         _hoverSeg.Children.Add(_quickButton);
         _hoverSeg.Children.Add(_pinsPanel);
-        _hoverSeg.Children.Add(more);
-        _hoverSeg.Children.Add(_moreSeg);
+        _hoverSeg.Children.Add(_moreButton);
         _hoverSeg.Children.Add(DockKit.Divider());
-        foreach (FrameworkElement child in _hoverSeg.Children)
-            if (child is Border { Width: not 1 } b) b.Margin = new Thickness(0, 0, 6, 0);
+        _quickButton.Margin = new Thickness(0, 0, ChipGap, 0);
+
+        // Secondary tray ("…"): its own row above the primary one — the pill
+        // grows upward into a rounded panel instead of one endless row.
+        _dictateButton = DockKit.Button("הכתבה", DockKit.Kind.Ghost, () => DictationToggleRequested?.Invoke(), DockKit.IconMic, TrayChipHeight);
+        _scanButton = DockKit.Button("קרא מסך", DockKit.Kind.Ghost, TerminalWindow.ReadScreenFromShortcut, DockKit.IconScan, TrayChipHeight);
+        var ask = DockKit.Button("שאל את Palon", DockKit.Kind.Ghost, () => AssistantToggleRequested?.Invoke(), DockKit.IconChat, TrayChipHeight);
+        ask.ToolTip = "שאל את Palon";
+        var settings = DockKit.IconButton(DockKit.IconGear, "קטעים והגדרות", () => OpenFlyoutRequested?.Invoke(), TrayChipHeight, DockPalette.Text);
+        _snippetsPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+
+        var tools = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+        foreach (var b in new[] { _dictateButton, _scanButton, ask })
+        {
+            b.Margin = new Thickness(0, 0, ChipGap, 0);
+            tools.Children.Add(b);
+        }
+        tools.Children.Add(settings);
+        _moreTray = new StackPanel
+        {
+            Orientation = Orientation.Vertical,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(14, 10, 14, 0),
+            Visibility = Visibility.Collapsed,
+        };
+        _moreTray.Children.Add(tools);
+        _snippetsPanel.HorizontalAlignment = HorizontalAlignment.Center;
+        _snippetsPanel.Margin = new Thickness(0, 6, 0, 0);
+        _moreTray.Children.Add(_snippetsPanel);
+        _moreTray.Children.Add(new Border { Height = 1, Margin = new Thickness(4, 10, 4, 0), Background = DockPalette.Stroke });
 
         RebuildPins();
         RebuildSnippets();
         RefreshHoverTips();
     }
 
+    const double ChipHeight = 34;
+    const double TrayChipHeight = 30;
+    const double ChipGap = 6;
+    const double PinLabelMax = 104;
+    const double SnippetLabelMax = 96;
+
     void ExpandHover()
     {
-        _moreSeg.Visibility = Visibility.Collapsed;
+        _moreTray.Visibility = Visibility.Collapsed;
         RebuildPins(); // the first name may have changed since last time
         _hoverSeg.BeginAnimation(OpacityProperty, null);
         _hoverSeg.Visibility = Visibility.Visible;
@@ -201,19 +232,21 @@ sealed partial class DockWindow
     {
         if (_restAvatar.RenderTransform is RotateTransform lean)
             lean.BeginAnimation(RotateTransform.AngleProperty, DockMotion.To(0, 450));
+        _moreTray.Visibility = Visibility.Collapsed;
         if (_hoverSeg.Visibility != Visibility.Visible) return;
         // Collapse first so the pill measures its resting width; the spring and
         // the clip carry the row out of view.
         _hoverSeg.BeginAnimation(OpacityProperty, null);
         _hoverSeg.Opacity = 0;
         _hoverSeg.Visibility = Visibility.Collapsed;
-        _moreSeg.Visibility = Visibility.Collapsed;
     }
+
+    bool TrayOpen => _moreTray.Visibility == Visibility.Visible;
 
     void ToggleMore()
     {
-        _moreSeg.Visibility = _moreSeg.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
-        if (_moreSeg.Visibility == Visibility.Visible) DockKit.RiseIn(_moreSeg, 0);
+        _moreTray.Visibility = TrayOpen ? Visibility.Collapsed : Visibility.Visible;
+        if (TrayOpen) DockKit.RiseIn(_moreTray, 120);
         Refit();
     }
 
@@ -261,10 +294,11 @@ sealed partial class DockWindow
         foreach (var t in pins)
         {
             var label = DockPins.ShortLabel(t);
-            var button = DockKit.Button(label, DockKit.Kind.Secondary, null, height: 34);
-            button.Margin = new Thickness(0, 0, 6, 0);
+            var button = DockKit.Button(label, DockKit.Kind.Secondary, null, height: ChipHeight);
+            button.Margin = new Thickness(0, 0, ChipGap, 0);
             button.ToolTip = first.Length > 0 ? $"{t.Title} · העתק עם השם {first}" : $"{t.Title} · העתק";
             var text = DockKit.LabelOf(button);
+            text.MaxWidth = PinLabelMax; // ellipsis; the full name is in the tooltip
             var revert = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1600) };
             revert.Tick += (_, _) =>
             {
@@ -320,15 +354,16 @@ sealed partial class DockWindow
         }
         catch
         {
-            return;
+            snippets = new();
         }
+        _snippetsPanel.Visibility = snippets.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         foreach (var snippet in snippets)
         {
             var original = snippet.Label.Length > 0 ? snippet.Label : "(ללא שם)";
-            var chip = DockKit.Button(original, DockKit.Kind.Secondary, null, DockKit.IconSnippet, height: 34);
-            chip.Margin = new Thickness(0, 0, 6, 0);
-            DockKit.LabelOf(chip).MaxWidth = 90;
-            chip.ToolTip = (snippet.Text.Length > 120 ? snippet.Text[..120] + "…" : snippet.Text) + "\n(קליק ימני: העתק בלבד)";
+            var chip = DockKit.Button(original, DockKit.Kind.Secondary, null, DockKit.IconSnippet, height: TrayChipHeight);
+            chip.Margin = new Thickness(0, 0, ChipGap, 0);
+            DockKit.LabelOf(chip).MaxWidth = SnippetLabelMax;
+            chip.ToolTip = original + "\n" + (snippet.Text.Length > 120 ? snippet.Text[..120] + "…" : snippet.Text) + "\n(קליק ימני: העתק בלבד)";
             var label = DockKit.LabelOf(chip);
             var revert = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Motion.Revert) };
             revert.Tick += (_, _) =>
@@ -353,6 +388,7 @@ sealed partial class DockWindow
             chip.MouseRightButtonUp += (_, _) => Show(SnippetPaster.CopyOnly(snippet) == PasteResult.Failed ? "נכשל" : "הועתק ✓");
             _snippetsPanel.Children.Add(chip);
         }
+        if (_mode == DockMode.Hover && TrayOpen) Refit();
     }
 
     // ---- today: rings, overdue, status dot ------------------------------------------------

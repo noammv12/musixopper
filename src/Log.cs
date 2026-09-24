@@ -10,9 +10,9 @@ static class Log
     static readonly object Gate = new();
     static int _writesSinceCheck;
 
-    static string Dir => Path.Combine(
+    internal static string Dir => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Palon");
-    static string FilePath => Path.Combine(Dir, "log.txt");
+    internal static string FilePath => Path.Combine(Dir, "log.txt");
 
     public static void Init()
     {

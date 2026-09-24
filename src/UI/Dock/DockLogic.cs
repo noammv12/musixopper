@@ -342,3 +342,41 @@ static class DockText
         return sb.ToString().TrimEnd();
     }
 }
+
+/// <summary>
+/// Pure width math for the dock pill: the pill is always as wide as its
+/// measured content (plus the 1px border each side), never wider than the
+/// window or the work area, and it is kept fully on screen.
+/// </summary>
+static class DockLayout
+{
+    /// <summary>Pill border (1px each side).</summary>
+    public const double Border = 2;
+    /// <summary>Min gap between the pill and a work-area edge.</summary>
+    public const double ScreenMargin = 8;
+
+    /// <summary>The widest the pill may be: inside the window (minus its side
+    /// margins) and inside the work area (minus a margin each side).</summary>
+    public static double MaxPillWidth(double windowWidth, double windowSideMargins, double workAreaWidth) =>
+        Math.Max(0, Math.Min(windowWidth - windowSideMargins, workAreaWidth > 0 ? workAreaWidth - 2 * ScreenMargin : double.PositiveInfinity));
+
+    /// <summary>Target pill width from the content's DesiredSize width.</summary>
+    public static double PillWidth(double contentDesired, double min, double max)
+    {
+        if (double.IsNaN(contentDesired) || double.IsInfinity(contentDesired)) contentDesired = 0;
+        var w = Math.Max(min, Math.Ceiling(contentDesired) + Border);
+        return Math.Min(w, Math.Max(min, max));
+    }
+
+    /// <summary>Clamps the pill's center so a pill of <paramref name="pillWidth"/>
+    /// sits entirely between <paramref name="left"/> and <paramref name="right"/>,
+    /// and at least <paramref name="keepIn"/> from each edge.</summary>
+    public static double ClampCenter(double center, double pillWidth, double left, double right, double keepIn)
+    {
+        var half = Math.Max(keepIn, pillWidth / 2 + ScreenMargin);
+        var lo = left + half;
+        var hi = right - half;
+        if (lo > hi) return (left + right) / 2; // wider than the screen: center it
+        return Math.Clamp(center, lo, hi);
+    }
+}

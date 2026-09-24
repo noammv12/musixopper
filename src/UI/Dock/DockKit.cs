@@ -137,7 +137,8 @@ static class DockKit
     public static readonly Geometry IconMinus = Geometry.Parse("M3.5,7 H10.5");
     public static readonly Geometry IconTemplate = Geometry.Parse("M3.5,1.8 H8.5 L11,4.3 V12.2 H3.5 Z M5.5,7 H9 M5.5,9.4 H8");
     public static readonly Geometry IconCloud = Geometry.Parse("M4.2,11 H10.2 A2.4,2.4 0 0 0 10.5,6.2 A3.6,3.6 0 0 0 3.7,5.8 A2.5,2.5 0 0 0 4.2,11 Z");
-    public static readonly Geometry IconSnippet = Geometry.Parse("M4.5,3 L1.8,7 L4.5,11 M9.5,3 L12.2,7 L9.5,11");
+    // A saved-text snippet: lines of text (was a "<>" code glyph that read as a stray character).
+    public static readonly Geometry IconSnippet = Geometry.Parse("M2.5,3.5 H11.5 M2.5,7 H11.5 M2.5,10.5 H7.5");
     public static readonly Geometry IconGear = Geometry.Parse("M7,4.6 A2.4,2.4 0 1 1 6.99,4.6 Z M7,1.5 V3 M7,11 V12.5 M1.5,7 H3 M11,7 H12.5 M3.1,3.1 L4.2,4.2 M9.8,9.8 L10.9,10.9 M3.1,10.9 L4.2,9.8 M9.8,4.2 L10.9,3.1");
     public static readonly Geometry PauseGlyph = Geometry.Parse("M0,0 H3.6 V11 H0 Z M6.4,0 H10 V11 H6.4 Z");
     public static readonly Geometry PlayGlyph = Geometry.Parse("M0,0 L10,5.5 L0,11 Z");
@@ -361,6 +362,30 @@ static class DockKit
         VerticalAlignment = VerticalAlignment.Center,
         Background = DockPalette.Stroke,
     };
+
+    /// <summary>
+    /// Dock tooltips: above the element (so they clear the pill), after a short
+    /// delay, never at the mouse where they would sit on top of the next chip.
+    /// Walks the tree once per re-fit; WPF shows one tooltip at a time.
+    /// </summary>
+    public static void ApplyTips(DependencyObject root)
+    {
+        if (root is FrameworkElement fe && fe.ToolTip is not null
+            && ToolTipService.GetPlacement(fe) != System.Windows.Controls.Primitives.PlacementMode.Top)
+        {
+            ToolTipService.SetPlacement(fe, System.Windows.Controls.Primitives.PlacementMode.Top);
+            ToolTipService.SetPlacementTarget(fe, fe);
+            ToolTipService.SetInitialShowDelay(fe, TipDelayMs);
+            ToolTipService.SetBetweenShowDelay(fe, 150);
+            ToolTipService.SetShowDuration(fe, 8000);
+        }
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++) ApplyTips(VisualTreeHelper.GetChild(root, i));
+    }
+
+    public const int TipDelayMs = 450;
+    /// <summary>Gap between the pill's top edge and a tooltip.</summary>
+    public const double TipGap = 8;
 
     public static bool TryCopy(string text)
     {

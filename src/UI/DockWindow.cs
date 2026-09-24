@@ -39,7 +39,7 @@ enum MomentKind { None, Card, Quick, Listening, CallChips }
 /// </summary>
 sealed partial class DockWindow : Window
 {
-    const double WindowWidth = 720;
+    const double WindowWidth = 840;  // room for the widest hover row; the pill is measured, the rest is click-through
     const double WindowHeight = 320; // room for the tallest card; transparent pixels are click-through
     const double BottomGap = 6;
     const double EdgeKeepIn = 120;   // min px between pill center and screen edge
@@ -126,7 +126,7 @@ sealed partial class DockWindow : Window
         _momentHost = new Border { VerticalAlignment = VerticalAlignment.Top };
 
         _host = new Grid { ClipToBounds = true, FlowDirection = FlowDirection.RightToLeft };
-        foreach (var layer in new UIElement[] { _restRow, _callRow, _momentHost })
+        foreach (var layer in new UIElement[] { _restLayer, _callRow, _momentHost })
         {
             layer.Visibility = Visibility.Collapsed;
             _host.Children.Add(layer);
@@ -202,6 +202,21 @@ sealed partial class DockWindow : Window
             else if (_mode == DockMode.Moment) ResumeCardIdle();
             ResumeFlashTimer();
         };
+        // Tooltips sit above the pill, clear of every chip (DockKit.ApplyTips sets Top placement).
+        _pill.AddHandler(FrameworkElement.ToolTipOpeningEvent, new ToolTipEventHandler((_, e) =>
+        {
+            if (e.Source is not FrameworkElement fe || fe == _pill) return;
+            DockKit.ApplyTips(fe);
+            try
+            {
+                var top = fe.TranslatePoint(new Point(0, 0), _pill).Y;
+                ToolTipService.SetVerticalOffset(fe, -(Math.Max(0, top) + DockKit.TipGap));
+            }
+            catch (InvalidOperationException)
+            {
+                // not in the pill's tree
+            }
+        }));
         _pill.MouseLeftButtonDown += OnPillMouseDown;
         _pill.MouseMove += OnPillMouseMove;
         _pill.MouseLeftButtonUp += OnPillMouseUp;
@@ -244,7 +259,7 @@ sealed partial class DockWindow : Window
         };
 
         RefreshToday();
-        ShowLayer(_restRow, animate: false);
+        ShowLayer(_restLayer, animate: false);
         ApplyShape(animate: false);
     }
 
@@ -690,7 +705,7 @@ sealed partial class DockWindow : Window
     /// <summary>Picks the visible layer and morphs the pill to fit it.</summary>
     void Refresh()
     {
-        UIElement layer = _mode == DockMode.Moment ? _momentHost : OnCall ? _callRow : _restRow;
+        UIElement layer = _mode == DockMode.Moment ? _momentHost : OnCall ? _callRow : _restLayer;
         ShowLayer(layer, animate: true);
         _callGlass.BeginAnimation(OpacityProperty, DockMotion.To(OnCall && _mode != DockMode.Moment || _moment == MomentKind.CallChips ? 1 : 0, 600));
         _pill.BorderBrush = OnCall ? DockPalette.CallStroke : DockPalette.Stroke;
@@ -722,9 +737,11 @@ sealed partial class DockWindow : Window
         DockKit.RiseIn(layer);
     }
 
-    /// <summary>The target geometry for the current state.</summary>
+    /// <summary>The target geometry for the current state. Widths come from the
+    /// content's measured DesiredSize (+ border), clamped to the window and the work area.</summary>
     (double W, double H, double R) TargetShape()
     {
+        var max = MaxPillWidth();
         switch (_mode)
         {
             case DockMode.Moment:
@@ -734,31 +751,77 @@ sealed partial class DockWindow : Window
                     MomentKind.Card => _cardWidth,
                     MomentKind.Quick => 600,
                     MomentKind.CallChips => 600,
-                    _ => Measure(_momentHost).Width,
+                    _ => MeasureWidth(_momentHost),
                 };
-                width = Math.Min(width, WindowWidth - 40);
-                _momentHost.Measure(new Size(width - 2, double.PositiveInfinity));
+                width = Math.Min(width, max);
+                _momentHost.Measure(new Size(width - DockLayout.Border, double.PositiveInfinity));
                 var height = Math.Min(Math.Ceiling(_momentHost.DesiredSize.Height) + 2, WindowHeight - 30);
                 var radius = _moment is MomentKind.Card ? 28 : Math.Min(28, height / 2);
                 return (width, height, radius);
             }
             case DockMode.Hover:
-                return (Math.Max(160, Measure(_restRow).Width), HoverHeight, HoverHeight / 2);
+            {
+                var width = DockLayout.PillWidth(MeasureWidth(_restLayer), 160, max);
+                if (!OnCall && TrayOpen)
+                {
+                    _restLayer.Measure(new Size(width - DockLayout.Border, double.PositiveInfinity));
+                    var trayH = Math.Ceiling(_moreTray.DesiredSize.Height);
+                    return (width, HoverHeight + trayH, 24);
+                }
+                return (width, HoverHeight, HoverHeight / 2);
+            }
             default:
-                if (OnCall) return (CallWidth, CallHeight, CallHeight / 2);
-                return (Math.Max(120, Measure(_restRow).Width), RestHeight, RestHeight / 2);
+                if (OnCall) return (Math.Min(CallWidth, max), CallHeight, CallHeight / 2);
+                return (DockLayout.PillWidth(MeasureWidth(_restLayer), 120, max), RestHeight, RestHeight / 2);
         }
     }
 
-    static Size Measure(UIElement content)
+    static double MeasureWidth(UIElement content)
     {
         content.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        return new Size(Math.Min(Math.Ceiling(content.DesiredSize.Width) + 2, WindowWidth - 40), Math.Ceiling(content.DesiredSize.Height));
+        return Math.Ceiling(content.DesiredSize.Width) + DockLayout.Border;
+    }
+
+    /// <summary>Window (minus the pill's side margins) ∩ work area, in DIPs.</summary>
+    double MaxPillWidth()
+    {
+        double workDip = 0;
+        try
+        {
+            var wa = (WinF.Screen.PrimaryScreen ?? WinF.Screen.AllScreens[0]).WorkingArea;
+            workDip = wa.Width / CurrentScale();
+        }
+        catch
+        {
+            // no screen info: the window bound alone
+        }
+        return DockLayout.MaxPillWidth(WindowWidth, _pill.Margin.Left + _pill.Margin.Right, workDip);
+    }
+
+    /// <summary>Slides the window so a pill of width <paramref name="pillWidth"/> sits
+    /// fully on screen (a wide hover row near a screen edge). Doesn't persist DockX.</summary>
+    void KeepPillOnScreen(double pillWidth)
+    {
+        if (_dragging || Left < -5000) return;
+        try
+        {
+            var wa = (WinF.Screen.PrimaryScreen ?? WinF.Screen.AllScreens[0]).WorkingArea;
+            var scale = CurrentScale();
+            var centerPx = Left * scale + Width * scale / 2;
+            var clamped = DockLayout.ClampCenter(centerPx, pillWidth * scale, wa.Left, wa.Right, EdgeKeepIn * scale);
+            if (Math.Abs(clamped - centerPx) > 0.5) Left = (clamped - Width * scale / 2) / scale;
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Dock keep-on-screen failed: {ex.Message}");
+        }
     }
 
     void ApplyShape(bool animate, int ms = DockMotion.Morph)
     {
         var (w, h, r) = TargetShape();
+        KeepPillOnScreen(w);
+        DockKit.ApplyTips(_pill);
         if (!animate)
         {
             _pill.BeginAnimation(WidthProperty, null);
@@ -856,7 +919,7 @@ sealed partial class DockWindow : Window
             double windowWidthPx = Width * scale;
             double windowHeightPx = Height * scale;
             double centerPx = wa.Left + Settings.DockX * wa.Width;
-            centerPx = Math.Clamp(centerPx, wa.Left + EdgeKeepIn * scale, wa.Right - EdgeKeepIn * scale);
+            centerPx = DockLayout.ClampCenter(centerPx, PillWidthNow() * scale, wa.Left, wa.Right, EdgeKeepIn * scale);
             Left = (centerPx - windowWidthPx / 2) / scale;
             Top = (wa.Bottom - windowHeightPx) / scale;
         }
@@ -871,9 +934,11 @@ sealed partial class DockWindow : Window
         var wa = (WinF.Screen.PrimaryScreen ?? WinF.Screen.AllScreens[0]).WorkingArea;
         var scale = _dragScale;
         double centerPx = left * scale + Width * scale / 2;
-        centerPx = Math.Clamp(centerPx, wa.Left + EdgeKeepIn * scale, wa.Right - EdgeKeepIn * scale);
+        centerPx = DockLayout.ClampCenter(centerPx, PillWidthNow() * scale, wa.Left, wa.Right, EdgeKeepIn * scale);
         return (centerPx - Width * scale / 2) / scale;
     }
+
+    double PillWidthNow() => Math.Max(_pill.ActualWidth, double.IsNaN(_pill.Width) ? 0 : _pill.Width);
 
     void PersistDockX()
     {
