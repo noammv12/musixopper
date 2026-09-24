@@ -323,40 +323,53 @@ sealed class AskPanel : Border
 
     // ---- the agent -------------------------------------------------------------------
 
-    static readonly Dictionary<string, string> ToolSteps = new()
+    /// <summary>
+    /// The approve card for External tools and plans: shown inline under the
+    /// steps; resolves false when declined, when the panel resets, or on cancel.
+    /// </summary>
+    sealed class InlineApprover : IAgentApprover
     {
-        ["open_command"] = "פותח את הפקודה",
-        ["open_url"] = "פותח קישור",
-        ["create_reminder"] = "קובע חזרה",
-        ["list_reminders"] = "בודק חזרות",
-        ["search_notes"] = "מחפש בהערות מהשיחות",
-        ["get_call_stats"] = "סופר שיחות",
-        ["open_whatsapp"] = "פותח וואטסאפ",
-        ["daily_recap"] = "מסכם את היום",
-        ["control_music"] = "שולט במוזיקה",
-        ["look_at_screen"] = "מחכה שתסמן אזור במסך ותאשר",
-    };
+        readonly AskPanel _panel;
+        readonly int _generation;
 
-    /// <summary>Wraps a tool so each call shows up as a step while it runs.</summary>
-    sealed class ObservedTool : AgentTool
-    {
-        readonly AgentTool _inner;
-        readonly Action<string> _started;
-
-        public ObservedTool(AgentTool inner, Action<string> started)
+        public InlineApprover(AskPanel panel, int generation)
         {
-            _inner = inner;
-            _started = started;
+            _panel = panel;
+            _generation = generation;
         }
 
-        public override string Name => _inner.Name;
-        public override string Description => _inner.Description;
-        public override string ParametersJson => _inner.ParametersJson;
+        public Task<bool> ApproveToolAsync(AgentTool tool, string argumentsJson, CancellationToken ct) =>
+            AskAsync("לאשר את הפעולה?", $"{ToolLabels.For(tool.Name)}\n{argumentsJson}", ct);
 
-        public override Task<ToolOutcome> ExecuteAsync(JsonElement args, CancellationToken ct)
+        public Task<bool> ApprovePlanAsync(string plan, CancellationToken ct) =>
+            AskAsync("זו התוכנית. לבצע?", plan, ct);
+
+        Task<bool> AskAsync(string title, string body, CancellationToken ct)
         {
-            _started(Name);
-            return _inner.ExecuteAsync(args, ct);
+            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            ct.Register(() => tcs.TrySetResult(false));
+            _panel.Dispatcher.BeginInvoke(() =>
+            {
+                if (_generation != _panel._generation) { tcs.TrySetResult(false); return; }
+                var col = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
+                col.Children.Add(Kit.T(title, 14, Tone.Text, FontWeights.SemiBold));
+                col.Children.Add(Kit.T(body, 13, Tone.Body, wrap: true));
+                var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 0) };
+                Border? card = null;
+                void Done(bool ok)
+                {
+                    tcs.TrySetResult(ok);
+                    if (card is not null) _panel._steps.Children.Remove(card);
+                }
+                row.Children.Add(Kit.Pill("אשר", PillKind.Primary, () => Done(true), height: 34, fontSize: 13));
+                var no = Kit.Pill("לא", PillKind.Ghost, () => Done(false), height: 34, fontSize: 13);
+                no.Margin = new Thickness(8, 0, 0, 0);
+                row.Children.Add(no);
+                col.Children.Add(row);
+                card = Kit.ListRow(col, new Thickness(14, 12, 14, 12));
+                _panel._steps.Children.Add(card);
+            });
+            return tcs.Task;
         }
     }
 
@@ -374,24 +387,50 @@ sealed class AskPanel : Border
         }
         var thinking = AddStep("חושב");
         var open = new List<(Border, TextBlock)> { thinking };
-        void Started(string tool) => Dispatcher.BeginInvoke(() =>
+        // Progress chips: one per tool call, ✓ when it finishes.
+        var steps = new Progress<AgentStep>(step =>
         {
             if (gen != _generation) return;
-            foreach (var s in open) CompleteStep(s);
-            open.Clear();
-            open.Add(AddStep(ToolSteps.TryGetValue(tool, out var label) ? label : tool));
+            if (step.State == AgentStepState.Started)
+            {
+                foreach (var s in open) CompleteStep(s);
+                open.Clear();
+                open.Add(AddStep(step.Label));
+            }
+            else if (step.State != AgentStepState.Done && open.Count > 0)
+            {
+                open[^1].Item2.Text = step.Label + (step.State == AgentStepState.Declined ? " · בוטל" : " · נכשל");
+            }
         });
-        var tools = ToolRegistry.CreateDefault().Select(t => (AgentTool)new ObservedTool(t, Started)).ToList();
+        // Streamed sentences start the typewriter before the whole answer is in.
+        var streamed = false;
+        void OnText(string sentence) => Dispatcher.BeginInvoke(() =>
+        {
+            if (gen != _generation) return;
+            if (!streamed)
+            {
+                streamed = true;
+                foreach (var s in open) CompleteStep(s);
+                open.Clear();
+                ShowAnswer(sentence);
+                return;
+            }
+            _full += " " + sentence;
+            if (!_type.IsEnabled) _type.Start();
+        });
         _session ??= new AssistantSession(_host.CallStateSource, _host.CurrentNumberSource);
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
+        var options = new AgentRunOptions { Steps = steps, Approver = new InlineApprover(this, gen), OnText = OnText };
         string answer;
+        AgentOutcome? outcome = null;
         try
         {
             // On the UI context, like the voice path: some tools touch windows.
-            var result = await AgentLoop.RunAsync(_session, question, ct, tools);
+            var result = await AgentLoop.RunAsync(_session, question, ct, options);
             if (result.Failure == AgentFailure.Cancelled || ct.IsCancellationRequested) return; // closed mid-answer — stay quiet
-            answer = result.Outcome?.Text ?? (result.Failure == AgentFailure.ProviderDown
+            outcome = result.Outcome;
+            answer = outcome?.Text ?? (result.Failure == AgentFailure.ProviderDown
                 ? "Palon לא מצליח להגיע למודל כרגע — נסה שוב עוד רגע."
                 : "לא הצלחתי למצוא תשובה. נסה לנסח אחרת.");
         }
@@ -406,7 +445,23 @@ sealed class AskPanel : Border
         }
         if (gen != _generation) return;
         foreach (var s in open) CompleteStep(s);
-        ShowAnswer(answer);
+        // Streamed text is already typing; make sure it ends on the exact answer.
+        if (streamed && outcome is { Acted: false }) _full = answer;
+        else ShowAnswer(answer);
+        if (!_type.IsEnabled && _shown < _full.Length) _type.Start();
+        if (outcome?.Undo is { } undo)
+            _host.Toast("בוצע", "בטל", async () =>
+            {
+                try
+                {
+                    _host.Toast(await undo());
+                }
+                catch (Exception ex)
+                {
+                    Log.Write($"Ask undo failed: {ex.Message}");
+                    _host.Toast("הביטול לא הצליח — ראה לוג");
+                }
+            });
     }
 
     // ---- screen reading ------------------------------------------------------------

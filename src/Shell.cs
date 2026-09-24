@@ -118,6 +118,14 @@ sealed class Shell : IDisposable
                 _dock.ShowToast($"Palon שכח: {item.Text}", paused: false,
                     onClick: () => TerminalWindow.ShowSingleton(TerminalPage.Memory), showIcon: false, important: true); });
         };
+        // Nightly Salesforce rehearsal: a quiet note only when a taught skill broke.
+        Palon.Salesforce.Rehearsal.Finished += status =>
+        {
+            if (status.Ok) return;
+            Application.Current.Dispatcher.InvokeAsync(() =>
+                _dock.ShowToast(status.Summary(), paused: false, showIcon: false));
+        };
+        Palon.Salesforce.Rehearsal.StartScheduler();
         _assistant.Answered += (question, answer) =>
         {
             _flyout.SetLastExchange(question, answer);

@@ -111,9 +111,10 @@ public class AgentLoopTests
     public async Task Round_cap_asks_once_more_without_tools_for_a_real_answer()
     {
         var tool = new FakeDataTool();
-        var loopForever = new ChatTurn(null, new[] { new ToolCallRequest("1", "fake_data", "{}") });
+        // Distinct args each round: identical repeats are answered from cache by the loop guard.
+        ChatTurn Round(int n) => new(null, new[] { new ToolCallRequest("1", "fake_data", $"{{\"n\":{n}}}") });
         var specs = new List<int>();
-        var turns = new[] { loopForever, loopForever, loopForever, loopForever, loopForever,
+        var turns = new[] { Round(1), Round(2), Round(3), Round(4), Round(5),
             new ChatTurn("Best guess: 42.", Array.Empty<ToolCallRequest>()) };
         var i = 0;
         var result = await AgentLoop.RunAsync(NewSession(), "loop", CancellationToken.None,
@@ -194,7 +195,7 @@ public class AgentLoopTests
         var tool = new FakeDataTool();
         string? secondRequest = null;
         var calls = 0;
-        var six = Enumerable.Range(1, 6).Select(n => new ToolCallRequest($"c{n}", "fake_data", "{}")).ToArray();
+        var six = Enumerable.Range(1, 6).Select(n => new ToolCallRequest($"c{n}", "fake_data", $"{{\"n\":{n}}}")).ToArray();
         await AgentLoop.RunAsync(NewSession(), "lots", CancellationToken.None,
             new AgentTool[] { tool },
             (messages, _) =>

@@ -5,7 +5,11 @@ namespace Palon.Agent;
 
 /// <summary>The loop's verdict: a spoken/shown answer, or an action whose
 /// toast is the whole feedback (a window opened, music paused).</summary>
-sealed record AgentOutcome(bool Acted, string Text);
+sealed record AgentOutcome(bool Acted, string Text)
+{
+    /// <summary>Undo for the last Reversible tool of the run (the Undo toast), or null.</summary>
+    public Func<Task<string>>? Undo { get; init; }
+}
 
 /// <summary>Why the loop produced no outcome: the provider chain is unusable
 /// (worth retrying on the v7 single-shot path), the model burning through
@@ -42,14 +46,26 @@ static class AgentLoop
         "above already gave you — no more tool calls. If something is still missing, say so " +
         "briefly.";
 
+    public static Task<AgentRunResult> RunAsync(
+        AssistantSession session, string question, CancellationToken ct,
+        IReadOnlyList<AgentTool>? tools = null,
+        Func<IReadOnlyList<object>, object[], Task<ChatTurn?>>? chat = null) =>
+        RunAsync(session, question, ct, new AgentRunOptions { Plan = false }, tools, chat);
+
+    /// <summary>
+    /// The full loop: permission tiers (External → approve card, declined →
+    /// "User declined."), progress chips, the loop guard, an optional plan
+    /// turn with ReadOnly tools only, and streamed answer text.
+    /// </summary>
     public static async Task<AgentRunResult> RunAsync(
         AssistantSession session, string question, CancellationToken ct,
+        AgentRunOptions options,
         IReadOnlyList<AgentTool>? tools = null,
         Func<IReadOnlyList<object>, object[], Task<ChatTurn?>>? chat = null)
     {
         tools ??= ToolRegistry.CreateDefault();
         var toolsSpec = ToolRegistry.ToToolsSpec(tools);
-        if (chat is null)
+        if (chat is null && options.StreamingChat is null)
         {
             // One conversation per run: the provider that answers first is
             // pinned for every later round. An empty tools array is the
@@ -71,24 +87,93 @@ static class AgentLoop
         }
         messages.Add(new Dictionary<string, object?> { ["role"] = "user", ["content"] = question });
 
+        var guard = new ToolCallLoopGuard();
+        var digests = new List<string>();
+        Func<Task<string>>? undo = null;
+        SentenceChunker? chunker = null;
+        string? acted = null;
+
         try
         {
-            for (var round = 0; round < MaxRounds; round++)
+            // ---- plan turn: ReadOnly tools only, then the approve card --------------------
+            if (options.Plan ?? PlanStep.Needs(question, tools))
+            {
+                var readOnly = tools.Where(t => t.Risk == ToolRisk.ReadOnly).ToList();
+                var planMessages = new List<object>(messages)
+                {
+                    new Dictionary<string, object?> { ["role"] = "system", ["content"] = PlanStep.PlanInstruction },
+                };
+                var (planText, planFailure) = await RoundsAsync(planMessages, readOnly, emit: false);
+                if (planText is null) return new AgentRunResult(null, planFailure);
+                const string planLabel = "מציג תוכנית לאישור";
+                options.Steps?.Report(new AgentStep("plan", planLabel, AgentStepState.Started));
+                var approved = await options.Approver.ApprovePlanAsync(planText, ct);
+                ct.ThrowIfCancellationRequested();
+                options.Steps?.Report(new AgentStep("plan", planLabel, approved ? AgentStepState.Done : AgentStepState.Declined));
+                if (!approved)
+                {
+                    session.Record(question, PlanStep.DeclinedAnswer);
+                    return new AgentRunResult(new AgentOutcome(Acted: false, PlanStep.DeclinedAnswer), AgentFailure.None);
+                }
+                messages.Add(new Dictionary<string, object?> { ["role"] = "assistant", ["content"] = planText });
+                messages.Add(new Dictionary<string, object?> { ["role"] = "user", ["content"] = PlanStep.ActInstruction });
+            }
+
+            // ---- act ------------------------------------------------------------------------
+            if (options.OnText is { } onText) chunker = new SentenceChunker(onText);
+            var (text, failure) = await RoundsAsync(messages, tools, emit: true);
+            if (text is null) return new AgentRunResult(null, failure);
+            if (acted is not null)
+            {
+                session.Record(question, acted, digests);
+                return new AgentRunResult(new AgentOutcome(Acted: true, acted) { Undo = undo }, AgentFailure.None);
+            }
+            if (chunker is not null)
+            {
+                // Streamed rounds already fed the chunker; a plain round feeds it now.
+                if (options.StreamingChat is null) chunker.Feed(text);
+                chunker.Flush();
+            }
+            session.Record(question, text, digests);
+            return new AgentRunResult(new AgentOutcome(Acted: false, text) { Undo = undo }, AgentFailure.None);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            Log.Write("Palon agent: cancelled");
+            return new AgentRunResult(null, AgentFailure.Cancelled);
+        }
+
+        // A streaming round feeds text as it arrives; a plain round's text is
+        // fed once the answer is known (the chunker still splits it for TTS).
+        Task<ChatTurn?> Chat(IReadOnlyList<object> msgs, object[] spec, bool emit)
+        {
+            if (options.StreamingChat is { } streaming)
+                return streaming(msgs, spec, delta => { if (emit) chunker?.Feed(delta); });
+            return chat!(msgs, spec);
+        }
+
+        // Rounds until a final answer: (text, None), or (null, failure). A
+        // terminal (EndTurn) tool sets `acted` and returns its toast as text.
+        async Task<(string? Text, AgentFailure Failure)> RoundsAsync(List<object> msgs, IReadOnlyList<AgentTool> available, bool emit)
+        {
+            acted = null;
+            var spec = available.Count == tools.Count ? toolsSpec : ToolRegistry.ToToolsSpec(available);
+            for (var round = 0; round < MaxRounds && !guard.Tripped; round++)
             {
                 ct.ThrowIfCancellationRequested();
-                var turn = await chat(messages, toolsSpec);
+                // A plan turn with no read-only tools still declares tools (an empty
+                // array means "final answer" to the chat delegate), so fall back to all.
+                var turn = await Chat(msgs, spec.Length == 0 ? toolsSpec : spec, emit);
                 ct.ThrowIfCancellationRequested();
-                if (turn is null) return new AgentRunResult(null, AgentFailure.ProviderDown);
+                if (turn is null) return (null, AgentFailure.ProviderDown);
 
                 if (turn.ToolCalls.Count == 0)
                 {
                     var answer = (turn.Content ?? "").Trim();
-                    if (answer.Length == 0) return new AgentRunResult(null, AgentFailure.ProviderDown);
-                    session.Record(question, answer);
-                    return new AgentRunResult(new AgentOutcome(Acted: false, answer), AgentFailure.None);
+                    return answer.Length == 0 ? (null, AgentFailure.ProviderDown) : (answer, AgentFailure.None);
                 }
 
-                messages.Add(AssistantMessage(turn));
+                msgs.Add(AssistantMessage(turn));
 
                 // Every tool_call_id gets a tool message — OpenAI-format APIs
                 // reject an assistant tool_calls entry left unanswered.
@@ -97,41 +182,89 @@ static class AgentLoop
                     var call = turn.ToolCalls[i];
                     if (i >= MaxToolCallsPerRound)
                     {
-                        messages.Add(ToolMessage(call.Id, SkippedResult));
+                        msgs.Add(ToolMessage(call.Id, SkippedResult));
                         continue;
                     }
-                    var outcome = await ExecuteAsync(tools, call, ct);
+                    if (guard.TryGetRepeat(call.Name, call.ArgumentsJson, out var cached))
+                    {
+                        msgs.Add(ToolMessage(call.Id, ToolCallLoopGuard.RepeatPrefix + CapToolResult(cached)));
+                        continue;
+                    }
+                    if (guard.Tripped)
+                    {
+                        msgs.Add(ToolMessage(call.Id, TooManyErrorsResult));
+                        continue;
+                    }
+                    var tool = available.FirstOrDefault(t => t.Name == call.Name);
+                    var label = tool is null ? call.Name : SafeLabel(tool, call.ArgumentsJson);
+                    options.Steps?.Report(new AgentStep(call.Name, label, AgentStepState.Started));
+                    if (tool is { Risk: ToolRisk.External })
+                    {
+                        var ok = await options.Approver.ApproveToolAsync(tool, call.ArgumentsJson, ct);
+                        ct.ThrowIfCancellationRequested();
+                        if (!ok)
+                        {
+                            options.Steps?.Report(new AgentStep(call.Name, label, AgentStepState.Declined));
+                            Log.Write($"Palon tool {call.Name}: declined by the user");
+                            msgs.Add(ToolMessage(call.Id, DeclinedResult));
+                            continue;
+                        }
+                    }
+                    var outcome = await ExecuteAsync(available, call, ct);
                     ct.ThrowIfCancellationRequested();
+                    var failed = ToolCallLoopGuard.LooksFailed(outcome.ResultForModel);
+                    guard.Record(call.Name, call.ArgumentsJson, outcome.ResultForModel, failed);
+                    options.Steps?.Report(new AgentStep(call.Name, label, failed ? AgentStepState.Failed : AgentStepState.Done));
+                    if (outcome.Undo is not null) undo = outcome.Undo;
+                    digests.Add(Digest(call.Name, outcome.Toast ?? outcome.ResultForModel));
                     Log.Write($"Palon tool {call.Name}: {(outcome.EndTurn ? "done (end turn)" : outcome.ResultForModel)}");
                     if (outcome.EndTurn)
                     {
-                        var text = outcome.Toast ?? outcome.ResultForModel;
-                        session.Record(question, text);
-                        return new AgentRunResult(new AgentOutcome(Acted: true, text), AgentFailure.None);
+                        acted = outcome.Toast ?? outcome.ResultForModel;
+                        return (acted, AgentFailure.None);
                     }
-                    messages.Add(ToolMessage(call.Id, CapToolResult(outcome.ResultForModel)));
+                    msgs.Add(ToolMessage(call.Id, CapToolResult(outcome.ResultForModel)));
                 }
             }
 
-            // Out of rounds: one last call with tools forbidden, so the user
-            // gets the best answer from what was gathered rather than a shrug.
-            Log.Write($"Palon agent: no final answer within {MaxRounds} rounds — asking for one without tools");
-            messages.Add(new Dictionary<string, object?> { ["role"] = "user", ["content"] = FinalAnswerNudge });
-            var final = await chat(messages, Array.Empty<object>());
+            // Out of rounds (or two tool errors in a row): one last call with tools
+            // forbidden, so the user gets the best answer from what was gathered.
+            Log.Write("Palon agent: no final answer within the round budget — asking for one without tools");
+            msgs.Add(new Dictionary<string, object?> { ["role"] = "user", ["content"] = FinalAnswerNudge });
+            var final = await Chat(msgs, Array.Empty<object>(), emit);
             ct.ThrowIfCancellationRequested();
             var finalAnswer = (final?.Content ?? "").Trim();
             if (final is not null && final.ToolCalls.Count == 0 && finalAnswer.Length > 0)
-            {
-                session.Record(question, finalAnswer);
-                return new AgentRunResult(new AgentOutcome(Acted: false, finalAnswer), AgentFailure.None);
-            }
-            return new AgentRunResult(null, AgentFailure.RoundCap);
+                return (finalAnswer, AgentFailure.None);
+            return (null, AgentFailure.RoundCap);
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+    }
+
+    internal const string DeclinedResult = "User declined.";
+
+    internal const string TooManyErrorsResult =
+        "Skipped: the last tool calls failed twice in a row. Answer from what you have.";
+
+    static string SafeLabel(AgentTool tool, string? argumentsJson)
+    {
+        try
         {
-            Log.Write("Palon agent: cancelled");
-            return new AgentRunResult(null, AgentFailure.Cancelled);
+            using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(argumentsJson) ? "{}" : argumentsJson);
+            return tool.ProgressLabel(doc.RootElement.Clone());
         }
+        catch (JsonException)
+        {
+            return ToolLabels.For(tool.Name);
+        }
+    }
+
+    /// <summary>"create_reminder → Reminder "Dani" set for Thu 17:00" — the
+    /// one-line memory of a tool call the next turn can refer back to.</summary>
+    internal static string Digest(string tool, string result)
+    {
+        var line = System.Text.RegularExpressions.Regex.Replace(result, @"\s+", " ").Trim();
+        if (line.Length > 80) line = line[..80] + "…";
+        return $"{tool} → {line}";
     }
 
     internal const string SkippedResult =

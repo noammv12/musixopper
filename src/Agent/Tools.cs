@@ -122,7 +122,14 @@ sealed class CreateReminderTool : AgentTool
         var callback = CallbackStore.Add(label, dueLocal.ToUniversalTime(), name, phone, url, CallbackSource.Voice);
         return Task.FromResult(callback is null
             ? new ToolOutcome("Saving the reminder failed (too many pending, or a bad link).")
-            : new ToolOutcome($"Reminder \"{callback.DisplayLine}\" set for {dueLocal:ddd d MMM HH:mm}.{moved}"));
+            : new ToolOutcome($"Reminder \"{callback.DisplayLine}\" set for {dueLocal:ddd d MMM HH:mm}.{moved}")
+            {
+                Undo = () =>
+                {
+                    CallbackStore.Remove(callback.Id);
+                    return Task.FromResult("החזרה בוטלה");
+                },
+            });
     }
 
     /// <summary>"yyyy-MM-dd HH:mm" (also with 'T') or bare "HH:mm" — today if
