@@ -27,6 +27,10 @@ abstract class AgentTool
 
     public abstract Task<ToolOutcome> ExecuteAsync(JsonElement args, CancellationToken ct);
 
+    /// <summary>How long the loop waits before answering the model with
+    /// "timed out" and moving on. Override for tools that are slow by nature.</summary>
+    public virtual TimeSpan Timeout => TimeSpan.FromSeconds(10);
+
     protected static string? Str(JsonElement args, string name) =>
         args.ValueKind == JsonValueKind.Object
         && args.TryGetProperty(name, out var value)
