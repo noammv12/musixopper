@@ -54,7 +54,25 @@ static class AiChat
         "e.g. \"אחזור אליך מחר ב-11\", \"call me back in an hour\"), add one final line exactly " +
         "like: CALLBACK: {\"when_iso\":\"yyyy-MM-ddTHH:mm\",\"phrase\":\"<the words used>\"," +
         "\"reason\":\"<what to do, few words, transcript language>\"} — when_iso in local time, " +
-        "resolved against the call end time given. Vague timing (\"בימים הקרובים\") gets no line.");
+        "resolved against the call end time given. Vague timing (\"בימים הקרובים\") gets no line.\n" +
+        CoachSpec);
+
+    /// <summary>The coaching trailer, asked in the same summary call (no extra request).</summary>
+    const string CoachSpec =
+        "Finally, always add one last line: COACH: <compact one-line JSON> with exactly this shape: " +
+        "{\"objections\":[{\"category\":\"already_has_broker|no_money_now|needs_to_think|spouse|trust_regulation|fees|other\"," +
+        "\"quote\":\"<client's exact words>\"}],\"client_questions\":[{\"quote\":\"<a question the client asked, exact words>\"}]," +
+        "\"next_step\":{\"agreed\":true|false,\"text\":\"<few words>\",\"quote\":\"<exact words where it was agreed>\"}}. " +
+        "Every quote must be copied verbatim from the transcript (a short span, 3–12 words) — never paraphrase or translate. " +
+        "Use empty arrays when there are none; when no next step was agreed use {\"agreed\":false}.";
+
+    const string CoachRepairPrompt =
+        "You fix a malformed JSON line describing a sales call. Reply with ONE line of valid compact JSON only, no " +
+        "prose, no code fence. " + CoachSpec;
+
+    static readonly string BestCallPrompt = PalonPersona.Speaking(
+        "In ONE short Hebrew sentence (max 20 words), tell the user why this was their best call of the week, " +
+        "from the numbers and note given. Concrete, warm, no numbers dump.");
 
     const string PolishPrompt =
         "You clean up dictated text. Fix punctuation and casing, remove filler words, false " +
@@ -103,9 +121,25 @@ static class AiChat
         var header = callEndedLocal is { } ended
             ? $"Call ended: {ended.ToString("dddd yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)} (local time)\n"
             : "";
-        return ChatCoreAsync(SummaryPrompt, header + "Transcript:\n" + transcript, 0.3, 400, ct,
+        // Room for the note, the CALLBACK line and the COACH JSON.
+        return ChatCoreAsync(SummaryPrompt, header + "Transcript:\n" + transcript, 0.3, 1200, ct,
             requestTimeoutMs: BackgroundTimeoutMs);
     }
+
+    /// <summary>The one retry for an invalid COACH line: the bad line and the
+    /// validator's error go back; null on failure (coaching is then skipped).</summary>
+    public static Task<string?> CoachRepairAsync(string transcript, string badLine, string error, CancellationToken ct)
+    {
+        if (transcript.Length > MaxTranscriptChars) transcript = transcript[..MaxTranscriptChars];
+        return ChatAsync(CoachRepairPrompt,
+            $"Your previous line:\n{badLine}\nValidator error: {error}\n\nTranscript:\n{transcript}",
+            0.0, 800, ct, rejectTruncated: true, requestTimeoutMs: BackgroundTimeoutMs);
+    }
+
+    /// <summary>One line on why the week's best call worked — from the
+    /// local numbers and the short note only (no transcript).</summary>
+    public static Task<string?> BestCallWhyAsync(string facts, CancellationToken ct) =>
+        ChatAsync(BestCallPrompt, facts, 0.4, 120, ct);
 
     /// <summary>One-shot element pick for Salesforce step recovery: a short,
     /// deterministic reply ({"ref":"eN"} or {"ref":null}); null on failure.</summary>
