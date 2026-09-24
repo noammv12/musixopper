@@ -41,6 +41,14 @@ static class ToolRisks
         // region and confirms before anything is captured or sent), so it is
         // ReadOnly here to avoid a second, redundant approval card.
         ["look_at_screen"] = ToolRisk.ReadOnly,
+        // Agentic layer: reads and drafts run freely; add_deal writes and returns an undo.
+        ["draft_followup"] = ToolRisk.ReadOnly,
+        ["summarize_client"] = ToolRisk.ReadOnly,
+        ["next_steps_today"] = ToolRisk.ReadOnly,
+        ["daily_brief"] = ToolRisk.ReadOnly,
+        ["prepare_deal_from_note"] = ToolRisk.ReadOnly,
+        ["find_in_notes"] = ToolRisk.ReadOnly,
+        ["add_deal"] = ToolRisk.Reversible,
     };
 
     /// <summary>Unknown tools default to Reversible: they run without a card

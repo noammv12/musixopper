@@ -24,6 +24,14 @@ static class ToolRegistry
         new ForgetAboutMeTool(),
         new RecallClientTool(),
         new LookAtScreenTool(),
+        // "Palon does it" — the agentic layer (src/Agentic).
+        new Palon.Agentic.DraftFollowUpTool(),
+        new Palon.Agentic.SummarizeClientTool(),
+        new Palon.Agentic.NextStepsTodayTool(),
+        new Palon.Agentic.RitualTool(),
+        new Palon.Agentic.PrepareDealFromNoteTool(),
+        new Palon.Agentic.AddDealTool(),
+        new Palon.Agentic.FindInNotesTool(),
     };
 
     /// <summary>Serializable request payload for the "tools" field.</summary>

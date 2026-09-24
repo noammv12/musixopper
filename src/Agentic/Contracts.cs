@@ -51,4 +51,10 @@ static class CommandRouter
 {
     public static Func<string, CancellationToken, Task<CommandPreview?>> PreviewAsync { get; set; } = (_, _) => Task.FromResult<CommandPreview?>(null);
     public static Func<string, IReadOnlyList<string>> Suggest { get; set; } = _ => Array.Empty<string>();
+
+    /// <summary>Raised after a command ran that can be reversed: (what was done, undo). The UI shows an
+    /// Undo toast; the undo returns the Hebrew line to show once reversed.</summary>
+    public static event Action<string, Func<Task<string>>>? UndoOffered;
+
+    public static void OfferUndo(string label, Func<Task<string>> undo) => UndoOffered?.Invoke(label, undo);
 }

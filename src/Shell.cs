@@ -128,6 +128,7 @@ sealed class Shell : IDisposable
                 _dock.ShowToast(status.Summary(), paused: false, showIcon: false));
         };
         Palon.Salesforce.Rehearsal.StartScheduler();
+        WireAgentic();
         _assistant.Answered += (question, answer) =>
         {
             _flyout.SetLastExchange(question, answer);
@@ -157,6 +158,7 @@ sealed class Shell : IDisposable
         _engine.StateChanged += () =>
         {
             var state = _engine.State;
+            Palon.Agentic.NudgeEngine.OnCallStateChanged(state == CallState.OnCall);
             if (state == CallState.OnCall && _lastEngineState != CallState.OnCall) ShowCallerBrief();
             _lastEngineState = state;
             _tray.SetState(state);
@@ -303,9 +305,30 @@ sealed class Shell : IDisposable
 
     static void Quit() => Application.Current.Shutdown();
 
+    /// <summary>The agentic layer: command bar brain + proactive nudges (src/Agentic). Surfaces
+    /// subscribe to NudgeHub / CommandRouter themselves; this only supplies the hooks.</summary>
+    void WireAgentic()
+    {
+        try
+        {
+            Palon.Agentic.AgenticHost.IsOnCall = () => _engine.State == CallState.OnCall;
+            Palon.Agentic.AgenticHost.OpenPage = (key, _) => Application.Current?.Dispatcher.InvokeAsync(() =>
+                TerminalWindow.ShowSingleton(Enum.TryParse<TerminalPage>(key, ignoreCase: true, out var page) ? page : null));
+            Palon.Agentic.AgenticHost.LogToSalesforce = (note, callback) =>
+                Application.Current?.Dispatcher.InvokeAsync(() => SalesforceSheets.Open(note, callback));
+            Palon.Agentic.AgenticRouter.Install();
+            Palon.Agentic.NudgeEngine.Start();
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Agentic: wiring failed: {ex.Message}");
+        }
+    }
+
     public void Dispose()
     {
         _ticker.Stop();
+        Palon.Agentic.NudgeEngine.Stop();
         _assistant.Dispose();
         _dictation.Dispose();
         _notes.Dispose();
