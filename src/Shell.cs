@@ -49,10 +49,8 @@ sealed class Shell : IDisposable
 
         _stats = new CallStatsTracker(_engine);
         _reminders = new CallbackScheduler(_engine);
-        _reminders.CallbackDue += (reminder, missed) => _dock.ShowReminder(reminder, missed);
-        _dock.ReminderOpenRequested += _reminders.Open;
-        _dock.ReminderSnoozeRequested += _reminders.Snooze;
-        _dock.ReminderDismissRequested += _reminders.Dismiss;
+        _reminders.CallbackDue += (callback, missed) => _dock.ShowCallbackDue(callback, missed);
+        _dock.ReminderOpenRequested += _reminders.Open; // done / snooze / undo write the store from the card
 
         _notes = new NotesPipeline(_engine)
         {
@@ -61,12 +59,10 @@ sealed class Shell : IDisposable
         };
         _notes.ToastRequested += message => _dock.ShowToast(message, paused: false, showIcon: false, important: true);
         _notes.StatusChanged += status => _dock.SetNotesStatus(status);
-        _notes.NoteReady += note => _dock.ShowToast(
-            note.SummaryError is { } reason
-                ? $"Notes ready, no summary ({reason}) — click to view"
-                : note.Number is { } number ? $"Notes ready ({number}) — click to view"
-                : "Notes ready — click to view",
-            paused: false, onClick: () => _flyout.ShowNotes(), showIcon: false, important: true);
+        // A finished call's note morphs the dock into the after-call card
+        // (summary, one-tap callback, copy for Salesforce). Short or
+        // unanswered calls produce no note, so nothing shows.
+        _notes.NoteReady += note => _dock.ShowAfterCall(note);
         try
         {
             _notes.SweepRecoveredSessions();
