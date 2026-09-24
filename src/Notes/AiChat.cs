@@ -96,16 +96,26 @@ static class AiChat
 
     /// <summary>The summary, or null plus the per-call failure reason —
     /// returned inline so concurrent AI calls can't garble the reason.</summary>
+    /// <param name="withFacts">Also ask for the client-memory FACTS trailer
+    /// (same call — memory never costs an extra request).</param>
+    /// <param name="knownFacts">The client's known facts with integer ids, for "replaces".</param>
     public static Task<(string? Summary, string? Error)> SummarizeAsync(
-        string transcript, CancellationToken ct, DateTime? callEndedLocal = null)
+        string transcript, CancellationToken ct, DateTime? callEndedLocal = null,
+        bool withFacts = false, string? knownFacts = null)
     {
         if (transcript.Length > MaxTranscriptChars) transcript = transcript[..MaxTranscriptChars];
         var header = callEndedLocal is { } ended
             ? $"Call ended: {ended.ToString("dddd yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)} (local time)\n"
             : "";
-        return ChatCoreAsync(SummaryPrompt, header + "Transcript:\n" + transcript, 0.3, 400, ct,
+        if (withFacts && !string.IsNullOrEmpty(knownFacts)) header += knownFacts + "\n\n";
+        return ChatCoreAsync(withFacts ? SummaryPrompt + Palon.Memory.FactBook.SummaryInstruction : SummaryPrompt,
+            header + "Transcript:\n" + transcript, 0.3, withFacts ? 750 : 400, ct,
             requestTimeoutMs: BackgroundTimeoutMs);
     }
+
+    /// <summary>A background memory-inference call (pure JSON reply), or null.</summary>
+    public static Task<string?> MemoryJsonAsync(string systemPrompt, string userContent, CancellationToken ct) =>
+        ChatAsync(systemPrompt, userContent, 0.0, 500, ct, rejectTruncated: true, requestTimeoutMs: BackgroundTimeoutMs);
 
     /// <summary>One-shot element pick for Salesforce step recovery: a short,
     /// deterministic reply ({"ref":"eN"} or {"ref":null}); null on failure.</summary>

@@ -194,14 +194,22 @@ sealed class NotesPipeline : IDisposable
                     string? summary = null;
                     string? summaryError = null;
                     CallbackProposal? proposal = null;
+                    Memory.FactsPayload? facts = null;
+                    IReadOnlyList<string> idMap = Array.Empty<string>();
+                    var memoryOn = false;
                     if (AiChat.HasKey)
                     {
                         StatusChanged?.Invoke("Summarizing…");
                         // Relative promises ("מחר ב-11") resolve against when the call ended.
                         var endedLocal = (session.EndedUtc ?? session.StartedUtc + session.Duration).ToLocalTime();
-                        (summary, summaryError) = await AiChat.SummarizeAsync(transcript, CancellationToken.None, endedLocal);
+                        memoryOn = !Memory.MemoryStore.Paused;
+                        var (knownFacts, factIds) = memoryOn ? Memory.MemoryStore.KnownFactsFor(number) : ("", new List<string>());
+                        idMap = factIds;
+                        (summary, summaryError) = await AiChat.SummarizeAsync(transcript, CancellationToken.None, endedLocal,
+                            withFacts: memoryOn, knownFacts: knownFacts);
                         if (summary is not null)
                         {
+                            (summary, facts) = Memory.FactBook.Extract(summary);
                             (summary, proposal) = CallbackProposals.Extract(summary, endedLocal);
                             if (proposal is not null)
                                 Log.Write($"Notes: callback heard → {proposal.WhenUtc.ToLocalTime():ddd HH:mm}");
@@ -209,8 +217,9 @@ sealed class NotesPipeline : IDisposable
                     }
 
                     var durationSec = (int)Math.Max(session.Duration.TotalSeconds, audioLength.TotalSeconds);
+                    var noteId = Guid.NewGuid().ToString("n");
                     var note = new CallNote(
-                        Guid.NewGuid().ToString("n"),
+                        noteId,
                         session.StartedUtc,
                         durationSec,
                         summary,
@@ -220,6 +229,8 @@ sealed class NotesPipeline : IDisposable
                         summary is null ? summaryError : null,
                         proposal);
                     NotesStore.Add(note);
+                    if (memoryOn && facts is not null)
+                        Memory.MemoryStore.ApplyCallFacts(number, facts, idMap, noteId, session.StartedUtc);
                     NoteReady?.Invoke(note);
                 }
                 catch (Exception ex)

@@ -175,6 +175,18 @@ sealed class ClientsScreen : TerminalScreen
         chips.Children.Add(Chip(next is null ? "אין חזרה פתוחה" : $"{He.When(next.DueAtUtc.ToLocalTime(), _now)} · {next.DisplayLine}", Tone.AccentSoft, Tone.Accent));
         col.Children.Add(chips);
 
+        // What Palon learned about this client on calls (active facts only;
+        // history lives on the Memory screen).
+        var facts = Palon.Memory.FactBook.ForClient(Palon.Memory.MemoryStore.Facts, c.Name, c.Phone)
+            .Where(f => f.IsActive).OrderByDescending(f => f.Pinned).ThenByDescending(f => f.ValidAt).Take(8).ToList();
+        if (facts.Count > 0)
+        {
+            var title = Kit.T("Palon זוכר", 12.5, Tone.Muted, FontWeights.SemiBold);
+            title.Margin = new Thickness(12, 10, 0, 2);
+            col.Children.Add(title);
+            foreach (var f in facts) col.Children.Add(MemoryScreen.FactRow(f, Host));
+        }
+
         var timeline = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
         var entries = c.Timeline(_rules);
         for (var i = 0; i < entries.Count; i++) timeline.Children.Add(TimelineRow(entries[i], i == entries.Count - 1));

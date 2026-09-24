@@ -102,10 +102,27 @@ sealed class CreateReminderTool : AgentTool
         var url = Str(args, "url") ?? "";
         if (url.Length == 0 && Phones.WaMeUrl(phone) is { } waMe) url = waMe;
 
+        // The user's own time-window rules ("don't call Dani before 12") are
+        // enforced here, not left to the prompt: the time moves to the first
+        // allowed slot and the model is told why.
+        string? moved = null;
+        try
+        {
+            if (Palon.Memory.TimeRules.Check(Palon.Memory.MemoryStore.RulesFor(name, phone), dueLocal) is { } broken)
+            {
+                moved = $" Moved from {dueLocal:ddd HH:mm} because of the user's rule ({broken.Rule.Describe()}) — tell them.";
+                dueLocal = broken.Suggested;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Reminder rule check failed: {ex.Message}");
+        }
+
         var callback = CallbackStore.Add(label, dueLocal.ToUniversalTime(), name, phone, url, CallbackSource.Voice);
         return Task.FromResult(callback is null
             ? new ToolOutcome("Saving the reminder failed (too many pending, or a bad link).")
-            : new ToolOutcome($"Reminder \"{callback.DisplayLine}\" set for {dueLocal:ddd d MMM HH:mm}."));
+            : new ToolOutcome($"Reminder \"{callback.DisplayLine}\" set for {dueLocal:ddd d MMM HH:mm}.{moved}"));
     }
 
     /// <summary>"yyyy-MM-dd HH:mm" (also with 'T') or bare "HH:mm" — today if
