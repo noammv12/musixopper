@@ -2,7 +2,7 @@
 
 **Your personal sales aide.** Palon pauses your music when a call starts and brings it back after, writes your call notes, books the callbacks you promised, types what you dictate into any app — and when you ask him something, he answers back in a composed British-butler register, or just does it: opens your CRM, sets the callback, digs the answer out of your call notes.
 
-**v9** adds the **Terminal** (a full workspace: today, callbacks, your month & deals, clients, message templates, coaching, memory), a rebuilt **dock** with an after-call card, **Palon himself** as a small animated character, **memory** of you and your clients, **screen reading**, **Salesforce logging** through Palon's own Edge window, and a **model switcher**. See [`docs/FIRST_RUN.md`](docs/FIRST_RUN.md) for a first-run checklist.
+**v10** is one coherent experience: the **Now window** (one screen — Palon, the action stack, pay and daily rings, and a command bar that understands "דני מחר ב-11"), a rewritten **dock** (rest / hover / one moment at a time, **Ctrl+Alt+R** books a callback from anywhere), and an **agentic brain** that previews every command before it runs (with Undo), nudges only when it's worth it, and prepares work — drafted follow-ups, unbooked next steps — instead of telling you whom to call. **Focus mode** keeps Palon quiet except for callbacks you set. v9 brought the Terminal, memory, screen reading, Salesforce logging and the model switcher. See [`docs/FIRST_RUN.md`](docs/FIRST_RUN.md) for a first-run checklist.
 
 Built for people who live between calls: sales, support, recruiting. One black-and-silver dock pill above the taskbar for the moment; the Terminal for everything else.
 
@@ -20,24 +20,26 @@ Requires Windows 10 version 1903 or later (Windows 11 works).
 
 ## The dock
 
-A small capsule floats just above the taskbar (drag it left/right — the spot is remembered):
+One pill just above the taskbar (drag it left/right — the spot is remembered) with exactly three states:
 
-- **Resting**: a quiet capsule with a status dot — green (ready), amber (on a call, with the live call timer). Nothing on it moves by itself.
-- **Hover**: expands into a bar with your status, this month's progress (**40/55** — shown once you set a target in Sales), how many callbacks are **overdue** (red, click to open them), and chips: **Palon** (ask), Terminal, dictate, callbacks, notes, up to three snippet chips (click = paste, right-click = copy), and **…** for settings.
-- **Right after a call** (once the note is ready): the pill becomes a card — "the call with … ended · 6:12", the summary's first line, and **"מתי לחזור?"** chips. If Palon heard a promise on the call ("דבר איתי ביום ראשון") that time is already highlighted. One tap books the callback (with undo). **העתק סיכום** copies a Salesforce-ready note: who, date/time, duration, summary, next step. The card tucks itself away after ~20 s untouched; ✕ dismisses it. Short/unanswered calls show nothing.
-- **When a callback is due**: "הגיע הזמן לחזור ל…" with the note, **copy number**, **+10 min**, **+1 h**, **done** — done shows a check and how many are left today (with undo). Late ones say **באיחור**.
-- **Call events**: briefly shows "Paused for your call" / "Music resumed", then tucks away.
-- Auto-hides during presentations and fullscreen apps; never steals focus from what you're typing.
+- **Rest**: a status dot, three micro rings for today (calls, deposits, callbacks — the same goals as Now), the overdue count and a small Palon. On a call it becomes an amber capsule (who · timer).
+- **Hover**: **+ חזרה**, your pinned templates (one click copies with the client's first name; pick them in Settings), Palon (opens Now) and **…** for dictate / read screen / snippets.
+- **Moment** (one at a time): the after-call card (four time chips — one click books, with undo; **העתק סיכום** for Salesforce), the callback-due card, a single Palon nudge, or the quick field. **Ctrl+Alt+R** anywhere opens the quick "name · when" field (change or turn it off in Settings).
+- Never takes focus except while the quick field is open; hides for presentations and fullscreen apps; nothing new appears during a call.
 
-The settings card (flyout) is draggable too — grab any empty spot on it. It never grows taller than your screen; long panels scroll.
+## The Now window
 
-## The Terminal
+Tray → **Terminal**, or Palon on the dock. A Hebrew-first (RTL) glass screen:
 
-Tray → **Terminal**, the Terminal chip on the dock, or *Terminal…* in the flyout. A Hebrew-first (RTL) workspace on an acrylic glass backdrop, with Palon on its side dock. Pages (**Ctrl+1…7**): **Today** (greeting, what's due, last calls with *ל-Salesforce*), **Callbacks**, **Month**, **Clients** (every number you've talked to, with notes and callbacks), **Templates**, **Coaching**, **Memory**. **Ctrl+K** opens **Ask** — the same agent as the voice hotkey, typed, with live progress chips, inline approval for anything that acts, and cancel. Click the brand to open the **brain sheet** (which model answers, keys, Test buttons).
+- **Palon** on the right with one line for the moment, up to two nudges (dismiss here and it's gone from the dock too) and result cards for longer answers (drafts, briefs, searches — with Copy).
+- **The action stack**: only callbacks you set that are due, promises Palon heard on a call, Salesforce logs, templates that fit a call, agreed next steps with nothing booked, buying signals and follow-ups Palon already drafted. Never a generic "call X now".
+- **Pay and three rings** (calls, callbacks, deposits vs. pace) on the left; **the command bar** at the bottom (Ctrl+K): type what you want — "דני מחר ב-11", "מאיה הפקידה 500", "נסח הודעה לרון", "מה עכשיו", "פוקוס שעה" — see a preview, confirm, undo. Anything else goes to Ask.
+- **Rituals**: a morning brief (your promises, pace and the best opportunities — in Palon's voice when an AI key is set), welcome-back, and an end-of-day recap with what's still open.
+- **Side sheets** from the rail (Ctrl+2…9): Month, Callbacks, Clients, Templates, Coaching, Memory, Calls, **Settings** (brain keys/model/name, the Ctrl+Alt+R hotkey, dock pins, daily calls goal, focus mode, sounds).
 
-**Palon the character:** a small vector figure (dock, Today, Ask) whose mood follows what he's doing — listening, thinking, talking, a little hop when you close a deal. Purely local animation.
+**Focus mode** (Settings, or type "פוקוס שעה"): Palon stops proactive nudges; only reminders you set get through.
 
-**Model switcher:** pick *Auto* (Gemini first, DeepSeek as fallback), Gemini 3.8 / 3.5 Flash, DeepSeek V4.1 Flash or V4 Pro. A picked model's provider goes first; the other stays the fallback. One agent run stays pinned to the provider that first answered.
+**Palon the character:** a small vector figure whose mood follows what he's doing. **Model switcher:** *Auto* (Gemini first, DeepSeek fallback) or a specific model.
 
 ## Month & deals
 
