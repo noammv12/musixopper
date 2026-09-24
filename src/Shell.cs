@@ -48,12 +48,11 @@ sealed class Shell : IDisposable
         _flyout.QuitRequested += Quit;
         _dock.OpenFlyoutRequested += () => _flyout.ShowSnippets();
         _dock.OpenRemindersRequested += () => _flyout.ShowReminders();
-        _dock.OpenNotesRequested += () => _flyout.ShowNotes();
 
         // On screen before anything that can fail below — a notes/dictation/
         // update hiccup must never cost the user the dock.
         _dock.ShowDock();
-        _dock.SyncState(_engine.State); // StateChanged won't fire until the state moves
+        _dock.SyncState(_engine.State, _engine.CurrentNumber); // StateChanged won't fire until the state moves
 
         _stats = new CallStatsTracker(_engine);
         _reminders = new CallbackScheduler(_engine);
@@ -143,6 +142,7 @@ sealed class Shell : IDisposable
         _dock.AssistantCancelRequested += _assistant.Cancel;
         _flyout.ApplyAssistantHotkey = _dock.ApplyAssistantHotkey;
         _flyout.ApplyScreenHotkey = _dock.ApplyScreenHotkey;
+        _flyout.ApplyQuickCallbackHotkey = _dock.ApplyQuickCallbackHotkey;
         _flyout.GetLiveHotkeys = _dock.LiveHotkeys;
         _flyout.PreviewVoice = () =>
         {
@@ -161,7 +161,7 @@ sealed class Shell : IDisposable
             _lastEngineState = state;
             _tray.SetState(state);
             _flyout.SyncFromEngine();
-            _dock.SyncState(state);
+            _dock.SyncState(state, _engine.CurrentNumber);
         };
         _engine.MusicPaused += () => _dock.ShowToast("Paused for your call", paused: true);
         _engine.MusicResumed += () => _dock.ShowToast("Music resumed", paused: false);

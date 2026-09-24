@@ -121,6 +121,29 @@ static class Settings
         }
     }
 
+    /// <summary>Quick-callback hotkey (opens the dock's "name · when" field),
+    /// same format as DictationHotkey; null/unset = Ctrl+Alt+R, "off" disables.</summary>
+    public static string? QuickCallbackHotkey
+    {
+        get => Read("QuickCallbackHotkey");
+        set
+        {
+            if (value is null) DeleteValue("QuickCallbackHotkey");
+            else WriteValue("QuickCallbackHotkey", value);
+        }
+    }
+
+    /// <summary>Template ids pinned to the dock's hover row, comma-separated; unset = defaults.</summary>
+    public static string? DockPinnedTemplates
+    {
+        get => Read("DockPinnedTemplates");
+        set
+        {
+            if (value is null) DeleteValue("DockPinnedTemplates");
+            else WriteValue("DockPinnedTemplates", value);
+        }
+    }
+
     /// <summary>Ctrl+Alt+Shift+S starts a screen read (region pick → gate).
     /// Opt-in, off by default — the dock chip and Ask cover it otherwise.</summary>
     public static bool ScreenReadHotkey

@@ -12,6 +12,8 @@ partial class FlyoutWindow
     TextBlock _palonKeyHint = null!;
     HotkeyCaptureBox _asstHotkeyBox = null!;
     TextBlock _asstHotkeyStatus = null!;
+    HotkeyCaptureBox _quickHotkeyBox = null!;
+    TextBlock _quickHotkeyStatus = null!;
     TextBlock _voiceStatus = null!;
     PasswordBox _elevenKeyBox = null!;
     TextBlock _elevenKeyStatus = null!;
@@ -23,6 +25,9 @@ partial class FlyoutWindow
 
     /// <summary>Set by Shell: re-registers the dock's Ask-Palon hotkey.</summary>
     public Func<bool>? ApplyAssistantHotkey { get; set; }
+
+    /// <summary>Set by Shell: re-registers the dock's quick-callback hotkey (Ctrl+Alt+R by default).</summary>
+    public Func<bool>? ApplyQuickCallbackHotkey { get; set; }
 
     /// <summary>Set by Shell: re-registers the opt-in screen-read hotkey.</summary>
     public Func<bool>? ApplyScreenHotkey { get; set; }
@@ -82,6 +87,37 @@ partial class FlyoutWindow
         _asstHotkeyStatus.TextWrapping = TextWrapping.Wrap;
         _asstHotkeyStatus.Margin = Ui.Top(Space.Tight);
         panel.Children.Add(_asstHotkeyStatus);
+
+        panel.Children.Add(Ui.Divider(Space.Section, Space.Row));
+        panel.Children.Add(Ui.Caption("QUICK CALLBACK HOTKEY"));
+        var quickRow = new Grid { Margin = Ui.Top(Space.Tight) };
+        quickRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        quickRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        quickRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        _quickHotkeyBox = new HotkeyCaptureBox(
+            load: Hotkey.LoadQuickCallback,
+            save: SaveQuickHotkey,
+            status: SetQuickHotkeyStatus,
+            suspend: () => SuspendGlobalHotkeys?.Invoke(),
+            restore: RestoreGlobalHotkeys);
+        quickRow.Children.Add(_quickHotkeyBox);
+        var quickReset = Ui.Link("Reset", Font.Caption);
+        quickReset.Margin = Ui.Left(Space.Row);
+        quickReset.VerticalAlignment = VerticalAlignment.Center;
+        quickReset.MouseLeftButtonUp += (_, _) => SaveQuickHotkey(Hotkey.QuickCallbackDefault);
+        Grid.SetColumn(quickReset, 1);
+        quickRow.Children.Add(quickReset);
+        var quickOff = Ui.Link("Turn off", Font.Caption);
+        quickOff.Margin = Ui.Left(Space.Row);
+        quickOff.VerticalAlignment = VerticalAlignment.Center;
+        quickOff.MouseLeftButtonUp += (_, _) => SaveQuickHotkey(Hotkey.Off);
+        Grid.SetColumn(quickOff, 2);
+        quickRow.Children.Add(quickOff);
+        panel.Children.Add(quickRow);
+        _quickHotkeyStatus = Ui.Small("Opens the dock's “name · when” field anywhere — type “דני 11”, press Enter.");
+        _quickHotkeyStatus.TextWrapping = TextWrapping.Wrap;
+        _quickHotkeyStatus.Margin = Ui.Top(Space.Tight);
+        panel.Children.Add(_quickHotkeyStatus);
 
         var screenSwitch = new PillSwitch(Settings.ScreenReadHotkey);
         var screenHint = Ui.Small("Select part of the screen, approve the preview, and Palon reads it. Nothing is captured until you press it.");
@@ -240,7 +276,40 @@ partial class FlyoutWindow
         ApplyDictationHotkey?.Invoke();
         ApplyAssistantHotkey?.Invoke();
         ApplyScreenHotkey?.Invoke();
+        ApplyQuickCallbackHotkey?.Invoke();
         ApplySnippetHotkeys?.Invoke();
+    }
+
+    void SaveQuickHotkey(Hotkey combo)
+    {
+        var others = new List<(string, Hotkey)> { ("dictation", Hotkey.LoadDictation()), ("Ask Palon", Hotkey.LoadAssistant()) };
+        others.AddRange(Hotkey.Fixed(Settings.ScreenReadHotkey, Settings.SnippetHotkeys));
+        if (Hotkey.ConflictWith(combo, others) is { } clash)
+        {
+            SetQuickHotkeyStatus($"{combo} is already Palon's {clash} hotkey — kept {Hotkey.LoadQuickCallback()}.", warn: true);
+            ApplyQuickCallbackHotkey?.Invoke();
+            _quickHotkeyBox.Refresh();
+            return;
+        }
+        var previous = Settings.QuickCallbackHotkey;
+        Settings.QuickCallbackHotkey = combo.Serialize();
+        if (ApplyQuickCallbackHotkey?.Invoke() ?? true)
+            SetQuickHotkeyStatus(combo.IsOff
+                ? "Hotkey off — use “+ חזרה” on the dock."
+                : $"Saved ✓ — press {combo} anywhere to book a callback.", warn: false);
+        else
+        {
+            Settings.QuickCallbackHotkey = previous;
+            ApplyQuickCallbackHotkey?.Invoke();
+            SetQuickHotkeyStatus($"{combo} is taken by another app — kept {Hotkey.LoadQuickCallback()}.", warn: true);
+        }
+        _quickHotkeyBox.Refresh();
+    }
+
+    void SetQuickHotkeyStatus(string text, bool warn)
+    {
+        _quickHotkeyStatus.Text = text;
+        _quickHotkeyStatus.SetResourceReference(TextBlock.ForegroundProperty, warn ? "AmberBrush" : "TextSecondaryBrush");
     }
 
     void SaveAssistantHotkey(Hotkey combo)

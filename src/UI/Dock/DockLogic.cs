@@ -34,13 +34,27 @@ static class DockActions
     public static Action<CallNote, DateTime?> LogToSalesforce { get; set; } = (_, _) => { };
 }
 
-enum DockCardKind { AfterCall, CallbackDue }
+enum DockCardKind { AfterCall, CallbackDue, Nudge }
 
 /// <summary>One card the dock owes the user: a finished call's note, or a
 /// callback that came due (Missed = fired late).</summary>
-sealed record DockCard(DockCardKind Kind, CallNote? Note = null, Callback? Callback = null, bool Missed = false)
+sealed record DockCard(DockCardKind Kind, CallNote? Note = null, Callback? Callback = null, bool Missed = false,
+    Palon.Agentic.Nudge? Nudge = null)
 {
-    public string Key => Kind == DockCardKind.AfterCall ? "note:" + Note?.Id : "cb:" + Callback?.Id;
+    public string Key => Kind switch
+    {
+        DockCardKind.AfterCall => "note:" + Note?.Id,
+        DockCardKind.Nudge => "nudge:" + Nudge?.Id,
+        _ => "cb:" + Callback?.Id,
+    };
+
+    public static DockCard ForNudge(Palon.Agentic.Nudge nudge) => new(DockCardKind.Nudge, Nudge: nudge);
+
+    /// <summary>The dock shows only high-priority nudges: reminders, and
+    /// suggestions that offer an action. Insights live in the Now window.</summary>
+    public static bool DockWorthy(Palon.Agentic.Nudge nudge) =>
+        nudge.Kind == Palon.Agentic.NudgeKind.Reminder
+        || (nudge.Kind == Palon.Agentic.NudgeKind.Suggestion && nudge.Act is not null);
 
     public static DockCard ForNote(CallNote note) => new(DockCardKind.AfterCall, Note: note);
     public static DockCard ForCallback(Callback callback, bool missed) => new(DockCardKind.CallbackDue, Callback: callback, Missed: missed);
@@ -73,6 +87,13 @@ sealed class DockCardQueue
             return false;
         }
         _waiting.RemoveAll(c => c.Key == card.Key);
+        if (card.Kind == DockCardKind.Nudge)
+        {
+            // At most one nudge in the line-up: a fresher one replaces the
+            // waiting one; a showing nudge is never swapped under the pointer.
+            if (Current is { Kind: DockCardKind.Nudge }) return false;
+            _waiting.RemoveAll(c => c.Kind == DockCardKind.Nudge);
+        }
         if (Current is null)
         {
             Current = card;
@@ -80,8 +101,13 @@ sealed class DockCardQueue
         }
         if (card.Kind == DockCardKind.CallbackDue)
         {
-            var firstNote = _waiting.FindIndex(c => c.Kind == DockCardKind.AfterCall);
+            var firstNote = _waiting.FindIndex(c => c.Kind != DockCardKind.CallbackDue);
             _waiting.Insert(firstNote < 0 ? _waiting.Count : firstNote, card);
+        }
+        else if (card.Kind == DockCardKind.AfterCall)
+        {
+            var firstNudge = _waiting.FindIndex(c => c.Kind == DockCardKind.Nudge);
+            _waiting.Insert(firstNudge < 0 ? _waiting.Count : firstNudge, card);
         }
         else
         {
@@ -105,8 +131,8 @@ sealed class DockCardQueue
 
     public void OnCallStarted()
     {
-        _waiting.RemoveAll(c => c.Kind == DockCardKind.AfterCall);
-        if (Current is { Kind: DockCardKind.AfterCall }) Current = null;
+        _waiting.RemoveAll(c => c.Kind is DockCardKind.AfterCall or DockCardKind.Nudge);
+        if (Current is { Kind: DockCardKind.AfterCall or DockCardKind.Nudge }) Current = null;
         else if (Current is { } parked)
         {
             _waiting.Insert(0, parked);
@@ -173,6 +199,14 @@ static class DockText
         <= 0 => "סומן כבוצע · סיימת את החזרות להיום",
         1 => "סומן כבוצע · נשארה לך חזרה אחת היום",
         _ => $"סומן כבוצע · נשארו לך {remaining} היום",
+    };
+
+    /// <summary>The due card's "done" line: "בוצע · נשארו 3 היום".</summary>
+    public static string DoneLeft(int remaining) => remaining switch
+    {
+        <= 0 => "בוצע · סיימת להיום",
+        1 => "בוצע · נשארה אחת היום",
+        _ => $"בוצע · נשארו {remaining} היום",
     };
 
     public static string SnoozedUntil(DateTime dueLocal) =>

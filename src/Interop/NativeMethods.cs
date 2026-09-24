@@ -98,6 +98,12 @@ static class NativeMethods
     [DllImport("user32.dll")]
     public static extern IntPtr GetForegroundWindow();
 
+    [DllImport("user32.dll")]
+    public static extern bool SetForegroundWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    public static extern bool IsWindow(IntPtr hwnd);
+
     // ---- dock drag ---------------------------------------------------------
 
     [StructLayout(LayoutKind.Sequential)]

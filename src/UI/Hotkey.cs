@@ -13,12 +13,32 @@ readonly record struct Hotkey(uint Modifiers, uint Vk)
 {
     public static readonly Hotkey Default = new(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, 0x20 /* Space */);
     public static readonly Hotkey AssistantDefault = new(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, 0x50 /* P */);
+    public static readonly Hotkey QuickCallbackDefault = new(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, 0x52 /* R */);
     public static readonly Hotkey Off = new(0, 0);
 
     public bool IsOff => Vk == 0;
 
     public static Hotkey LoadDictation() => Parse(Settings.DictationHotkey);
     public static Hotkey LoadAssistant() => Parse(Settings.AssistantHotkey, AssistantDefault);
+
+    public static Hotkey LoadQuickCallback() => Parse(Settings.QuickCallbackHotkey, QuickCallbackDefault);
+
+    /// <summary>Palon's own fixed combos: screen read (Ctrl+Alt+Shift+S) and snippets (Ctrl+Alt+1–9).</summary>
+    public static IEnumerable<(string Name, Hotkey Key)> Fixed(bool screenRead, bool snippets)
+    {
+        if (screenRead) yield return ("Read screen", new Hotkey(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT | NativeMethods.MOD_SHIFT, 0x53));
+        if (snippets)
+            for (uint i = 0; i < 9; i++) yield return ($"Snippet {i + 1}", new Hotkey(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, 0x31 + i));
+    }
+
+    /// <summary>The name of another Palon hotkey this combo would collide with, else null. Off never conflicts.</summary>
+    public static string? ConflictWith(Hotkey candidate, IEnumerable<(string Name, Hotkey Key)> others)
+    {
+        if (candidate.IsOff) return null;
+        foreach (var (name, key) in others)
+            if (!key.IsOff && key.Vk == candidate.Vk && (key.Modifiers & 0xF) == (candidate.Modifiers & 0xF)) return name;
+        return null;
+    }
 
     public static Hotkey Parse(string? stored) => Parse(stored, Default);
 
