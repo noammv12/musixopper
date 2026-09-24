@@ -48,6 +48,14 @@ static class CoachStore
         catch (Exception ex)
         {
             Log.Write($"Coaching load failed: {ex.Message}");
+            // The next save would overwrite it — keep the unreadable file.
+            try
+            {
+                if (ex is JsonException && File.Exists(FilePath)) File.Copy(FilePath, FilePath + ".bad", overwrite: true);
+            }
+            catch
+            {
+            }
             return new Envelope();
         }
     }

@@ -268,17 +268,26 @@ static class ProfileReflector
 
     public static void Submit(string question, string answer)
     {
-        if (!Palon.Notes.AiChat.HasKey || MemoryStore.Paused) return;
-        CancellationToken token;
-        lock (Gate)
+        // Best-effort side channel: a key/profile read failure (DPAPI,
+        // registry) must never fail the Ask turn that recorded the exchange.
+        try
         {
-            Buffer.Add((question, answer));
-            if (Buffer.Count > MaxBuffered) Buffer.RemoveAt(0);
-            _pending?.Cancel();
-            _pending = new CancellationTokenSource();
-            token = _pending.Token;
+            if (!Palon.Notes.AiChat.HasKey || MemoryStore.Paused) return;
+            CancellationToken token;
+            lock (Gate)
+            {
+                Buffer.Add((question, answer));
+                if (Buffer.Count > MaxBuffered) Buffer.RemoveAt(0);
+                _pending?.Cancel();
+                _pending = new CancellationTokenSource();
+                token = _pending.Token;
+            }
+            _ = RunAfterDelayAsync(token);
         }
-        _ = RunAfterDelayAsync(token);
+        catch (Exception ex)
+        {
+            Log.Write($"Memory: reflection submit failed: {ex.Message}");
+        }
     }
 
     static async Task RunAfterDelayAsync(CancellationToken token)

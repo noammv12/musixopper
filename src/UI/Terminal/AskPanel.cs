@@ -475,9 +475,19 @@ sealed class AskPanel : Border
         Begin(question);
         var gen = _generation;
         var pick = AddStep("מחכה שתסמן אזור במסך ותאשר");
-        var (shot, error) = await ScreenReader.CaptureAsync(windowMode: false, receipt
-            ? "Palon יחלץ מהקבלה שם, סכום ותאריך וימלא עסקה חדשה — לבדיקה שלך לפני שמירה."
-            : "Palon יקרא את מה שבתמונה ויענה על השאלה שלך.");
+        ScreenShot? shot;
+        string? error;
+        try
+        {
+            (shot, error) = await ScreenReader.CaptureAsync(windowMode: false, receipt
+                ? "Palon יחלץ מהקבלה שם, סכום ותאריך וימלא עסקה חדשה — לבדיקה שלך לפני שמירה."
+                : "Palon יקרא את מה שבתמונה ויענה על השאלה שלך.");
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Screen capture failed: {ex}");
+            (shot, error) = (null, "הצילום לא הצליח — ראה לוג.");
+        }
         if (gen != _generation) return;
         if (shot is null)
         {

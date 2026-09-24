@@ -74,6 +74,9 @@ static class ToolLabels
         ["daily_recap"] = "מסכם את היום",
         ["control_music"] = "שולט במוזיקה",
         ["look_at_screen"] = "מחכה שתסמן אזור במסך ותאשר",
+        ["recall_client"] = "בודק מה אני זוכר על הלקוח",
+        ["remember_about_me"] = "שומר בזיכרון",
+        ["forget_about_me"] = "מוחק מהזיכרון",
     };
 
     public static string For(string toolName) => Known.TryGetValue(toolName, out var label) ? label : toolName;

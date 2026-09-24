@@ -166,6 +166,18 @@ static class CallbackStore
         catch (Exception ex)
         {
             Log.Write($"Callbacks load failed: {ex.Message}");
+            // An unparseable file would be overwritten by the next save —
+            // keep a copy so nothing the user booked is silently lost.
+            if (ex is JsonException)
+            {
+                try
+                {
+                    if (File.Exists(FilePath)) File.Copy(FilePath, FilePath + ".bad", overwrite: true);
+                }
+                catch
+                {
+                }
+            }
             return new List<Callback>();
         }
     }

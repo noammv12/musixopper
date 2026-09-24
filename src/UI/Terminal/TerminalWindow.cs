@@ -62,13 +62,20 @@ sealed class TerminalWindow : Window
     /// </summary>
     public static async void ReadScreenFromShortcut()
     {
-        var (shot, error) = await Vision.ScreenReader.CaptureAsync(windowMode: false,
-            "Palon יקרא את מה שבתמונה ויסכם. אפשר לשאול עליו שאלות המשך ב-Ask.");
-        if (shot is null && error is null) return; // cancelled — nothing happens
-        ShowAsk();
-        if (_instance?._ask is not { } ask) return;
-        if (shot is null) ask.ShowNotice("קרא מהמסך", error!);
-        else ask.ReadApprovedShot(shot, receipt: false);
+        try
+        {
+            var (shot, error) = await Vision.ScreenReader.CaptureAsync(windowMode: false,
+                "Palon יקרא את מה שבתמונה ויסכם. אפשר לשאול עליו שאלות המשך ב-Ask.");
+            if (shot is null && error is null) return; // cancelled — nothing happens
+            ShowAsk();
+            if (_instance?._ask is not { } ask) return;
+            if (shot is null) ask.ShowNotice("קרא מהמסך", error!);
+            else ask.ReadApprovedShot(shot, receipt: false);
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Screen read shortcut failed: {ex}");
+        }
     }
 
     internal Func<CallState> CallStateSource => _callState;
